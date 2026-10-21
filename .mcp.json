@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "godot": {
+      "type": "stdio",
+      "command": "node",
+      "args": ["server/dist/index.js"],
+      "env": {
+        "GODOT_PROJECT_PATH": "test-project"
+      }
+    }
+  }
+}
