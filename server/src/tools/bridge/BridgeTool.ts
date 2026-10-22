@@ -52,7 +52,7 @@ export class BridgeTool<InputSchema extends z.ZodObject, Response> implements To
 
 function describeRequestFailure(error: unknown): CallToolResult {
   if (error instanceof EditorUnavailableError) {
-    return errorResult(`The Godot editor is not connected: ${error.message}\nCall godot_status to check the project and the connection.`);
+    return errorResult(`The Godot editor is not connected: ${error.message}\nStart it with editor_launch, or call godot_status to check the project and the connection.`);
   }
   if (error instanceof BridgeRequestError) {
     return errorResult(error.hint === undefined || error.hint === '' ? error.message : `${error.message}\nHint: ${error.hint}`);

@@ -405,7 +405,7 @@ About 65 tools across all milestones; 16 in the MVP.
 | Tool | What it does | M | Kind | Needs |
 |---|---|---|---|---|
 | `editor_rescan` | Sync the editor with the disk (§9.3): scan, reimport, reload open scripts; wait until done | 1 | W (idempotent) | E (C: `--headless --import`) |
-| `editor_launch` | Launch the editor for the project and wait until the addon connects | 2 | W | C |
+| `editor_launch` | Launch the editor for the project and wait until the addon connects; with a window unless `headless`; refuses to start a second editor while one is registered in the discovery file | 2 | W | C |
 | `editor_screenshot` | Render of the 3D scene open in the editor from the editor camera or from given views (§8.9), without the grid and gizmos; says when the editor's preview sun and sky light it. 2D scenes and UI are checked with `game_screenshot`; a capture of the whole editor window is not planned yet | 2 | R | E |
 | `editor_select` | Select nodes or files so the user sees what the agent is talking about | 3 | W (harmless) | E |
 | `editor_run_script` | Run a GDScript snippet in the editor context — an escape hatch, disabled by default | 3 | D | E |
@@ -830,7 +830,9 @@ Dropped and failed connections are the top complaint about almost every existing
   so we neither connect to the editor nor launch Godot at startup.
 - Shutdown: when stdin closes and on SIGINT/SIGTERM (Claude Code stops a server with SIGINT, then SIGTERM after
   100 ms, then SIGKILL after another 400 ms). Games started by the server stop with it; an editor started via
-  `editor_launch` is a detached process and keeps running.
+  `editor_launch` is a detached process and keeps running. Its output goes to `.godot/godot_mcp_tool/editor.log`
+  rather than to a pipe of the server, which would break once the server exits; the end of that log is shown when
+  the editor stops before its plugin connects.
 - Processes are started with `spawn`/`execFile` and an argument array, never through a shell (Coding-Solo had an RCE
   via shell injection in the project path).
 - Long operations (tests, import, export) send progress notifications: Claude Code moves calls longer than 2 minutes
@@ -1122,7 +1124,8 @@ against a headless editor, Ctrl+Z included, and it passed in a live Claude Code 
       scene or for the running game (`in_game`).
 - [x] `editor_screenshot`: the open scene from the editor camera or from views, without the grid and gizmos, with a
       note when the editor's preview sun and sky light the render.
-- [ ] `editor_launch`.
+- [x] `editor_launch`: starts the editor as a detached process, waits up to three minutes for the plugin, and does
+      nothing when the editor is already connected; not-connected errors and `godot_status` point to it.
 - [x] `script_validate` (LSP and the fallback).
 - [x] `docs_class`, `docs_search`: the reference of the installed engine from its API dump with docs, cached per
       engine version, and the project's own classes from their `##` doc comments; BBCode → Markdown; search by

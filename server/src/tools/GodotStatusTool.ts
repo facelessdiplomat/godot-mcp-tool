@@ -60,7 +60,7 @@ export class GodotStatusTool implements Tool<typeof inputSchema> {
 
 function describeEditor(editorStatus: EditorStatus): string {
   if (!editorStatus.connected) {
-    return `Editor: not connected. ${editorStatus.reason}`;
+    return `Editor: not connected. ${editorStatus.reason} Start it with editor_launch.`;
   }
   const { hello } = editorStatus;
   return `Editor: connected. Godot ${hello.godotVersion}, addon ${hello.addonVersion}, bridge protocol ${String(hello.protocol)}`;

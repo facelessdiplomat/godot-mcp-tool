@@ -3,10 +3,12 @@ import type { McpServer } from '@modelcontextprotocol/server';
 import { BridgeClient } from './bridge/BridgeClient.js';
 import { DiscoveryFileReader, isProcessAlive } from './bridge/DiscoveryFileReader.js';
 import { DocsSource } from './docs/DocsSource.js';
+import { EditorLauncher, systemClock } from './editor/EditorLauncher.js';
 import { EditorConnection, type EditorSession, UnavailableEditor } from './bridge/EditorConnection.js';
 import { type BinaryLocator, GodotBinaryLocator } from './godot/GodotBinaryLocator.js';
 import { GodotCli } from './godot/GodotCli.js';
 import { LanguageServerClient } from './lsp/LanguageServerClient.js';
+import { NodeDetachedLauncher } from './process/DetachedLauncher.js';
 import { NodeProcessLauncher } from './process/ProcessLauncher.js';
 import { NodeProcessRunner, type ProcessRunner } from './process/ProcessRunner.js';
 import { readAutoloadNames } from './project/ProjectFile.js';
@@ -20,6 +22,7 @@ import { createMcpServer } from './server/createMcpServer.js';
 import { serverInstructions } from './server/serverInstructions.js';
 import { BRIDGE_PROTOCOL_VERSION, SERVER_NAME, SERVER_VERSION } from './serverInfo.js';
 import { DocsClassTool, DocsSearchTool } from './tools/docsTools.js';
+import { EditorLaunchTool } from './tools/EditorLaunchTool.js';
 import { createEditorTools } from './tools/editorTools.js';
 import { ErrorReportingTool } from './tools/ErrorReportingTool.js';
 import { createGameTools } from './tools/gameTools.js';
@@ -45,9 +48,10 @@ const checkOnlyTimeoutMs = 60_000;
 
 export function createApplication(environment: ApplicationEnvironment): Application {
   const project = new ProjectLocator(environment.variables, environment.workingDirectory).locate();
-  const editor: EditorSession = project.found
+  const discovery = project.found ? new DiscoveryFileReader(project.root, isProcessAlive) : undefined;
+  const editor: EditorSession = discovery
     ? new EditorConnection(
-        new DiscoveryFileReader(project.root, isProcessAlive),
+        discovery,
         (endpoint) =>
           new BridgeClient(endpoint, {
             clientName: `${SERVER_NAME}/${SERVER_VERSION}`,
@@ -66,6 +70,14 @@ export function createApplication(environment: ApplicationEnvironment): Applicat
     platform: environment.platform,
     homeDirectory: environment.homeDirectory,
     isExecutableFile,
+  });
+  const editorLauncher = new EditorLauncher({
+    projectRoot: project.found ? project.root : undefined,
+    editor,
+    readDiscovery: () => discovery?.read() ?? { kind: 'missing', path: '' },
+    locateBinary: () => binaryLocator.locate(),
+    launcher: new NodeDetachedLauncher(),
+    clock: systemClock,
   });
   const docsSource = new DocsSource({
     projectRoot: project.found ? project.root : undefined,
@@ -89,6 +101,7 @@ export function createApplication(environment: ApplicationEnvironment): Applicat
       binaryLocator,
       readVersion: (executablePath) => new GodotCli(processRunner, executablePath).version(),
     }),
+    new EditorLaunchTool(editorLauncher),
     ...createEditorTools(editor, readFileSync),
     new ScriptValidateTool(
       createScriptValidator({

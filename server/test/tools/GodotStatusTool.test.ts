@@ -60,7 +60,7 @@ describe('GodotStatusTool', () => {
       readVersion: readKnownVersion,
     });
 
-    expect(await statusText(tool)).toContain('Editor: not connected. The editor is not running.');
+    expect(await statusText(tool)).toContain('Editor: not connected. The editor is not running. Start it with editor_launch.');
   });
 
   it('reports a missing binary with a hint', async () => {
