@@ -33,6 +33,21 @@ describe('game tools', () => {
     expect(createGameRunTool(editor, new GameOutputCursor()).definition.showsErrors).toBe(true);
   });
 
+  it('game_run passes a fixed frame rate and explains what it means', async () => {
+    const editor = new FakeEditorGateway().respondTo('game.run', quietRun);
+
+    const result = await createGameRunTool(editor, new GameOutputCursor()).execute({ fixed_fps: 60 });
+
+    expect(editor.requests[0]?.params).toEqual({ scene: 'main', watch_ms: 1000, stop_after: false, fixed_fps: 60 });
+    expect(textOf(result)).toBe(
+      [
+        'The game is running res://levels/arena.tscn; it was ready after 850 ms.',
+        'Every frame advances the game by exactly 1/60 s, however long it takes, so wait and hold for physics frames, not milliseconds.',
+        'No output yet.',
+      ].join('\n'),
+    );
+  });
+
   it('game_run runs for a given time and stops', async () => {
     const editor = new FakeEditorGateway().respondTo('game.run', {
       ...quietRun,
@@ -139,6 +154,9 @@ describe('game tools', () => {
       ['game_wait', false],
       ['game_input', false],
       ['game_screenshot', false],
+      ['game_pause', false],
+      ['game_step', false],
+      ['game_performance', false],
     ]);
   });
 

@@ -813,8 +813,18 @@ On a script error the editor's debugger pauses the game by default — to the ag
 - `game_run({fixed_fps: 60})` → `--fixed-fps 60`: the same `delta` every frame and reproducible runs.
 - Waits and holds count **physics** frames, not only render frames — otherwise movement depends on the FPS
   (tugcantopaloglu/godot-mcp tripped on this).
-- Pause and step (`game_pause`, `game_step`): through the Game view's built-in "pause / next frame" or by pausing the
-  scene tree — chosen in a spike during milestone 3.
+- Pause and step (`game_pause`, `game_step`) pause the scene tree from the runtime agent. The spike of milestone 3
+  compared this with the Game view's own "suspend / next frame": `SceneTree.set_suspend` is not available to scripts,
+  only through the debugger messages `scene:suspend_changed` and `scene:next_frame`, and its next frame runs until the
+  next rendered frame, which holds no fixed number of physics frames. The agent instead waits for the start of a
+  physics tick, unpauses the tree, lets `physics_frame` fire N times and pauses it again: exactly N ticks of
+  `_physics_process` and of the physics server. Nodes that the game sets to `PROCESS_MODE_ALWAYS` keep running, and
+  resuming also ends a pause that the game set itself.
+- With `fixed_fps` and no window the game runs as fast as it can (60 frames in 0.2 ms in the spike), so waits and
+  holds in milliseconds mean little there; the tool descriptions point to physics frames.
+- `game_performance` samples the `Performance` monitors and the frame times over N frames: average, 95th percentile
+  and worst frame time, process and physics time, draw calls and primitives, memory, objects, nodes and orphan nodes,
+  and the 3D physics load.
 
 ### 9.11 Response size and tokens
 
@@ -1205,8 +1215,8 @@ a window and the two renders when `GODOT_MCP_WINDOW_TESTS=1`), and it passed in 
 - [x] `test_run` (GUT and gdUnit4, JUnit parsing), checked against GUT 9.7.1 and gdUnit4 6.2.2 (§8.8).
       `scripts/install-gdunit4.sh` installs gdUnit4 for the tests as the Asset Library package, without its own
       tests; `project_info` lists the project's own global classes before those of addons.
-- [ ] Deterministic mode: `fixed_fps`, `game_pause`, `game_step` (§9.10).
-- [ ] `game_eval`, `game_performance`, `node_call_method`, `editor_run_script` — behind flags.
+- [x] Deterministic mode: `fixed_fps`, `game_pause`, `game_step` (§9.10), and `game_performance`.
+- [ ] `game_eval`, `node_call_method`, `editor_run_script` — behind flags.
 - [ ] MCP resources and prompts; the companion skill (§8.10); read-only mode.
 
 Order of work: the resource tools, which the scenario below needs for the `PhysicsMaterial`; `test_run`, which runs
@@ -1512,6 +1522,9 @@ Checked against the sources in `~/Software/godot` (`master`, 4.8-beta, commit `6
 | `EditorPlugin.add_autoload_singleton` with a name that is not a valid identifier, or that collides with an engine class, a `class_name`, a built-in type, a global constant or a keyword, shows a modal warning in the editor; `remove_autoload_singleton` erases the autoload only from the runtime list, so its `autoload/` setting stays in `project.godot` until it is set to `null` — the Delete button of the dialog does that and then calls `EditorAutoloadSettings.update_autoload()`, which also drops the global name from GDScript | `editor/settings/editor_autoload_settings.cpp`, `core/config/project_settings.cpp`, observed on 4.8 |
 | `EditorInterface.close_scene()` closes the current scene without asking and discards its unsaved changes; `get_unsaved_scenes()` (since 4.7) tells which scenes have them | `editor/editor_interface.cpp`, `editor/editor_node.cpp` |
 | All 529 global constants of `@GlobalScope` are written in capitals and start with one of 26 words (`KEY`, `PROPERTY`, `ERR`, `TYPE`, `JOY`, `OP`, `MIDI`, `MOUSE`, …, `OK`, `FAILED`); scripts cannot list them | `doc/classes/@GlobalScope.xml` |
+| `SceneTree.physics_frame` is emitted at the start of a physics tick, before `_physics_process` of the nodes and before the physics server steps; pausing the tree also deactivates the physics servers, and the signal keeps firing while paused | `scene/main/scene_tree.cpp`, observed on 4.8 |
+| `SceneTree.set_suspend` (the Game view's suspend) is not bound for scripts; the debugger message `scene:next_frame` lifts it until the next `frame_post_draw` | `scene/main/scene_tree.cpp`, `scene/debugger/scene_debugger.cpp` |
+| `--fixed-fps N` makes every process frame advance the game by exactly 1/N s and drops real-time synchronization: without a window the game runs uncapped; it is an engine argument that `OS.get_cmdline_args()` does not show | `main/main.cpp`, observed on 4.8 |
 | `GDScript.can_instantiate()` is false inside the editor for scripts without `@tool`, because scripting is disabled there; the editor creates an object of a `class_name` by instantiating the native base class and calling `set_script`, which gives it a placeholder instance that keeps the exported values | `modules/gdscript/gdscript.cpp`, `editor/editor_data.cpp` |
 | An `UndoRedo` property change on a `Resource` marks it as edited, and saving a scene also saves the edited external resources; `ResourceSaver.save` in the editor updates the file system dock through the save callback | `core/object/undo_redo.cpp`, `editor/editor_node.cpp` |
 | `var_to_str` writes a float that holds a single-precision value with the fewest digits for single precision (`0.05`), while `JSON.stringify` writes 15 significant digits of the double (`0.0500000007450581`) | observed on 4.8 |

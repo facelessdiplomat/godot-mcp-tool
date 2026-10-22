@@ -38,6 +38,7 @@ const runParamsSchema = z.object({
   scene: z.string().default('main'),
   watch_ms: z.number().int().min(0).default(1000),
   stop_after: z.boolean().default(false),
+  fixed_fps: z.number().int().min(1).max(1000).optional(),
 });
 
 type RunParams = z.infer<typeof runParamsSchema>;
@@ -97,7 +98,7 @@ export class LocalGameGateway implements EditorGateway {
     await this.stop();
     this.beginRun(records);
     const startedAt = Date.now();
-    const launched = this.options.launcher.launch(binaryPath, this.launchArguments(projectRoot, params.scene, records.path), projectRoot);
+    const launched = this.options.launcher.launch(binaryPath, this.launchArguments(projectRoot, params, records.path), projectRoot);
     this.process = launched;
     launched.onOutput((text) => {
       this.rememberOutput(text);
@@ -161,8 +162,16 @@ export class LocalGameGateway implements EditorGateway {
     this.recentOutput = [];
   }
 
-  private launchArguments(projectRoot: string, scene: string, logFile: string): string[] {
-    return ['--path', projectRoot, ...(this.options.headless ? ['--headless'] : []), ...(scene === 'main' ? [] : [scene]), '--', `--mcp-log-file=${logFile}`];
+  private launchArguments(projectRoot: string, params: RunParams, logFile: string): string[] {
+    return [
+      '--path',
+      projectRoot,
+      ...(this.options.headless ? ['--headless'] : []),
+      ...(params.fixed_fps === undefined ? [] : ['--fixed-fps', String(params.fixed_fps)]),
+      ...(params.scene === 'main' ? [] : [params.scene]),
+      '--',
+      `--mcp-log-file=${logFile}`,
+    ];
   }
 
   private async stop(): Promise<{ was_running: boolean }> {

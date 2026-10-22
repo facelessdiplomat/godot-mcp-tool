@@ -1,5 +1,7 @@
 extends RefCounted
 
+const RunRequest := preload("run_request.gd")
+
 const STOPPED := "stopped"
 const STARTING := "starting"
 const RUNNING := "running"
@@ -11,17 +13,17 @@ var first_seq := 1
 var ready_count := 0
 var stop_count := 0
 
-var _agent_run_requested := false
+var _agent_run_request: RunRequest
 
 
-func request_agent_run() -> void:
-	_agent_run_requested = true
+func request_agent_run(request: RunRequest) -> void:
+	_agent_run_request = request
 
 
-func take_agent_run_request() -> bool:
-	var was_requested := _agent_run_requested
-	_agent_run_requested = false
-	return was_requested
+func take_agent_run_request() -> RunRequest:
+	var request := _agent_run_request
+	_agent_run_request = null
+	return request
 
 
 func mark_started(run_first_seq: int) -> void:

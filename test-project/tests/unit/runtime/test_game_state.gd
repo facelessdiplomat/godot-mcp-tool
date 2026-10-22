@@ -1,6 +1,7 @@
 extends GutTest
 
 const GameState := preload("res://addons/godot_mcp_tool/runtime/game_state.gd")
+const RunRequest := preload("res://addons/godot_mcp_tool/runtime/run_request.gd")
 
 var _game: GameState
 
@@ -29,6 +30,6 @@ func test_follows_a_run_through_its_lifecycle() -> void:
 
 
 func test_hands_out_an_agent_run_request_once() -> void:
-	_game.request_agent_run()
-	assert_true(_game.take_agent_run_request())
-	assert_false(_game.take_agent_run_request())
+	_game.request_agent_run(RunRequest.new(30))
+	assert_eq(_game.take_agent_run_request().fixed_fps, 30)
+	assert_null(_game.take_agent_run_request())

@@ -93,4 +93,7 @@ static func build_router(context: EditingContext, runtime: RuntimeContext, read_
 	router.register("game.wait", GameRequestCommand.new(runtime, "wait", WAIT_TIMEOUT_MSEC))
 	router.register("game.input", GameRequestCommand.new(runtime, "input", INPUT_TIMEOUT_MSEC))
 	router.register("game.screenshot", GameRequestCommand.new(runtime, "screenshot", SCREENSHOT_TIMEOUT_MSEC))
+	router.register("game.pause", GameRequestCommand.new(runtime, "pause", INSPECTION_TIMEOUT_MSEC))
+	router.register("game.step", GameRequestCommand.new(runtime, "step", WAIT_TIMEOUT_MSEC))
+	router.register("game.performance", GameRequestCommand.new(runtime, "performance", WAIT_TIMEOUT_MSEC))
 	return router

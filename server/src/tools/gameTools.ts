@@ -5,6 +5,7 @@ import { changingAnnotations, readingAnnotations } from './annotations.js';
 import { BridgeTool } from './bridge/BridgeTool.js';
 import { type CaptureReader, createGameScreenshotTool } from './captureTools.js';
 import { formatLogEntries, logEntrySchema } from './formatting/logEntries.js';
+import { createGamePauseTool, createGamePerformanceTool, createGameStepTool } from './gameControlTools.js';
 import { createGameGetPropertiesTool, createGameGetTreeTool, createGameSetPropertiesTool, createGameWaitTool } from './gameInspectionTools.js';
 import { createGameInputTool } from './inputTools.js';
 import { textResult } from './results.js';
@@ -21,6 +22,9 @@ export function createGameTools(game: EditorGateway, cursor: GameOutputCursor, r
     createGameWaitTool(game),
     createGameInputTool(game, readCapture),
     createGameScreenshotTool(game, readCapture),
+    createGamePauseTool(game),
+    createGameStepTool(game),
+    createGamePerformanceTool(game),
   ];
 }
 
@@ -68,6 +72,15 @@ const gameRunInput = z.object({
     .max(600_000)
     .optional()
     .describe('Keep the game running this long after it is ready, then stop it. Without it, the game keeps running after the first second of output.'),
+  fixed_fps: z
+    .number()
+    .int()
+    .min(1)
+    .max(1000)
+    .optional()
+    .describe(
+      'Run with a fixed frame rate, such as 60: every frame advances the game by exactly 1/fps seconds, so runs repeat exactly. Game time then no longer follows the clock, and without a window the game runs as fast as it can, so count waits and holds in physics frames.',
+    ),
 });
 
 export function createGameRunTool(editor: EditorGateway, cursor: GameOutputCursor): BridgeTool<typeof gameRunInput, GameRun> {
@@ -84,17 +97,25 @@ export function createGameRunTool(editor: EditorGateway, cursor: GameOutputCurso
     },
     method: 'game.run',
     responseSchema: gameRunSchema,
-    params: ({ scene, duration_ms }) => ({ scene, watch_ms: duration_ms ?? defaultWatchMs, stop_after: duration_ms !== undefined }),
+    params: ({ scene, duration_ms, fixed_fps }) => ({
+      scene,
+      watch_ms: duration_ms ?? defaultWatchMs,
+      stop_after: duration_ms !== undefined,
+      ...(fixed_fps === undefined ? {} : { fixed_fps }),
+    }),
     timeoutMs: ({ duration_ms }) => runAllowanceMs + (duration_ms ?? defaultWatchMs),
     present: (run, input) => {
       cursor.moveTo(run.next_after);
-      return textResult(describeRun(run, input.duration_ms));
+      return textResult(describeRun(run, input.duration_ms, input.fixed_fps));
     },
   });
 }
 
-function describeRun(run: GameRun, durationMs: number | undefined): string {
+function describeRun(run: GameRun, durationMs: number | undefined, fixedFps: number | undefined): string {
   const lines = [describeOutcome(run, durationMs)];
+  if (fixedFps !== undefined) {
+    lines.push(`Every frame advances the game by exactly 1/${String(fixedFps)} s, however long it takes, so wait and hold for physics frames, not milliseconds.`);
+  }
   const saved = [...run.saved_scenes, ...run.saved_scripts];
   if (saved.length > 0) {
     lines.push(`Running saved ${saved.join(', ')} first, as the editor does.`);

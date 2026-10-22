@@ -2,6 +2,7 @@ extends "../command.gd"
 
 const EditingContext := preload("../../scene/editing_context.gd")
 const Params := preload("../params.gd")
+const RunRequest := preload("../../runtime/run_request.gd")
 const RuntimeContext := preload("../../runtime/runtime_context.gd")
 const SceneResolver := preload("../../scene/scene_resolver.gd")
 const Waiting := preload("../../util/waiting.gd")
@@ -13,6 +14,7 @@ const DEFAULT_WATCH_MSEC := 1000
 const DEFAULT_STARTUP_TIMEOUT_MSEC := 30_000
 const STOP_TIMEOUT_MSEC := 10_000
 const OUTPUT_LIMIT := 60
+const MAXIMUM_FIXED_FPS := 1000
 
 var _context: EditingContext
 var _runtime: RuntimeContext
@@ -28,9 +30,12 @@ func execute(params: Dictionary) -> Variant:
 	var watch_msec: Variant = Params.whole_number(params, "watch_ms", DEFAULT_WATCH_MSEC)
 	var startup_timeout_msec: Variant = Params.whole_number(params, "startup_timeout_ms", DEFAULT_STARTUP_TIMEOUT_MSEC)
 	var stop_after: Variant = Params.flag(params, "stop_after", false)
-	for value in [target, watch_msec, startup_timeout_msec, stop_after]:
+	var fixed_fps: Variant = Params.whole_number(params, "fixed_fps", 0)
+	for value in [target, watch_msec, startup_timeout_msec, stop_after, fixed_fps]:
 		if value is CommandError:
 			return value
+	if params.has("fixed_fps") and (fixed_fps < 1 or fixed_fps > MAXIMUM_FIXED_FPS):
+		return CommandError.new(JsonRpc.INVALID_PARAMS, "\"fixed_fps\" must be from 1 to %d" % MAXIMUM_FIXED_FPS, "Example: 60")
 	var scene_path: Variant = _resolve_target(target)
 	if scene_path is CommandError:
 		return scene_path
@@ -52,7 +57,7 @@ func execute(params: Dictionary) -> Variant:
 	var stop_count := game.stop_count
 	var first_seq := _runtime.log_store.last_seq + 1
 	var started_msec := Time.get_ticks_msec()
-	game.request_agent_run()
+	game.request_agent_run(RunRequest.new(fixed_fps))
 	_play(target, scene_path)
 	await Waiting.until(func() -> bool: return game.ready_count != ready_count or game.stop_count != stop_count, startup_timeout_msec)
 	var outcome := _outcome(ready_count, stop_count)

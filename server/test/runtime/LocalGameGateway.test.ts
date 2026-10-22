@@ -76,6 +76,14 @@ describe('LocalGameGateway', () => {
     expect(launcher.calls[0]?.workingDirectory).toBe(projectRoot);
   });
 
+  it('runs with a fixed frame rate on request', async () => {
+    launcher.simulate = readyGame([]);
+
+    await gateway().request('game.run', { scene: 'main', watch_ms: 0, stop_after: false, fixed_fps: 60 });
+
+    expect(launcher.calls[0]?.args).toEqual(['--path', projectRoot, '--fixed-fps', '60', '--', `--mcp-log-file=${join(projectRoot, '.godot', 'godot_mcp_tool', 'local_game.ndjson')}`]);
+  });
+
   it('runs a given scene, without a window when asked', async () => {
     launcher.simulate = readyGame([]);
     mkdirSync(join(projectRoot, 'levels'));

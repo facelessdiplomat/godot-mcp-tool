@@ -14,6 +14,7 @@ const GameStopCommand := preload("res://addons/godot_mcp_tool/commands/game/game
 const JsonRpc := preload("res://addons/godot_mcp_tool/bridge/json_rpc.gd")
 const LogStore := preload("res://addons/godot_mcp_tool/runtime/log_store.gd")
 const PlainUndoHistory := preload("res://addons/godot_mcp_tool/scene/plain_undo_history.gd")
+const RunRequest := preload("res://addons/godot_mcp_tool/runtime/run_request.gd")
 const RuntimeContext := preload("res://addons/godot_mcp_tool/runtime/runtime_context.gd")
 const VariantCodec := preload("res://addons/godot_mcp_tool/codec/variant_codec.gd")
 
@@ -78,7 +79,20 @@ func test_runs_the_main_scene_and_returns_its_first_output() -> void:
 func test_marks_its_runs_as_agent_runs() -> void:
 	_launcher.simulate_game = _ready_game_printing("")
 	await _run({"watch_ms": 0})
-	assert_eq(_launcher.agent_runs, [true])
+	assert_eq(_launcher.agent_runs.size(), 1)
+	assert_eq((_launcher.agent_runs[0] as RunRequest).fixed_fps, 0)
+
+
+func test_asks_for_a_fixed_frame_rate() -> void:
+	_launcher.simulate_game = _ready_game_printing("")
+	await _run({"watch_ms": 0, "fixed_fps": 60})
+	assert_eq((_launcher.agent_runs[0] as RunRequest).fixed_fps, 60)
+
+
+func test_refuses_a_fixed_frame_rate_out_of_range() -> void:
+	var result: CommandError = await _run({"fixed_fps": 0})
+	assert_eq(result.code, JsonRpc.INVALID_PARAMS)
+	assert_eq(_launcher.agent_runs.size(), 0)
 
 
 func test_runs_a_given_scene() -> void:

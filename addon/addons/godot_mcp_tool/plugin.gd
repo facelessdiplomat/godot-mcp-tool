@@ -19,6 +19,7 @@ const GodotVersionText := preload("editor/godot_version_text.gd")
 const LogStore := preload("runtime/log_store.gd")
 const ResponsivenessController := preload("editor/responsiveness_controller.gd")
 const RunArguments := preload("runtime/run_arguments.gd")
+const RunRequest := preload("runtime/run_request.gd")
 const RuntimeContext := preload("runtime/runtime_context.gd")
 const RuntimeDebugger := preload("runtime/runtime_debugger.gd")
 const RuntimeLogger := preload("runtime/runtime_logger.gd")
@@ -97,8 +98,8 @@ func _disable_plugin() -> void:
 
 
 func _run_scene(_scene: String, args: PackedStringArray) -> PackedStringArray:
-	var is_agent_run := _runtime != null and _runtime.game.take_agent_run_request()
-	return RunArguments.extend(args, is_agent_run, DisplayServer.get_name() == "headless")
+	var agent_run: RunRequest = _runtime.game.take_agent_run_request() if _runtime != null else null
+	return RunArguments.extend(args, agent_run, DisplayServer.get_name() == "headless")
 
 
 func _create_session() -> BridgeSession:
