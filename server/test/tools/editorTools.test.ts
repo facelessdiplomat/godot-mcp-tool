@@ -12,6 +12,8 @@ describe('createEditorTools', () => {
       'project_settings_get',
       'project_settings_set',
       'editor_rescan',
+      'input_map_get',
+      'input_map_set',
       'scene_create',
       'scene_open',
       'scene_save',

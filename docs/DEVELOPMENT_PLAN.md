@@ -396,7 +396,7 @@ About 65 tools across all milestones; 16 in the MVP.
 | `project_info` | Name, main scene, renderer, 3D physics engine, window size and stretch mode, autoloads, plugins, global classes (`class_name`), indentation style, top-level folders | 1 | R | C/E |
 | `project_settings_get` | Values by key or prefix | 1 | R | C/E |
 | `project_settings_set` | Change settings through the editor's `ProjectSettings` and `save()` | 1 | W | E |
-| `input_map_get` / `input_map_set` / `input_map_remove` | Input actions in a simple format: `{"type":"key","key":"Space"}`, `{"type":"joypad_button","button":1}` | 3 | R/W | E |
+| `input_map_get` / `input_map_set` | Input actions in a simple format: key names such as `"Space"` or `"Ctrl+S"`, `{"type":"mouse_button","button":"left"}`, `{"type":"joypad_button","button":"a"}`; `null` removes an action | 2 | R/W | E |
 | `autoload_add` / `autoload_remove` | Autoloads (the list is part of `project_info`) | 3 | W | E |
 
 ### 8.2 Editor and file system
@@ -1086,7 +1086,11 @@ against a headless editor, Ctrl+Z included, and it passed in a live Claude Code 
       arguments such as `is_on_floor()` included), `game_set_properties`, `game_wait`. They travel over a request
       channel from the editor to the game: `mcp:request` / `mcp:response` debugger messages, answered by game-side
       commands that the runtime agent loads only when a debugger is attached.
-- [ ] Runtime: `game_screenshot`, `game_input`.
+- [x] `game_input`: steps that tap or hold input actions and keys for physics frames or milliseconds, move and click
+      the mouse in game-view pixels, type text and wait. Actions go in as `InputEventAction`, so both polling and
+      `_input` see them; held input is released at the end unless asked otherwise.
+- [x] `input_map_get` / `input_map_set`, moved here from milestone 3 for the scenario below.
+- [ ] Runtime: `game_screenshot`.
 - [ ] 3D views: the `camera` option of the screenshot tools, preset angles, contact sheets; `node_get_bounds`.
 - [ ] `editor_screenshot`, `editor_launch`.
 - [x] `script_validate` (LSP and the fallback).
@@ -1110,7 +1114,7 @@ A deliberately broken script is caught by `script_validate` before running.
 
 ### Milestone 3 — Project, resources, tests
 
-- [ ] `input_map_*`, `autoload_*`, `node_set_groups`, `editor_select`, `scene_close`.
+- [ ] `autoload_*`, `node_set_groups`, `editor_select`, `scene_close` (`input_map_*` moved to milestone 2).
 - [ ] `resource_create`, `resource_get`, `resource_set_properties`.
 - [ ] `test_run` (GUT and gdUnit4, JUnit parsing).
 - [ ] Deterministic mode: `fixed_fps`, `game_pause`, `game_step` (§9.10).
@@ -1392,6 +1396,10 @@ Checked against the sources in `~/Software/godot` (`master`, 4.8-beta, commit `6
 | `--lsp-port` sets `GDScriptLanguageServer::port_override` and is not passed on to `OS.get_cmdline_args()` | `main/main.cpp` |
 | The language server parses every project script on its first `initialize`, logs `LSP: Failed to parse script` for broken ones, and on `initialize` from another project root sends `window/showMessage` and `gdscript_client/changeWorkspace` with its own project path | `modules/gdscript/language_server/` |
 | A language server client must close a document before opening it again; `didOpen` parses the sent text and always publishes diagnostics, even an empty list | `modules/gdscript/language_server/gdscript_language_protocol.cpp` |
+| `Input.parse_input_event` may buffer events until the next frame; `Input.flush_buffered_events()` delivers them at once. An `InputEventAction` is matched to its action by name, so it sets the action state and reaches `_input` too. The headless display server also delivers events to the window | `core/input/input.cpp`, `core/input/input_map.cpp`, `servers/display/display_server_headless.cpp` |
+| A `SceneTreeTimer` counts frame time, so it can end before the same wall-clock time has passed; real-time waits poll `Time.get_ticks_msec()` | observed in GUT runs |
+| `InputEvent.as_text()` is not uniform for physical keys ("W - Physical", "Up"); the addon writes its own short text ("W", "Ctrl+S", "Mouse left", "Joypad a") | observed on 4.8 |
+| A static function on a preloaded script is shadowed by a `Resource` or `Object` method of the same name (`is_built_in`, `get_name`, …), because the call goes to the script resource itself | observed on 4.8 |
 | `TCPServer.listen(port, bind_address = "*")` listens on all interfaces by default; `get_local_port()` | `doc/classes/TCPServer.xml` |
 | The maximum debugger message size is 8 MiB | `core/debugger/remote_debugger_peer.cpp` |
 | LSP: port 6005, starts when the editor is ready, up to 8 clients; `didOpen` → parser + analyzer → `publishDiagnostics` | `modules/gdscript/language_server/` |

@@ -47,7 +47,9 @@ func execute(params: Dictionary) -> Variant:
 			var milliseconds: Variant = Params.whole_number(params, "ms", 0)
 			if milliseconds is CommandError:
 				return milliseconds
-			await tree.create_timer(clampi(milliseconds, 0, MAXIMUM_TIMEOUT_MSEC) / 1000.0, true, false, true).timeout
+			var deadline_msec := started_msec + clampi(milliseconds, 0, MAXIMUM_TIMEOUT_MSEC)
+			while Time.get_ticks_msec() < deadline_msec:
+				await tree.process_frame
 			return {"waited_ms": Time.get_ticks_msec() - started_msec}
 	return await _wait_for_condition(params, started_msec)
 

@@ -1,6 +1,7 @@
 extends RefCounted
 
 const CommandRouter := preload("../../commands/command_router.gd")
+const GameInputCommand := preload("game_input_command.gd")
 const GamePropertiesGetCommand := preload("game_properties_get_command.gd")
 const GamePropertiesSetCommand := preload("game_properties_set_command.gd")
 const GameScene := preload("game_scene.gd")
@@ -19,4 +20,5 @@ static func build_router(scene_root_provider: Callable) -> CommandRouter:
 	router.register("properties.get", GamePropertiesGetCommand.new(scene, properties, codec))
 	router.register("properties.set", GamePropertiesSetCommand.new(scene, properties))
 	router.register("wait", GameWaitCommand.new(scene, codec))
+	router.register("input", GameInputCommand.new())
 	return router

@@ -137,6 +137,7 @@ describe('game tools', () => {
       ['game_get_properties', false],
       ['game_set_properties', false],
       ['game_wait', false],
+      ['game_input', false],
     ]);
   });
 

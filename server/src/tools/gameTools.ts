@@ -5,6 +5,7 @@ import { changingAnnotations, readingAnnotations } from './annotations.js';
 import { BridgeTool } from './bridge/BridgeTool.js';
 import { formatLogEntries, logEntrySchema } from './formatting/logEntries.js';
 import { createGameGetPropertiesTool, createGameGetTreeTool, createGameSetPropertiesTool, createGameWaitTool } from './gameInspectionTools.js';
+import { createGameInputTool } from './inputTools.js';
 import { textResult } from './results.js';
 import type { Tool } from './Tool.js';
 
@@ -17,6 +18,7 @@ export function createGameTools(game: EditorGateway, cursor: GameOutputCursor): 
     createGameGetPropertiesTool(game),
     createGameSetPropertiesTool(game),
     createGameWaitTool(game),
+    createGameInputTool(game),
   ];
 }
 

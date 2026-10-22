@@ -1,4 +1,5 @@
 import type { EditorGateway } from '../editor/EditorGateway.js';
+import { createInputMapGetTool, createInputMapSetTool } from './inputTools.js';
 import { createNodeAddTool, createNodeDeleteTool, createNodeGetPropertiesTool, createNodeSetPropertiesTool } from './nodeTools.js';
 import {
   createEditorRescanTool,
@@ -15,6 +16,8 @@ export function createEditorTools(editor: EditorGateway): Tool[] {
     createProjectSettingsGetTool(editor),
     createProjectSettingsSetTool(editor),
     createEditorRescanTool(editor),
+    createInputMapGetTool(editor),
+    createInputMapSetTool(editor),
     createSceneCreateTool(editor),
     createSceneOpenTool(editor),
     createSceneSaveTool(editor),

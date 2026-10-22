@@ -51,4 +51,4 @@ func test_answers_an_unknown_method_with_the_known_ones() -> void:
 
 func test_the_game_offers_its_inspection_commands() -> void:
 	var router := GameCommandCatalog.build_router(func() -> Node: return null)
-	assert_eq(router.methods(), PackedStringArray(["properties.get", "properties.set", "tree", "wait"]))
+	assert_eq(router.methods(), PackedStringArray(["input", "properties.get", "properties.set", "tree", "wait"]))
