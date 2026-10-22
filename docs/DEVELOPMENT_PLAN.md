@@ -193,7 +193,7 @@ over HTTP), [GoPeak](https://github.com/HaD0Yun/Doyunha-Gopeak) (LSP + DAP, tool
 | Silent write failures: resources, `Array[T]`, custom classes | a typed codec and read-back verification (§9.1) |
 | Unclear source of truth: editor memory or disk | an explicit rule and a sync before saving and running (§9.3) |
 | Context overload: hundreds of tools, unbounded output | about 65 tools across all milestones, Claude Code tool search, cursors and limits (§8.12, §9.11) |
-| Docs for the wrong engine version | `--doctool` of the installed engine (§8.6) |
+| Docs for the wrong engine version | the API reference dumped by the installed engine (§8.6) |
 
 ### Build or reuse
 
@@ -216,7 +216,7 @@ against one of them.
                            │ stdio · MCP (JSON-RPC)
              ┌─────────────▼──────────────┐
              │ MCP server (TypeScript)    │── spawn ──► godot --headless …
-             │ • tools and schemas        │             import, check-only, doctool,
+             │ • tools and schemas        │             import, check-only, API dump,
              │ • bridge client            │             tests, export, running the
              │ • LSP client (GDScript)    │             game without the editor
              │ • docs index               │
@@ -254,8 +254,9 @@ against one of them.
 - Connects to the addon through the discovery file and reconnects after editor restarts. The tool list is static:
   a tool that needs the editor returns a clear error when the editor is missing instead of disappearing.
 - An LSP client for the built-in GDScript language server (port 6005) provides script diagnostics.
-- A CLI runner: `--headless --import`, `--check-only`, `--doctool`, running the game as a process, tests, export.
-- A docs index built from `--doctool` XML and cached per engine version.
+- A CLI runner: `--headless --import`, `--check-only`, `--dump-extension-api-with-docs`, `--doctool --gdscript-docs`,
+  running the game as a process, tests, export.
+- A docs index built from the API dump of the installed engine, cached per engine version.
 - A log store with cursors; it also produces the new-error summary attached to every response.
 - The server knows nothing about scene internals: Godot logic runs in the addon. The server owns schemas, validation,
   formatting, size limits and error texts.
@@ -452,9 +453,20 @@ About 65 tools across all milestones; 16 in the MVP.
 | `docs_class` | Reference for an engine class or your own `class_name`: inheritance, properties, method signatures, signals, constants; for a single member — the full description | 2 | R | C |
 | `docs_search` | Search across classes and members ("raycast", "tween", "character controller") | 2 | R | C |
 
-The docs come from `godot --doctool <cache>` of the installed engine (XML for all classes, including modules),
-converted from BBCode to Markdown. Your own classes come from the global class list and `##` doc comments
-(`--doctool --gdscript-docs res://`).
+The engine docs come from `godot --headless --dump-extension-api-with-docs` of the installed engine: one JSON file
+(about 12 MB, 1 s) with every class, built-in type and global function and the descriptions the editor shows in its
+help. It is cached per engine version in the user cache folder (`~/Library/Caches/godot-mcp-tool` on macOS,
+`$XDG_CACHE_HOME` on Linux, `%LOCALAPPDATA%` on Windows, or `GODOT_MCP_CACHE_DIR`). `--doctool <folder>` is not
+enough: it writes only the structure of the API and takes the descriptions from XML files that already lie in the
+folder, which exist only in the engine source tree. The project's own classes come from their `##` doc comments
+through `godot --path <project> --doctool <folder> --gdscript-docs res://` (under a second), generated into
+`.godot/godot_mcp_tool/class_docs/` again whenever a `.gd` file of the project changes. Descriptions are converted
+from BBCode to Markdown, keeping the GDScript version of code examples. A class overview lists each member with the
+first sentence of its description and stays under about 6,000 tokens: for large classes the summaries are shortened
+or left out, and the longest sections are cut with a pointer to `docs_search`. Setters and getters of properties are
+left out of the overview, as in the editor's help. Not covered yet: the `@GDScript` page (annotations such as
+`@export_range`, and functions such as `preload`) and the default values of engine properties, which the API dump
+doesn't carry.
 
 ### 8.7 Running the game and runtime
 
@@ -909,7 +921,7 @@ Dropped and failed connections are the top complaint about almost every existing
 | Manual checks | MCP Inspector (`@modelcontextprotocol/inspector` 2.x, Node ≥ 22.19) | calling tools without Claude Code |
 | Addon | GDScript with static typing | no compilation, runs on every platform; no GDExtension needed |
 | Addon tests | GUT | simple CLI runs |
-| Engine docs | `godot --doctool` → XML → index | exactly matches the installed build |
+| Engine docs | `godot --dump-extension-api-with-docs` → JSON → index | exactly matches the installed build |
 | CI | GitHub Actions | free for public repositories |
 
 A sketch of a tool registration with SDK v2 (the exact API is checked during implementation):
@@ -969,7 +981,7 @@ godot-mcp-tool/
 │   │   ├── bridge/               bridge client: discovery, NDJSON, JSON-RPC, reconnects
 │   │   ├── godot/                Godot CLI runs, output parsing, process management
 │   │   ├── lsp/                  LSP client for the GDScript language server
-│   │   ├── docs/                 docs index built from --doctool
+│   │   ├── docs/                 docs index built from the API dump of the engine
 │   │   ├── logs/                 log store with cursors, new-error summary
 │   │   ├── tools/                one file per area: project, editor, scene, node, game, docs, view3d, …
 │   │   ├── resources/            MCP resources
@@ -1112,7 +1124,9 @@ against a headless editor, Ctrl+Z included, and it passed in a live Claude Code 
       note when the editor's preview sun and sky light the render.
 - [ ] `editor_launch`.
 - [x] `script_validate` (LSP and the fallback).
-- [ ] `docs_class`, `docs_search`: the `--doctool` cache, BBCode → Markdown, your own classes.
+- [x] `docs_class`, `docs_search`: the reference of the installed engine from its API dump with docs, cached per
+      engine version, and the project's own classes from their `##` doc comments; BBCode → Markdown; search by
+      words in names and summaries. They work without the editor.
 - [x] `scene_batch_edit`: node and signal operations in one call and one Undo action, applied in order so later
       operations use the nodes that earlier ones added or renamed; nothing changes when one fails.
 - [x] `node_reparent` (move, rename, reorder; keeps the world transform and updates `NodePath` properties),
@@ -1371,9 +1385,11 @@ in the Claude Code CLI — `claude --debug=mcp` (the server's stderr ends up in 
 - Structured errors and warnings from the same analyzer the editor uses, with positions; a file can be checked before
   it is saved. The fallback is `--check-only`.
 
-### ADR-6. Docs from `--doctool` of the installed engine
+### ADR-6. Docs from the installed engine
 
 - Exactly matches the version (important for a `master` build), works offline, doesn't depend on the docs website.
+- The descriptions come from `--dump-extension-api-with-docs`, which reads the help compiled into the editor;
+  `--doctool` alone writes empty descriptions outside the engine source tree (checked on 4.8, 2026-10-22).
 
 ### ADR-7. Scenes and resources are changed only through the editor
 
@@ -1439,6 +1455,9 @@ Checked against the sources in `~/Software/godot` (`master`, 4.8-beta, commit `6
 | Removing a node from a parent in the tree clears the owner of every moved node whose owner is no longer an ancestor; `set_name` with a sibling's name silently adds a number | `scene/main/node.cpp` (`_propagate_after_exit_tree`, `_validate_child_name`) |
 | `Node.duplicate()` leaves the owners of the copies empty, except inside instanced scenes; `DUPLICATE_SIGNALS` copies persistent connections and retargets the ones inside the copied branch | `scene/main/node.cpp` |
 | `UndoRedo` runs undo operations in the order they were added; `commit_action(false)` registers an action without executing it | `core/object/undo_redo.cpp` |
+| `--doctool <folder>` generates the class structure from ClassDB and merges the descriptions of XML files already in the folder (`doc/classes`, `modules/*/doc_classes`), so in an empty folder every description is empty; `--dump-extension-api-with-docs` writes `extension_api.json` into the working folder with the descriptions of the editor's help (`EditorHelp::get_doc_data()`), but without the `@GDScript` page and without default values of properties | `main/main.cpp`, `core/extension/extension_api_dump.cpp` |
+| In the API dump an enum property has the type `int`; its setter's last argument carries the enum type (`enum::Class.Name`, `bitfield::…`) | `extension_api.json` |
+| `--doctool <folder> --gdscript-docs res://` with `--path` writes one XML file per script, named after its `class_name` (or the quoted file name), with descriptions from `##` comments; a script that does not parse is skipped with an error | `main/main.cpp`, observed on 4.8 |
 | Bound callables are equal when their base callable and bound arguments are equal, so `disconnect` works with a callable bound again; a non-tool script in the editor has a placeholder instance whose `has_method` checks the script and its base scripts | `core/variant/callable_bind.cpp`, `core/object/script_language.cpp` |
 | GDScript files may preload each other, and a script may preload itself | observed on 4.8 |
 | 3D: `NavigationRegion3D.bake_navigation_mesh()` and the `bake_finished` signal; `Viewport.world_3d` / `own_world_3d`; `physics/3d/physics_engine` (`DEFAULT` currently means GodotPhysics3D; Jolt can be selected); CSG nodes (`CSGBox3D`, `CSGCombiner3D`, …); `GridMap.set_cell_item` | `doc/classes/`, `modules/csg/doc_classes/` |

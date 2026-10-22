@@ -26,7 +26,7 @@ describe('serverInstructions', () => {
 
   it('names only tools that exist', async () => {
     const toolNames = await registeredToolNames();
-    const mentionedTools = serverInstructions.match(/\b(?:godot|project|editor|scene|node|game)_[a-z_]+\b/g) ?? [];
+    const mentionedTools = serverInstructions.match(/\b(?:godot|project|editor|scene|node|game|docs|signal|script|input)_[a-z_]+\b/g) ?? [];
 
     expect(mentionedTools.length).toBeGreaterThan(5);
     for (const toolName of mentionedTools) {

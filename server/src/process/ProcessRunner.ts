@@ -8,6 +8,7 @@ export interface ProcessResult {
 
 export interface ProcessRunOptions {
   readonly timeoutMs: number;
+  readonly cwd?: string;
 }
 
 export interface ProcessRunner {
@@ -22,7 +23,7 @@ export class NodeProcessRunner implements ProcessRunner {
       execFile(
         command,
         [...args],
-        { timeout: options.timeoutMs, encoding: 'utf8', windowsHide: true, maxBuffer: maximumOutputBytes },
+        { timeout: options.timeoutMs, encoding: 'utf8', windowsHide: true, maxBuffer: maximumOutputBytes, ...(options.cwd === undefined ? {} : { cwd: options.cwd }) },
         (error, stdout, stderr) => {
           if (error === null) {
             resolve({ exitCode: 0, stdout, stderr });

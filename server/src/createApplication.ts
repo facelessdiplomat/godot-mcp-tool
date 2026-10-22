@@ -2,6 +2,7 @@ import { accessSync, constants, readFileSync, statSync } from 'node:fs';
 import type { McpServer } from '@modelcontextprotocol/server';
 import { BridgeClient } from './bridge/BridgeClient.js';
 import { DiscoveryFileReader, isProcessAlive } from './bridge/DiscoveryFileReader.js';
+import { DocsSource } from './docs/DocsSource.js';
 import { EditorConnection, type EditorSession, UnavailableEditor } from './bridge/EditorConnection.js';
 import { type BinaryLocator, GodotBinaryLocator } from './godot/GodotBinaryLocator.js';
 import { GodotCli } from './godot/GodotCli.js';
@@ -18,12 +19,14 @@ import { ScriptValidator, ValidationUnavailableError } from './scripts/ScriptVal
 import { createMcpServer } from './server/createMcpServer.js';
 import { serverInstructions } from './server/serverInstructions.js';
 import { BRIDGE_PROTOCOL_VERSION, SERVER_NAME, SERVER_VERSION } from './serverInfo.js';
+import { DocsClassTool, DocsSearchTool } from './tools/docsTools.js';
 import { createEditorTools } from './tools/editorTools.js';
 import { ErrorReportingTool } from './tools/ErrorReportingTool.js';
 import { createGameTools } from './tools/gameTools.js';
 import { GodotStatusTool } from './tools/GodotStatusTool.js';
 import { ScriptValidateTool } from './tools/scriptTools.js';
 import type { Tool } from './tools/Tool.js';
+import { userCacheDirectory } from './util/CacheDirectory.js';
 
 export interface ApplicationEnvironment {
   readonly variables: Readonly<Record<string, string | undefined>>;
@@ -64,6 +67,15 @@ export function createApplication(environment: ApplicationEnvironment): Applicat
     homeDirectory: environment.homeDirectory,
     isExecutableFile,
   });
+  const docsSource = new DocsSource({
+    projectRoot: project.found ? project.root : undefined,
+    cacheDirectory: userCacheDirectory(environment),
+    locateBinary: async () => {
+      const editorStatus = await editor.status();
+      return binaryLocator.locate(editorStatus.connected ? editorStatus.hello.executablePath : undefined);
+    },
+    processRunner,
+  });
   const localGame = new LocalGameGateway({
     projectRoot: project.found ? project.root : undefined,
     locateBinary: () => binaryLocator.locate(),
@@ -87,6 +99,8 @@ export function createApplication(environment: ApplicationEnvironment): Applicat
         languageServerPort: parsePort(environment.variables['GODOT_LSP_PORT']),
       }),
     ),
+    new DocsClassTool(docsSource),
+    new DocsSearchTool(docsSource),
     ...createGameTools(new GameGatewayRouter(editor, localGame), new GameOutputCursor(), readFileSync),
   ];
   const tools = plainTools.map((tool) => new ErrorReportingTool(tool, errorSummary));

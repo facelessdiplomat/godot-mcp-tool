@@ -2,7 +2,7 @@ export const serverInstructions = [
   'Tools for building a Godot 4 game (3D, GDScript) through the running Godot editor.',
   '- Start with godot_status. If the editor is not connected, ask the user to open the project in Godot with the "Godot MCP Tool" plugin enabled; game_run still works without it.',
   '- Call project_info once per session: main scene, autoloads, global classes, and the indentation of .gd files. Never mix tabs and spaces.',
-  '- Write GDScript for Godot 4 only: @export, @onready, await, signal.connect(callable), CharacterBody3D, Node3D.',
+  '- Write GDScript for Godot 4 only: @export, @onready, await, signal.connect(callable), CharacterBody3D, Node3D. When unsure about an engine API, read it with docs_class (or find it with docs_search) before writing code: it is the reference of the installed Godot build.',
   '- While the editor is connected, change scenes only with the scene_ and node_ tools, never by editing .tscn or .tres files as text. Edit .gd files with your own file tools; after creating or changing scripts that scenes use, call editor_rescan.',
   '- Learn node paths with scene_get_tree or node_find before changing a scene. rotation is in radians; use rotation_degrees for degrees.',
   '- Build or rework a scene with scene_batch_edit: many node and signal changes in one call and one Undo step, and nothing changes if one of them fails. Connect signals with signal_connect once the method exists in the script.',
