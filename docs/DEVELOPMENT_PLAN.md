@@ -395,11 +395,18 @@ About 65 tools across all milestones; 16 in the MVP.
 | Tool | What it does | M | Kind | Needs |
 |---|---|---|---|---|
 | `godot_status` | Editor connection; Godot, addon and protocol versions; open scenes; game state (running / paused on error); binary path; warnings about editor settings | 1 | R | — |
-| `project_info` | Name, main scene, renderer, 3D physics engine, window size and stretch mode, autoloads, plugins, global classes (`class_name`), indentation style, top-level folders | 1 | R | C/E |
+| `project_info` | Name, main scene, renderer, 3D physics engine, window size and stretch mode, autoloads, plugins, the project's own global classes (`class_name`, up to 50) and the number of global classes in each addon folder, indentation style, top-level folders | 1 | R | C/E |
 | `project_settings_get` | Values by key or prefix | 1 | R | C/E |
 | `project_settings_set` | Change settings through the editor's `ProjectSettings` and `save()` | 1 | W | E |
 | `input_map_get` / `input_map_set` | Input actions in a simple format: key names such as `"Space"` or `"Ctrl+S"`, `{"type":"mouse_button","button":"left"}`, `{"type":"joypad_button","button":"a"}`; `null` removes an action | 2 | R/W | E |
 | `autoload_add` / `autoload_remove` | Autoloads (the list is part of `project_info`) | 3 | W | E |
+
+`project_info` lists the project's own global classes with their base classes and paths, up to 50, and counts the
+classes of each folder in `res://addons/` instead of listing them, because gdUnit4 alone declares about 200: "Global
+classes from addons: gdUnit4 (202), gut (10); look one up with docs_class". The base classes that tests extend
+(`GutTest`, `GdUnitTestSuite`) are not named either: the folder names show which test framework is installed,
+`test_run` states the convention when a run finds no tests, the companion skill documents both, and `docs_class`
+reads either one.
 
 ### 8.2 Editor and file system
 
@@ -1254,7 +1261,7 @@ a window and the two renders when `GODOT_MCP_WINDOW_TESTS=1`), and it passed in 
       project's own classes, saved at once (§8.5).
 - [x] `test_run` (GUT and gdUnit4, JUnit parsing), checked against GUT 9.7.1 and gdUnit4 6.2.2 (§8.8).
       `scripts/install-gdunit4.sh` installs gdUnit4 for the tests as the Asset Library package, without its own
-      tests; `project_info` lists the project's own global classes before those of addons.
+      tests; `project_info` lists the project's own global classes and counts those of each addon (§8.1).
 - [x] Deterministic mode: `fixed_fps`, `game_pause`, `game_step` (§9.10), and `game_performance`.
 - [x] `game_eval`, `node_call_method`, `editor_run_script` — behind flags; the read-only mode and `GODOT_MCP_DISABLE`
       (§8.12).
@@ -1287,8 +1294,9 @@ load), `dash()`, 2 of 2 tests green, and a 3.5 m dash in the running game. It fo
   repeated the load error `test_run` had reported, after the script was already fixed. `test_run` now pings the
   editor after the run and leaves those errors out (§9.6). The underlying delay, a new script in a new folder, also
   affects `editor_rescan` and is still open (§9.6).
-- `project_info` lists 100 global classes, which in `test-project` are almost all gdUnit4's: about 9 KB of output on
-  every first call. Not fixed yet.
+- `project_info` listed 100 global classes, which in `test-project` were almost all gdUnit4's: about 11 KB of output
+  on every first call. It now lists the project's own classes and counts those of each addon, and the overview of
+  `test-project` takes under 1 KB (§8.1).
 
 A second live run with the fixes and a fresh editor saw `"device": -1` on both events of `dash` in `project.godot`,
 and a broken test in a new folder: the editor printed its parse errors, while neither the result of `test_run` nor

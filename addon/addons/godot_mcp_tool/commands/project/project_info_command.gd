@@ -1,10 +1,10 @@
 extends "../command.gd"
 
 const AutoloadList := preload("../../project/autoload_list.gd")
+const GlobalClassSummary := preload("../../project/global_class_summary.gd")
 const ResourcePaths := preload("../../util/resource_paths.gd")
 
-const MAXIMUM_GLOBAL_CLASSES := 100
-const ADDONS_FOLDER := "res://addons/"
+const MAXIMUM_PROJECT_CLASSES := 50
 
 var _read_indentation: Callable
 
@@ -14,7 +14,6 @@ func _init(read_indentation: Callable) -> void:
 
 
 func execute(_params: Dictionary) -> Variant:
-	var global_classes := ProjectSettings.get_global_class_list()
 	return {
 		"name": str(ProjectSettings.get_setting("application/config/name", "")),
 		"path": ProjectSettings.globalize_path("res://").trim_suffix("/"),
@@ -30,28 +29,10 @@ func execute(_params: Dictionary) -> Variant:
 		},
 		"autoloads": AutoloadList.read(),
 		"enabled_plugins": Array(ProjectSettings.get_setting("editor_plugins/enabled", PackedStringArray())),
-		"global_classes": _describe_global_classes(global_classes),
-		"global_class_count": global_classes.size(),
+		"global_classes": GlobalClassSummary.summarize(ProjectSettings.get_global_class_list(), MAXIMUM_PROJECT_CLASSES),
 		"indentation": _read_indentation.call(),
 		"folders": _top_level_folders(),
 	}
-
-
-static func _describe_global_classes(global_classes: Array[Dictionary]) -> Array:
-	var described: Array = []
-	for global_class in _project_classes_first(global_classes).slice(0, MAXIMUM_GLOBAL_CLASSES):
-		described.append({"name": str(global_class["class"]), "base": str(global_class["base"]), "path": str(global_class["path"])})
-	return described
-
-
-static func _project_classes_first(global_classes: Array[Dictionary]) -> Array[Dictionary]:
-	var project_classes := global_classes.filter(func(global_class: Dictionary) -> bool: return not _is_in_addons(global_class))
-	var addon_classes := global_classes.filter(_is_in_addons)
-	return project_classes + addon_classes
-
-
-static func _is_in_addons(global_class: Dictionary) -> bool:
-	return str(global_class["path"]).begins_with(ADDONS_FOLDER)
 
 
 static func _top_level_folders() -> Array:

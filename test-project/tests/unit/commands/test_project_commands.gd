@@ -38,12 +38,21 @@ func test_describes_the_project() -> void:
 	assert_eq(info["indentation"], {"style": "tabs", "size": 4})
 	assert_has(info["enabled_plugins"], "res://addons/godot_mcp_tool/plugin.cfg")
 	assert_has(info["folders"], "tests")
-	var global_class_names: Array = (info["global_classes"] as Array).map(func(entry: Dictionary) -> String: return entry["name"])
-	assert_has(global_class_names, "PatrolPoint")
-	assert_false(str((info["global_classes"][0] as Dictionary)["path"]).begins_with("res://addons/"))
 	assert_true((info["window"] as Dictionary).has("width"))
 	assert_true(info.has("renderer"))
 	assert_true(info.has("physics_engine_3d"))
+
+
+func test_lists_the_project_classes_and_counts_the_classes_of_addons() -> void:
+	var info: Dictionary = await ProjectInfoCommand.new(_fake_indentation).execute({})
+	var global_classes: Dictionary = info["global_classes"]
+	var project_class_names: Array = (global_classes["project"] as Array).map(func(entry: Dictionary) -> String: return entry["name"])
+	assert_eq(project_class_names, ["EnemyStats", "PatrolPoint"])
+	assert_eq(global_classes["project_count"], 2)
+	var addon_folders: Array = (global_classes["addons"] as Array).map(func(entry: Dictionary) -> String: return entry["folder"])
+	assert_has(addon_folders, "gut")
+	var addon_class_total: int = (global_classes["addons"] as Array).reduce(func(total: int, entry: Dictionary) -> int: return total + int(entry["count"]), 0)
+	assert_eq(global_classes["project_count"] + addon_class_total, ProjectSettings.get_global_class_list().size())
 
 
 func test_gets_settings_by_name() -> void:

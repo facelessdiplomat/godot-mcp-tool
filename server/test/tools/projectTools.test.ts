@@ -14,6 +14,23 @@ function textOf(result: CallToolResult): string {
   return content?.type === 'text' ? content.text : '';
 }
 
+function projectInfoWith(globalClasses: Record<string, unknown>): Record<string, unknown> {
+  return {
+    name: 'Arena Shooter',
+    path: '/projects/arena',
+    main_scene: '',
+    features: [],
+    renderer: 'forward_plus',
+    physics_engine_3d: 'DEFAULT',
+    window: { width: 1152, height: 648, stretch_mode: 'disabled', stretch_aspect: 'keep' },
+    autoloads: [],
+    enabled_plugins: [],
+    global_classes: globalClasses,
+    indentation: { style: 'tabs', size: 4 },
+    folders: [],
+  };
+}
+
 describe('project tools', () => {
   it('project_info summarizes the project', async () => {
     const editor = new FakeEditorGateway().respondTo('project.info', {
@@ -26,8 +43,7 @@ describe('project tools', () => {
       window: { width: 1152, height: 648, stretch_mode: 'disabled', stretch_aspect: 'keep' },
       autoloads: [{ name: 'GameState', path: 'res://autoload/game_state.gd', singleton: true }],
       enabled_plugins: ['res://addons/godot_mcp_tool/plugin.cfg'],
-      global_classes: [{ name: 'PatrolPoint', base: 'Marker3D', path: 'res://ai/patrol_point.gd' }],
-      global_class_count: 1,
+      global_classes: { project: [{ name: 'PatrolPoint', base: 'Marker3D', path: 'res://ai/patrol_point.gd' }], project_count: 1, addons: [] },
       indentation: { style: 'tabs', size: 4 },
       folders: ['addons', 'levels'],
     });
@@ -44,37 +60,61 @@ describe('project tools', () => {
         'Indentation in .gd files: tabs — never mix tabs and spaces',
         'Autoloads: GameState → res://autoload/game_state.gd',
         'Enabled plugins: res://addons/godot_mcp_tool/plugin.cfg',
-        'Global classes (1): PatrolPoint extends Marker3D (res://ai/patrol_point.gd)',
+        'Global classes of the project (1): PatrolPoint extends Marker3D (res://ai/patrol_point.gd)',
         'Top-level folders: addons, levels',
       ].join('\n'),
     );
   });
 
-  it('project_info says which global classes it shows when there are many', async () => {
-    const editor = new FakeEditorGateway().respondTo('project.info', {
-      name: 'Arena Shooter',
-      path: '/projects/arena',
-      main_scene: '',
-      features: [],
-      renderer: 'forward_plus',
-      physics_engine_3d: 'DEFAULT',
-      window: { width: 1152, height: 648, stretch_mode: 'disabled', stretch_aspect: 'keep' },
-      autoloads: [],
-      enabled_plugins: [],
-      global_classes: [
-        { name: 'PatrolPoint', base: 'Marker3D', path: 'res://ai/patrol_point.gd' },
-        { name: 'CmdOption', base: 'RefCounted', path: 'res://addons/gdUnit4/src/cmd/CmdOption.gd' },
-      ],
-      global_class_count: 240,
-      indentation: { style: 'tabs', size: 4 },
-      folders: [],
-    });
+  it('project_info lists the classes of the project and counts those of each addon', async () => {
+    const editor = new FakeEditorGateway().respondTo(
+      'project.info',
+      projectInfoWith({
+        project: [{ name: 'PatrolPoint', base: 'Marker3D', path: 'res://ai/patrol_point.gd' }],
+        project_count: 1,
+        addons: [
+          { folder: 'gdUnit4', count: 202 },
+          { folder: 'gut', count: 10 },
+        ],
+      }),
+    );
 
     const text = textOf(await createProjectInfoTool(editor).execute({}));
 
     expect(text).toContain(
-      "Global classes (240, the first 2 shown, the project's own before those of addons): PatrolPoint extends Marker3D (res://ai/patrol_point.gd); CmdOption extends RefCounted (res://addons/gdUnit4/src/cmd/CmdOption.gd)",
+      [
+        'Global classes of the project (1): PatrolPoint extends Marker3D (res://ai/patrol_point.gd)',
+        'Global classes from addons: gdUnit4 (202), gut (10); look one up with docs_class',
+      ].join('\n'),
     );
+  });
+
+  it('project_info says how to find the classes of the project it leaves out', async () => {
+    const editor = new FakeEditorGateway().respondTo(
+      'project.info',
+      projectInfoWith({
+        project: [
+          { name: 'EnemyStats', base: 'Resource', path: 'res://ai/enemy_stats.gd' },
+          { name: 'PatrolPoint', base: 'Marker3D', path: 'res://ai/patrol_point.gd' },
+        ],
+        project_count: 240,
+        addons: [],
+      }),
+    );
+
+    const text = textOf(await createProjectInfoTool(editor).execute({}));
+
+    expect(text).toContain(
+      'Global classes of the project (240, the first 2 shown; search the .gd files for class_name to find the rest): EnemyStats extends Resource (res://ai/enemy_stats.gd); PatrolPoint extends Marker3D (res://ai/patrol_point.gd)\n',
+    );
+  });
+
+  it('project_info says when only addons declare global classes', async () => {
+    const editor = new FakeEditorGateway().respondTo('project.info', projectInfoWith({ project: [], project_count: 0, addons: [{ folder: 'gut', count: 10 }] }));
+
+    const text = textOf(await createProjectInfoTool(editor).execute({}));
+
+    expect(text).toContain(['Global classes of the project: none', 'Global classes from addons: gut (10); look one up with docs_class'].join('\n'));
   });
 
   it('editor_select names what it selected', async () => {

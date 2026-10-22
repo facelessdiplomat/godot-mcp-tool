@@ -9,6 +9,14 @@ export const autoloadSchema = z.object({ name: z.string(), path: z.string(), sin
 
 type Autoload = z.infer<typeof autoloadSchema>;
 
+const globalClassesSchema = z.object({
+  project: z.array(z.object({ name: z.string(), base: z.string(), path: z.string() })),
+  project_count: z.number().int(),
+  addons: z.array(z.object({ folder: z.string(), count: z.number().int() })),
+});
+
+type GlobalClasses = z.infer<typeof globalClassesSchema>;
+
 const projectInfoSchema = z.object({
   name: z.string(),
   path: z.string(),
@@ -19,8 +27,7 @@ const projectInfoSchema = z.object({
   window: z.object({ width: z.number(), height: z.number(), stretch_mode: z.string(), stretch_aspect: z.string() }),
   autoloads: z.array(autoloadSchema),
   enabled_plugins: z.array(z.string()),
-  global_classes: z.array(z.object({ name: z.string(), base: z.string(), path: z.string() })),
-  global_class_count: z.number().int(),
+  global_classes: globalClassesSchema,
   indentation: z.object({ style: z.enum(['tabs', 'spaces']), size: z.number().int() }),
   folders: z.array(z.string()),
 });
@@ -74,21 +81,30 @@ function describeProject(info: ProjectInfo): string {
     `Indentation in .gd files: ${info.indentation.style === 'tabs' ? 'tabs' : `${String(info.indentation.size)} spaces`} — never mix tabs and spaces`,
     `Autoloads: ${formatAutoloads(info.autoloads)}`,
     `Enabled plugins: ${listOrNone(info.enabled_plugins)}`,
-    describeGlobalClasses(info),
+    describeProjectClasses(info.global_classes),
+    ...describeAddonClasses(info.global_classes.addons),
     `Top-level folders: ${listOrNone(info.folders)}`,
   ].join('\n');
 }
 
-function describeGlobalClasses(info: ProjectInfo): string {
-  if (info.global_class_count === 0) {
-    return 'Global classes: none';
+function describeProjectClasses({ project, project_count: projectCount }: GlobalClasses): string {
+  if (projectCount === 0) {
+    return 'Global classes of the project: none';
   }
-  const shown = info.global_classes.map((globalClass) => `${globalClass.name} extends ${globalClass.base} (${globalClass.path})`).join('; ');
+  const shown = project.map((projectClass) => `${projectClass.name} extends ${projectClass.base} (${projectClass.path})`).join('; ');
   const count =
-    info.global_classes.length < info.global_class_count
-      ? `${String(info.global_class_count)}, the first ${String(info.global_classes.length)} shown, the project's own before those of addons`
-      : String(info.global_class_count);
-  return `Global classes (${count}): ${shown}`;
+    project.length < projectCount
+      ? `${String(projectCount)}, the first ${String(project.length)} shown; search the .gd files for class_name to find the rest`
+      : String(projectCount);
+  return `Global classes of the project (${count}): ${shown}`;
+}
+
+function describeAddonClasses(addons: GlobalClasses['addons']): string[] {
+  if (addons.length === 0) {
+    return [];
+  }
+  const counts = addons.map((addon) => `${addon.folder} (${String(addon.count)})`).join(', ');
+  return [`Global classes from addons: ${counts}; look one up with docs_class`];
 }
 
 export function formatAutoloads(autoloads: readonly Autoload[]): string {
