@@ -830,15 +830,21 @@ Dropped and failed connections are the top complaint about almost every existing
 
 - It starts automatically with the editor (port `network/language_server/remote_port`, 6005 by default; `--lsp-port`
   overrides it). Up to 8 clients at once — it can be shared with VS Code.
-- With two editors open, the second can't take the port — the addon writes the actual port into the discovery file.
+- With two editors open, the second can't take the port. The addon cannot see the port it actually listens on: the
+  engine consumes `--lsp-port` and leaves it out of `OS.get_cmdline_args()`, so the discovery file carries the editor
+  setting. The server sets `GODOT_LSP_PORT` over it when given, and it recognizes a language server that belongs to
+  another project by its `gdscript_client/changeWorkspace` notification and falls back to `--check-only`.
 - `didOpen` runs the parser and the analyzer and publishes diagnostics with positions; since 4.8 the warning code is
   sent in the `code` field. Spike 4: diagnostics arrive 1–9 ms after `didOpen`, unsaved text is analyzed as sent,
   autoloads and `class_name` types resolve. The same problem can be reported twice, so results are deduplicated by
   position.
-- When the editor is connected but the language server is not available, the addon reloads the script and captures
-  the parse errors with its `Logger` (spike 3).
-- `--check-only --script` is the last resort: its exit code is always 0 and references to autoloads are reported as
-  errors (spike 7), so its stderr is parsed and errors about autoload names are filtered out.
+- Before asking the language server, `script_validate` rescans the project, so classes from new scripts are known.
+- The language server parses every script of the project on its first `initialize` and logs each failure as an editor
+  error; the addon leaves errors from `modules/gdscript/language_server/` out of the new-error summary, since
+  `script_validate` reports them itself.
+- `--check-only --script` is the fallback when the language server is not available: its exit code is always 0, so its
+  output is parsed (`SCRIPT ERROR: …` followed by `at: … (res://…:line)`), duplicates on one line are dropped, and errors
+  about autoload names are filtered out (spike 7; not seen again on 4.8). It finds errors but not warnings.
 
 ### 9.16 3D specifics
 
@@ -1080,12 +1086,18 @@ against a headless editor, Ctrl+Z included, and it passed in a live Claude Code 
       `game_set_properties`.
 - [ ] 3D views: the `camera` option of the screenshot tools, preset angles, contact sheets; `node_get_bounds`.
 - [ ] `editor_screenshot`, `editor_launch`.
-- [ ] `script_validate` (LSP and the fallback).
+- [x] `script_validate` (LSP and the fallback).
 - [ ] `docs_class`, `docs_search`: the `--doctool` cache, BBCode → Markdown, your own classes.
 - [ ] `scene_batch_edit`, `node_reparent`, `node_duplicate`, `node_find`, `signal_list/connect/disconnect`.
 - [ ] Optional: a Claude Code `PostToolUse` hook for `.gd` files — after every script edit Claude immediately gets the
       diagnostics without a separate `script_validate` call. It is enabled in the game project's settings, at your
       discretion.
+
+Order of work: `script_validate`; a request channel from the editor to the running game, then `game_get_tree`,
+`game_get_properties`, `game_set_properties` and `game_wait`; `game_input` together with `input_map_get` /
+`input_map_set` from milestone 3, because the scenario below holds the `move_forward` action, which has to exist
+first; the screenshots, camera views and `node_get_bounds`, which also finish spike 8 for images; the scene editing
+tools; `docs_class` / `docs_search`; `editor_launch`; the acceptance test.
 
 **Done when** this passes: "Make a third-person prototype: a `CharacterBody3D` player that walks with WASD and jumps
 on Space in the arena; make sure it works." The agent writes the script, checks it with `script_validate`, builds the
@@ -1374,6 +1386,9 @@ Checked against the sources in `~/Software/godot` (`master`, 4.8-beta, commit `6
 | Game output and errors forwarded by the debugger go straight to the editor's Output panel and do not pass through `Logger`s registered in the editor | `editor/debugger/script_editor_debugger.cpp` |
 | `Node3D.rotation_degrees`, `global_position` and `transform` have no `PROPERTY_USAGE_EDITOR`; the inspector shows `rotation` in degrees, but it is stored in radians | `scene/3d/node_3d.cpp` |
 | Scenes saved by 4.8 carry `unique_id=` in every `[node …]` header | saved `.tscn` files |
+| `--lsp-port` sets `GDScriptLanguageServer::port_override` and is not passed on to `OS.get_cmdline_args()` | `main/main.cpp` |
+| The language server parses every project script on its first `initialize`, logs `LSP: Failed to parse script` for broken ones, and on `initialize` from another project root sends `window/showMessage` and `gdscript_client/changeWorkspace` with its own project path | `modules/gdscript/language_server/` |
+| A language server client must close a document before opening it again; `didOpen` parses the sent text and always publishes diagnostics, even an empty list | `modules/gdscript/language_server/gdscript_language_protocol.cpp` |
 | `TCPServer.listen(port, bind_address = "*")` listens on all interfaces by default; `get_local_port()` | `doc/classes/TCPServer.xml` |
 | The maximum debugger message size is 8 MiB | `core/debugger/remote_debugger_peer.cpp` |
 | LSP: port 6005, starts when the editor is ready, up to 8 clients; `didOpen` → parser + analyzer → `publishDiagnostics` | `modules/gdscript/language_server/` |

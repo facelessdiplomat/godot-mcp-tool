@@ -185,6 +185,20 @@ describe('EditorConnection', () => {
   });
 });
 
+describe('EditorConnection language server', () => {
+  it('gives the port from the discovery file and the project path of the editor', async () => {
+    const { connection } = connectionWith({ kind: 'found', endpoint }, [new FakeBridge(hello)]);
+
+    await expect(connection.languageServer()).resolves.toEqual({ port: 6005, projectPath: '/projects/game' });
+  });
+
+  it('gives nothing while the editor is not connected', async () => {
+    const { connection } = connectionWith({ kind: 'missing', path: '/projects/game/.godot/godot_mcp_tool/bridge.json' }, []);
+
+    await expect(connection.languageServer()).resolves.toBeUndefined();
+  });
+});
+
 describe('EditorConnection notifications', () => {
   it('passes notifications on with the number of the connection', async () => {
     const first = new FakeBridge(hello);

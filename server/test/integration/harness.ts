@@ -1,5 +1,6 @@
 import { type ChildProcess, spawn } from 'node:child_process';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { createServer } from 'node:net';
 import { homedir, tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { Client } from '@modelcontextprotocol/client';
@@ -31,14 +32,29 @@ export async function waitFor(condition: () => boolean, timeoutMs: number): Prom
   }
 }
 
-export async function startHeadlessEditor(projectRoot: string): Promise<ChildProcess> {
+export async function startHeadlessEditor(projectRoot: string, languageServerPort?: number): Promise<ChildProcess> {
   const discovery = new DiscoveryFileReader(projectRoot, isProcessAlive);
-  const editorProcess = spawn(godotBinary, ['--headless', '--editor', '--path', projectRoot], { stdio: 'ignore' });
+  const portArguments = languageServerPort === undefined ? [] : ['--lsp-port', String(languageServerPort)];
+  const editorProcess = spawn(godotBinary, ['--headless', '--editor', '--path', projectRoot, ...portArguments], { stdio: 'ignore' });
   await waitFor(() => {
     const discovered = discovery.read();
     return discovered.kind === 'found' && discovered.endpoint.pid === editorProcess.pid;
   }, editorStartupTimeoutMs);
   return editorProcess;
+}
+
+export function findFreePort(): Promise<number> {
+  return new Promise((resolvePort, reject) => {
+    const server = createServer();
+    server.once('error', reject);
+    server.listen(0, '127.0.0.1', () => {
+      const address = server.address();
+      const port = typeof address === 'object' && address !== null ? address.port : 0;
+      server.close(() => {
+        resolvePort(port);
+      });
+    });
+  });
 }
 
 export class McpSession {

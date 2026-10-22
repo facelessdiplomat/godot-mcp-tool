@@ -13,14 +13,21 @@ export interface EditorStatusProvider {
 
 export type ConnectionNotificationListener = (connectionNumber: number, method: string, params: unknown) => void;
 
+export interface LanguageServerAddress {
+  readonly port: number;
+  readonly projectPath: string;
+}
+
 export interface EditorSession extends EditorStatusProvider, EditorGateway {
   onNotification(listener: ConnectionNotificationListener): void;
+  languageServer(): Promise<LanguageServerAddress | undefined>;
   close(): void;
 }
 
 export class EditorConnection implements EditorSession {
   private bridge: EditorBridge | undefined;
   private hello: HelloResult | undefined;
+  private endpoint: BridgeEndpoint | undefined;
   private connectionInProgress: Promise<EditorStatus> | undefined;
   private connectionCount = 0;
   private readonly notificationListeners: ConnectionNotificationListener[] = [];
@@ -60,10 +67,19 @@ export class EditorConnection implements EditorSession {
     this.notificationListeners.push(listener);
   }
 
+  async languageServer(): Promise<LanguageServerAddress | undefined> {
+    const editorStatus = await this.status();
+    if (!editorStatus.connected || this.endpoint === undefined || this.endpoint.lspPort <= 0) {
+      return undefined;
+    }
+    return { port: this.endpoint.lspPort, projectPath: editorStatus.hello.projectPath };
+  }
+
   close(): void {
     this.bridge?.close();
     this.bridge = undefined;
     this.hello = undefined;
+    this.endpoint = undefined;
   }
 
   private async discoverAndConnect(): Promise<EditorStatus> {
@@ -100,6 +116,7 @@ export class EditorConnection implements EditorSession {
       const hello = await bridge.connect();
       this.bridge = bridge;
       this.hello = hello;
+      this.endpoint = endpoint;
       return { connected: true, hello };
     } catch (error) {
       bridge.close();
@@ -123,6 +140,10 @@ export class UnavailableEditor implements EditorSession {
   }
 
   onNotification(): void {}
+
+  languageServer(): Promise<LanguageServerAddress | undefined> {
+    return Promise.resolve(undefined);
+  }
 
   close(): void {}
 }
