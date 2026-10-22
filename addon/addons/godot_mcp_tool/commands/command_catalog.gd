@@ -1,6 +1,9 @@
 extends RefCounted
 
 const AddonInfo := preload("../addon_info.gd")
+const AnimationDeleteCommand := preload("animation/animation_delete_command.gd")
+const AnimationGetCommand := preload("animation/animation_get_command.gd")
+const AnimationSetCommand := preload("animation/animation_set_command.gd")
 const AssetImportSettingsGetCommand := preload("asset/asset_import_settings_get_command.gd")
 const AssetImportSettingsSetCommand := preload("asset/asset_import_settings_set_command.gd")
 const AutoloadAddCommand := preload("project/autoload_add_command.gd")
@@ -72,6 +75,9 @@ static func build_router(context: EditingContext, runtime: RuntimeContext, read_
 	router.register("editor.select", EditorSelectCommand.new(context))
 	router.register("asset.import_settings_get", AssetImportSettingsGetCommand.new(context.codec))
 	router.register("asset.import_settings_set", AssetImportSettingsSetCommand.new(context.codec, file_system))
+	router.register("animation.get", AnimationGetCommand.new(context))
+	router.register("animation.set", AnimationSetCommand.new(context))
+	router.register("animation.delete", AnimationDeleteCommand.new(context))
 	router.register("navigation.bake", NavigationBakeCommand.new(context))
 	router.register("input_map.get", InputMapGetCommand.new())
 	router.register("input_map.set", InputMapSetCommand.new(save_project_settings))
