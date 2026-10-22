@@ -8,5 +8,6 @@ export const serverInstructions = [
   '- Changes stay unsaved until scene_save, as in the editor. Save when a logical change is complete; game_run saves first, like the editor does.',
   '- After writing or changing .gd files, check them with script_validate before running. Then check the result with game_run and read errors with game_get_output.',
   '- To check how the running game behaves, play input with game_input (actions come from input_map_set), wait for a state with game_wait and read nodes with game_get_properties; getters such as is_on_floor() work there.',
+  '- Check 3D placement and scale with numbers first (node_get_bounds), then look: game_screenshot shows the game window or views of its 3D world, editor_screenshot renders the open scene. One picture of a 3D scene can mislead, so use views from several angles, such as ["front", "top", "iso"].',
   '- When a result reports new errors (⚠), read them with game_get_output before you continue.',
 ].join('\n');

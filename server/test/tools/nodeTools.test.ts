@@ -1,6 +1,12 @@
 import type { CallToolResult } from '@modelcontextprotocol/server';
 import { describe, expect, it } from 'vitest';
-import { createNodeAddTool, createNodeDeleteTool, createNodeGetPropertiesTool, createNodeSetPropertiesTool } from '../../src/tools/nodeTools.js';
+import {
+  createNodeAddTool,
+  createNodeDeleteTool,
+  createNodeGetBoundsTool,
+  createNodeGetPropertiesTool,
+  createNodeSetPropertiesTool,
+} from '../../src/tools/nodeTools.js';
 import { FakeEditorGateway } from '../support/FakeEditorGateway.js';
 
 function textOf(result: CallToolResult): string {
@@ -85,5 +91,69 @@ describe('node tools', () => {
     const result = await createNodeSetPropertiesTool(editor).execute({ path: 'Player', properties: { speed: 5 } });
 
     expect(result.isError).toBe(true);
+  });
+
+  it('node_get_bounds describes the box a node takes up in the world', async () => {
+    const editor = new FakeEditorGateway().respondTo('node.get_bounds', {
+      scene: 'res://levels/arena.tscn',
+      path: 'Crate',
+      type: 'Node3D',
+      position: 'Vector3(3, 0, -1)',
+      size: 'Vector3(2, 2, 2)',
+      center: 'Vector3(4, 1, 0)',
+      end: 'Vector3(5, 2, 1)',
+      visual_count: 1,
+      collision_count: 1,
+    });
+
+    const result = await createNodeGetBoundsTool(editor).execute({ path: 'Crate' });
+
+    expect(editor.requests[0]?.params).toEqual({ path: 'Crate', in_game: false });
+    expect(textOf(result)).toBe(
+      [
+        'Crate (Node3D) in res://levels/arena.tscn, in world coordinates:',
+        'center Vector3(4, 1, 0), size Vector3(2, 2, 2)',
+        'from Vector3(3, 0, -1) to Vector3(5, 2, 1)',
+        'Measured from 1 visual node.',
+      ].join('\n'),
+    );
+  });
+
+  it('node_get_bounds measures a node of the running game by its collision shapes', async () => {
+    const editor = new FakeEditorGateway().respondTo('node.get_bounds', {
+      scene: 'res://levels/arena.tscn',
+      path: 'Player',
+      type: 'CharacterBody3D',
+      position: 'Vector3(-0.5, 0, -0.5)',
+      size: 'Vector3(1, 2, 1)',
+      center: 'Vector3(0, 1, 0)',
+      end: 'Vector3(0.5, 2, 0.5)',
+      visual_count: 0,
+      collision_count: 2,
+    });
+
+    const result = await createNodeGetBoundsTool(editor).execute({ path: 'Player', in_game: true });
+
+    expect(textOf(result)).toContain('Player (CharacterBody3D) in the running game (res://levels/arena.tscn), in world coordinates:');
+    expect(textOf(result)).toContain('No visual nodes, so measured from 2 collision shapes.');
+  });
+
+  it('node_get_bounds says when a node has nothing to measure', async () => {
+    const editor = new FakeEditorGateway().respondTo('node.get_bounds', {
+      scene: 'res://levels/arena.tscn',
+      path: '.',
+      type: 'Node3D',
+      position: 'Vector3(0, 0, 0)',
+      size: 'Vector3(0, 0, 0)',
+      center: 'Vector3(0, 0, 0)',
+      end: 'Vector3(0, 0, 0)',
+      visual_count: 0,
+      collision_count: 0,
+    });
+
+    const result = await createNodeGetBoundsTool(editor).execute({ path: '.' });
+
+    expect(textOf(result)).toContain('The scene root (Node3D)');
+    expect(textOf(result)).toContain('There are no visual nodes or collision shapes below it, so this is only its position.');
   });
 });

@@ -1,4 +1,4 @@
-import { accessSync, constants, statSync } from 'node:fs';
+import { accessSync, constants, readFileSync, statSync } from 'node:fs';
 import type { McpServer } from '@modelcontextprotocol/server';
 import { BridgeClient } from './bridge/BridgeClient.js';
 import { DiscoveryFileReader, isProcessAlive } from './bridge/DiscoveryFileReader.js';
@@ -77,7 +77,7 @@ export function createApplication(environment: ApplicationEnvironment): Applicat
       binaryLocator,
       readVersion: (executablePath) => new GodotCli(processRunner, executablePath).version(),
     }),
-    ...createEditorTools(editor),
+    ...createEditorTools(editor, readFileSync),
     new ScriptValidateTool(
       createScriptValidator({
         projectRoot: project.found ? project.root : undefined,
@@ -87,7 +87,7 @@ export function createApplication(environment: ApplicationEnvironment): Applicat
         languageServerPort: parsePort(environment.variables['GODOT_LSP_PORT']),
       }),
     ),
-    ...createGameTools(new GameGatewayRouter(editor, localGame), new GameOutputCursor()),
+    ...createGameTools(new GameGatewayRouter(editor, localGame), new GameOutputCursor(), readFileSync),
   ];
   const tools = plainTools.map((tool) => new ErrorReportingTool(tool, errorSummary));
 

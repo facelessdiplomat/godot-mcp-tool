@@ -1,0 +1,65 @@
+import type { TemporaryProject } from './harness.js';
+
+const playerScript = [
+  'extends CharacterBody3D',
+  '',
+  '',
+  'func _physics_process(delta: float) -> void:',
+  '\tif not is_on_floor():',
+  '\t\tvelocity += get_gravity() * delta',
+  '\tmove_and_slide()',
+  '',
+].join('\n');
+
+const mainScene = [
+  '[gd_scene load_steps=7 format=3]',
+  '',
+  '[ext_resource type="Script" path="res://player.gd" id="1_player"]',
+  '',
+  '[sub_resource type="StandardMaterial3D" id="Material_red"]',
+  'shading_mode = 0',
+  'albedo_color = Color(1, 0, 0, 1)',
+  '',
+  '[sub_resource type="BoxMesh" id="BoxMesh_crate"]',
+  'material = SubResource("Material_red")',
+  'size = Vector3(2, 2, 2)',
+  '',
+  '[sub_resource type="CapsuleShape3D" id="CapsuleShape3D_player"]',
+  '',
+  '[sub_resource type="Environment" id="Environment_plain"]',
+  'background_mode = 1',
+  'background_color = Color(0.2, 0.3, 0.5, 1)',
+  '',
+  '[node name="Main" type="Node3D"]',
+  '',
+  '[node name="Floor" type="CSGBox3D" parent="."]',
+  'transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.5, 0)',
+  'use_collision = true',
+  'size = Vector3(20, 1, 20)',
+  '',
+  '[node name="Crate" type="MeshInstance3D" parent="."]',
+  'transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4, 1, 0)',
+  'mesh = SubResource("BoxMesh_crate")',
+  '',
+  '[node name="Player" type="CharacterBody3D" parent="."]',
+  'transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 3, 0)',
+  'script = ExtResource("1_player")',
+  '',
+  '[node name="Shape" type="CollisionShape3D" parent="Player"]',
+  'shape = SubResource("CapsuleShape3D_player")',
+  '',
+  '[node name="Sun" type="DirectionalLight3D" parent="."]',
+  'transform = Transform3D(1, 0, 0, 0, 0.707107, 0.707107, 0, -0.707107, 0.707107, 0, 10, 0)',
+  '',
+  '[node name="Environment" type="WorldEnvironment" parent="."]',
+  'environment = SubResource("Environment_plain")',
+  '',
+  '[node name="Camera" type="Camera3D" parent="."]',
+  'transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4, 1, 6)',
+  '',
+].join('\n');
+
+export function writeCaptureScene(project: TemporaryProject): void {
+  project.write('player.gd', playerScript);
+  project.write('main.tscn', mainScene);
+}

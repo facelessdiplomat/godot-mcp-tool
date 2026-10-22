@@ -89,13 +89,14 @@ describe('input tools', () => {
       .respondTo('game.input', { steps: 1, waited_ms: 33, released: [], held: ['jump'] });
 
     const first = textOf(
-      await createGameInputTool(editor).execute({ steps: [{ action: 'move_forward', state: 'down' }, { wait_ms: 1000 }, { action: 'jump' }] }),
+      await createGameInputTool(editor, () => Buffer.alloc(0)).execute({ steps: [{ action: 'move_forward', state: 'down' }, { wait_ms: 1000 }, { action: 'jump' }] }),
     );
-    const second = textOf(await createGameInputTool(editor).execute({ steps: [{ action: 'jump', state: 'down' }], release_at_end: false }));
+    const second = textOf(await createGameInputTool(editor, () => Buffer.alloc(0)).execute({ steps: [{ action: 'jump', state: 'down' }], release_at_end: false }));
 
     expect(editor.requests[0]?.params).toEqual({
       steps: [{ action: 'move_forward', state: 'down' }, { wait_ms: 1000 }, { action: 'jump' }],
       release_at_end: true,
+      screenshot: false,
     });
     expect(editor.requests[0]?.options?.timeoutMs).toBeGreaterThan(1000 + 15_000);
     expect(first).toBe('Played 3 input steps in 1240 ms.\nReleased at the end: move_forward.');
@@ -105,14 +106,56 @@ describe('input tools', () => {
   it('game_input tells how to release a held key', async () => {
     const editor = new FakeEditorGateway().respondTo('game.input', { steps: 1, waited_ms: 16, released: [], held: ['key W'] });
 
-    const text = textOf(await createGameInputTool(editor).execute({ steps: [{ key: 'W', state: 'down' }], release_at_end: false }));
+    const text = textOf(await createGameInputTool(editor, () => Buffer.alloc(0)).execute({ steps: [{ key: 'W', state: 'down' }], release_at_end: false }));
 
     expect(text).toContain('Release it with {"key": "W", "state": "up"}.');
   });
 
   it('game_input refuses steps with unknown fields', async () => {
-    const result = await createGameInputTool(new FakeEditorGateway()).execute({ steps: [{ action: 'jump', hold: 5 }] } as never);
+    const result = await createGameInputTool(new FakeEditorGateway(), () => Buffer.alloc(0)).execute({ steps: [{ action: 'jump', hold: 5 }] } as never);
 
     expect(result.isError).toBe(true);
+  });
+
+  it('game_input returns a screenshot taken right after the last step', async () => {
+    const editor = new FakeEditorGateway().respondTo('game.input', {
+      steps: 1,
+      waited_ms: 40,
+      released: [],
+      held: [],
+      screenshot: {
+        path: '/captures/game-1-001.png',
+        width: 1152,
+        height: 648,
+        original_width: 1152,
+        original_height: 648,
+        scene: 'res://levels/arena.tscn',
+        views: [],
+      },
+    });
+
+    const result = await createGameInputTool(editor, () => Buffer.from('png')).execute({ steps: [{ action: 'jump' }], screenshot: true });
+
+    expect(editor.requests[0]?.params).toEqual({ steps: [{ action: 'jump' }], release_at_end: true, screenshot: true });
+    expect(result.content[0]).toEqual({ type: 'image', data: Buffer.from('png').toString('base64'), mimeType: 'image/png' });
+    expect(result.content[1]).toEqual({
+      type: 'text',
+      text: 'Played 1 input step in 40 ms.\nScreenshot of the running game (res://levels/arena.tscn), 1152×648.\nSaved to /captures/game-1-001.png',
+    });
+  });
+
+  it('game_input explains a screenshot it could not take', async () => {
+    const editor = new FakeEditorGateway().respondTo('game.input', {
+      steps: 1,
+      waited_ms: 40,
+      released: [],
+      held: [],
+      screenshot_error: 'The game runs without a window (headless), so it cannot render a screenshot',
+    });
+
+    const result = await createGameInputTool(editor, () => Buffer.from('png')).execute({ steps: [{ action: 'jump' }], screenshot: true });
+
+    expect(result.isError).toBeFalsy();
+    expect(textOf(result)).toBe('Played 1 input step in 40 ms.\nNo screenshot: The game runs without a window (headless), so it cannot render a screenshot');
   });
 });

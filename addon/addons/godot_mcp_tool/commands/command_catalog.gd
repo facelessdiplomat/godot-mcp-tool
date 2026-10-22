@@ -1,8 +1,11 @@
 extends RefCounted
 
+const AddonInfo := preload("../addon_info.gd")
 const CommandRouter := preload("command_router.gd")
 const EditingContext := preload("../scene/editing_context.gd")
 const EditorRescanCommand := preload("editor/editor_rescan_command.gd")
+const EditorScreenshotCommand := preload("editor/editor_screenshot_command.gd")
+const EditorViewportAccess := preload("../editor/editor_viewport_access.gd")
 const GameGetOutputCommand := preload("game/game_get_output_command.gd")
 const GameRequestCommand := preload("game/game_request_command.gd")
 const GameRunCommand := preload("game/game_run_command.gd")
@@ -11,6 +14,7 @@ const InputMapGetCommand := preload("input/input_map_get_command.gd")
 const InputMapSetCommand := preload("input/input_map_set_command.gd")
 const NodeAddCommand := preload("node/node_add_command.gd")
 const NodeDeleteCommand := preload("node/node_delete_command.gd")
+const NodeGetBoundsCommand := preload("node/node_get_bounds_command.gd")
 const NodeGetPropertiesCommand := preload("node/node_get_properties_command.gd")
 const NodeSetPropertiesCommand := preload("node/node_set_properties_command.gd")
 const PingCommand := preload("ping_command.gd")
@@ -23,19 +27,21 @@ const SceneGetTreeCommand := preload("scene/scene_get_tree_command.gd")
 const SceneOpenCommand := preload("scene/scene_open_command.gd")
 const SceneSaveCommand := preload("scene/scene_save_command.gd")
 
-
 const INSPECTION_TIMEOUT_MSEC := 10_000
 const WAIT_TIMEOUT_MSEC := 65_000
 const INPUT_TIMEOUT_MSEC := 300_000
+const SCREENSHOT_TIMEOUT_MSEC := 30_000
 
 
 static func build_router(context: EditingContext, runtime: RuntimeContext, read_indentation: Callable, save_project_settings: Callable) -> CommandRouter:
+	var captures := ProjectSettings.globalize_path("res://").path_join(AddonInfo.CAPTURES_RELATIVE_PATH)
 	var router := CommandRouter.new()
 	router.register("ping", PingCommand.new())
 	router.register("project.info", ProjectInfoCommand.new(read_indentation))
 	router.register("project.settings_get", ProjectSettingsGetCommand.new(context.codec))
 	router.register("project.settings_set", ProjectSettingsSetCommand.new(context.codec, save_project_settings))
 	router.register("editor.rescan", EditorRescanCommand.new())
+	router.register("editor.screenshot", EditorScreenshotCommand.new(context, EditorViewportAccess.new(), captures))
 	router.register("input_map.get", InputMapGetCommand.new())
 	router.register("input_map.set", InputMapSetCommand.new(save_project_settings))
 	router.register("scene.create", SceneCreateCommand.new(context))
@@ -45,6 +51,7 @@ static func build_router(context: EditingContext, runtime: RuntimeContext, read_
 	router.register("node.add", NodeAddCommand.new(context))
 	router.register("node.delete", NodeDeleteCommand.new(context))
 	router.register("node.get_properties", NodeGetPropertiesCommand.new(context))
+	router.register("node.get_bounds", NodeGetBoundsCommand.new(context, GameRequestCommand.new(runtime, "bounds", INSPECTION_TIMEOUT_MSEC)))
 	router.register("node.set_properties", NodeSetPropertiesCommand.new(context))
 	router.register("game.run", GameRunCommand.new(context, runtime))
 	router.register("game.stop", GameStopCommand.new(runtime))
@@ -54,4 +61,5 @@ static func build_router(context: EditingContext, runtime: RuntimeContext, read_
 	router.register("game.set_properties", GameRequestCommand.new(runtime, "properties.set", INSPECTION_TIMEOUT_MSEC))
 	router.register("game.wait", GameRequestCommand.new(runtime, "wait", WAIT_TIMEOUT_MSEC))
 	router.register("game.input", GameRequestCommand.new(runtime, "input", INPUT_TIMEOUT_MSEC))
+	router.register("game.screenshot", GameRequestCommand.new(runtime, "screenshot", SCREENSHOT_TIMEOUT_MSEC))
 	return router

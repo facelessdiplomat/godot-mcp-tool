@@ -1,5 +1,6 @@
 extends "../../commands/command.gd"
 
+const Command := preload("../../commands/command.gd")
 const InputEventCodec := preload("../../input/input_event_codec.gd")
 const Params := preload("../../commands/params.gd")
 const SimilarNames := preload("../../util/similar_names.gd")
@@ -11,14 +12,21 @@ const TAP_PHYSICS_FRAMES := 2
 const STATES := ["tap", "down", "up"]
 const STEP_KINDS := "{\"action\": name}, {\"key\": name}, {\"mouse_motion\": [dx, dy]}, {\"click\": [x, y]}, {\"text\": text}, {\"wait_ms\": n} or {\"wait_physics_frames\": n}"
 
+var _capture: Command
 var _held := {}
+
+
+func _init(capture: Command) -> void:
+	_capture = capture
 
 
 func execute(params: Dictionary) -> Variant:
 	var steps: Variant = params.get("steps")
 	var release_at_end: Variant = Params.flag(params, "release_at_end", true)
-	if release_at_end is CommandError:
-		return release_at_end
+	var take_screenshot: Variant = Params.flag(params, "screenshot", false)
+	for value in [release_at_end, take_screenshot]:
+		if value is CommandError:
+			return value
 	if not steps is Array or (steps as Array).is_empty() or (steps as Array).size() > MAXIMUM_STEPS:
 		return CommandError.new(
 			JsonRpc.INVALID_PARAMS,
@@ -41,7 +49,14 @@ func execute(params: Dictionary) -> Variant:
 		for label in released:
 			_send(_held[label], false)
 		_held.clear()
-	return {"steps": planned.size(), "waited_ms": Time.get_ticks_msec() - started_msec, "released": released, "held": _held.keys()}
+	var played := {"steps": planned.size(), "waited_ms": Time.get_ticks_msec() - started_msec, "released": released, "held": _held.keys()}
+	if take_screenshot:
+		var capture: Variant = await _capture.execute({})
+		if capture is CommandError:
+			played["screenshot_error"] = (capture as CommandError).message
+		else:
+			played["screenshot"] = capture
+	return played
 
 
 func _perform(step: Dictionary, tree: SceneTree) -> void:

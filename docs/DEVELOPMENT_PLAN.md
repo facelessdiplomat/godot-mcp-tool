@@ -405,7 +405,7 @@ About 65 tools across all milestones; 16 in the MVP.
 |---|---|---|---|---|
 | `editor_rescan` | Sync the editor with the disk (§9.3): scan, reimport, reload open scripts; wait until done | 1 | W (idempotent) | E (C: `--headless --import`) |
 | `editor_launch` | Launch the editor for the project and wait until the addon connects | 2 | W | C |
-| `editor_screenshot` | Screenshot of the 2D/3D viewport or the whole editor window; in 3D, optionally renders from given cameras (§8.9) | 2 | R | E |
+| `editor_screenshot` | Render of the 3D scene open in the editor from the editor camera or from given views (§8.9), without the grid and gizmos; says when the editor's preview sun and sky light it. 2D scenes and UI are checked with `game_screenshot`; a capture of the whole editor window is not planned yet | 2 | R | E |
 | `editor_select` | Select nodes or files so the user sees what the agent is talking about | 3 | W (harmless) | E |
 | `editor_run_script` | Run a GDScript snippet in the editor context — an escape hatch, disabled by default | 3 | D | E |
 | `filesystem_move` / `filesystem_delete` | Move and delete files together with their `.uid`/`.import` files, checking dependencies | 4 | D | E |
@@ -506,7 +506,7 @@ right angles and in structured spatial checks.
 
 | Tool / capability | What it does | M | Kind | Needs |
 |---|---|---|---|---|
-| `camera` option of `editor_screenshot` and `game_screenshot` | Render from given viewpoints (`position`, `look_at`, `fov`) or preset angles (`front`, `side`, `top`, `iso`) framed on a node's bounds. Uses a temporary `Camera3D` in a `SubViewport` that shares the scene's `World3D`; the user's editor camera and the game's active camera stay untouched | 2 | R | E/G |
+| `views` option of `editor_screenshot` and `game_screenshot` | Render from preset angles (`front`, `back`, `left`, `right`, `top`, `iso`) framed on the whole scene or on a node's bounds, or from given viewpoints (`position`, `look_at`, `fov`); up to six views in one labelled contact sheet. Uses a temporary `Camera3D` in a `SubViewport` that shares the scene's `World3D`; the user's editor camera and the game's active camera stay untouched | 2 | R | E/G |
 | `node_get_bounds` | Global AABB (center, size) of a 3D node and its subtree — for placement and scale checks | 2 | R | E/G |
 | `asset_import_settings_get` / `asset_import_settings_set` | Import options of 3D models (glTF, FBX, `.blend`): scale, root type, collision generation, material extraction; then reimport | 4 | R/W | E |
 | `navigation_bake` | Bake the `NavigationMesh` of a `NavigationRegion3D`, wait for `bake_finished`, report the result | 4 | W | E |
@@ -726,9 +726,11 @@ On a script error the editor's debugger pauses the game by default — to the ag
 
 - In the game: wait for `RenderingServer.frame_post_draw`, then `get_viewport().get_texture().get_image()` (spike 2:
   3 ms, plus 17 ms for the PNG). On macOS a game started from the editor runs embedded in the Game view by default;
-  capturing works the same.
-- In the editor: `EditorInterface.get_editor_viewport_2d()` / `get_editor_viewport_3d(i)` or the editor window's
-  viewport. The 3D viewport image includes the grid and the axis gizmos.
+  capturing works the same. The image is scaled to the game view (`get_visible_rect()`), so that its pixels are the
+  positions `game_input` clicks use: with the `canvas_items` stretch mode the window texture is larger than the view.
+- In the editor, the image of `get_editor_viewport_3d(i)` includes the grid and the gizmos and goes stale while the 3D
+  screen is hidden, so `editor_screenshot` renders from the editor camera's transform, field of view and projection
+  with an extra camera instead, as below.
 - Renders from extra cameras: a temporary `SubViewport` whose `world_3d` is the scene's world (`find_world_3d()`) plus
   a `Camera3D` with the requested transform; rendered once, then freed. The image has no gizmos. Spike 11:
   - in the editor, don't wait for `frame_post_draw`: an idle editor may not draw a frame for seconds (90 s in one run).
@@ -736,11 +738,14 @@ On a script error the editor's debugger pauses the game by default — to the ag
     first frame renders from the origin), then `RenderingServer.force_draw(false)`: 13–44 ms with the editor in the
     background;
   - the editor's preview sun and sky live in the same `World3D`, so a scene without its own lights looks lit in editor
-    renders but dark in the running game. Editor renders are labelled "editor preview lighting" in that case, and the
-    final look is checked with `game_screenshot`.
-- Images are downscaled to a given longest side (1280 px by default), PNG or JPEG, and written to
-  `.godot/godot_mcp_tool/captures/`; the server returns the image as image content plus the file path. Several angles
-  go into a single contact sheet to save tokens.
+    renders but dark in the running game. The result of an editor render says so when the scene has no
+    `DirectionalLight3D` or `WorldEnvironment` of its own, and the final look is checked with `game_screenshot`;
+  - each view is labelled by a `Label` inside its `SubViewport`. A `CanvasItem` draws itself through a deferred call,
+    so the editor render waits for one `process_frame` before `force_draw`.
+- Images are fitted to a given longest side (1280 px by default, 256–2560), PNG or JPEG, and written to
+  `.godot/godot_mcp_tool/captures/` (the latest 100 are kept); the server returns the image as image content plus the
+  file path. Several views go into a single contact sheet to save tokens: `ceil(sqrt(n))` columns of 16:9 cells,
+  each rendered at its final size, so nothing is scaled down afterwards. The file is the image the model receives.
 - A debugger message is capped at 8 MiB — in spike 2 a 7 MB message arrived and a 9 MB one was dropped without any
   error. One more reason to pass a path rather than bytes.
 - `--headless` has no rendering, so screenshots are impossible there and the tool returns a clear error. A game
@@ -779,7 +784,7 @@ Our rules:
 - a typical response stays under ~2,000 tokens, with a hard ceiling of ~8,000;
 - every read tool has limits (`max_depth`, `max_items`, `max_lines`, `cursor`) with conservative defaults; when output
   is truncated, the response says what was cut and how to get the rest;
-- screenshots are downscaled by default; the full-size file stays on disk;
+- screenshots are fitted to 1280 px by default, and several views share one image;
 - text first: we don't use `structuredContent` by default. According to the Agent SDK docs, when it is present the
   model receives the JSON instead of the text blocks; this is not confirmed for external stdio servers — a spike
   will check.
@@ -1090,9 +1095,14 @@ against a headless editor, Ctrl+Z included, and it passed in a live Claude Code 
       the mouse in game-view pixels, type text and wait. Actions go in as `InputEventAction`, so both polling and
       `_input` see them; held input is released at the end unless asked otherwise.
 - [x] `input_map_get` / `input_map_set`, moved here from milestone 3 for the scenario below.
-- [ ] Runtime: `game_screenshot`.
-- [ ] 3D views: the `camera` option of the screenshot tools, preset angles, contact sheets; `node_get_bounds`.
-- [ ] `editor_screenshot`, `editor_launch`.
+- [x] `game_screenshot`: the game window with its UI, scaled to the game view so that its pixels are the positions
+      `game_input` clicks use. `game_input` takes one right after its last step with `screenshot: true`.
+- [x] 3D views: the `views` option of both screenshot tools — preset angles framed on the scene or on a node, or
+      cameras at a position — rendered by temporary cameras into one labelled contact sheet; `node_get_bounds` for a
+      scene or for the running game (`in_game`).
+- [x] `editor_screenshot`: the open scene from the editor camera or from views, without the grid and gizmos, with a
+      note when the editor's preview sun and sky light the render.
+- [ ] `editor_launch`.
 - [x] `script_validate` (LSP and the fallback).
 - [ ] `docs_class`, `docs_search`: the `--doctool` cache, BBCode → Markdown, your own classes.
 - [ ] `scene_batch_edit`, `node_reparent`, `node_duplicate`, `node_find`, `signal_list/connect/disconnect`.
@@ -1409,6 +1419,10 @@ Checked against the sources in `~/Software/godot` (`master`, 4.8-beta, commit `6
 | File logging is on for desktop: `debug/file_logging/enable_file_logging.pc = true`, path `user://logs/godot.log` | `main/main.cpp` |
 | Editor settings: `text_editor/behavior/files/auto_reload_scripts_on_external_change` = `true`, `interface/editor/timers/unfocused_low_processor_mode_sleep_usec` = 100000 | `editor/settings/editor_settings.cpp` |
 | `JSON.from_native/to_native` (since 4.3), `ClassDB.class_get_property_default_value`, `ProjectSettings.get_global_class_list` | `doc/classes/` |
+| A `Node3D` follows only a direct `Node3D` parent: under a plain `Node` its own transform is its global transform | `scene/3d/node_3d.cpp` |
+| `CanvasItem.queue_redraw()` draws through a deferred call. `SceneTree.process` emits `process_frame`, flushes the message queue, runs `_process` and flushes again, so a node added during a frame has drawn itself by the next `process_frame` | `scene/main/canvas_item.cpp`, `scene/main/scene_tree.cpp` |
+| `Viewport.get_visible_rect()` returns the 2D size override (the base size of the `canvas_items` stretch mode), while the root viewport's texture has the window's size in pixels | `scene/main/viewport.cpp` |
+| `Vector3.snapped(Vector3.ONE * 0.001)` leaves float32 noise such as `3.0000002`, and `String.num(10.0, 2)` gives `"10.0"`; the addon rounds with `(v * 1000.0).round() / 1000.0` and writes whole numbers itself | observed on 4.8 |
 | 3D: `NavigationRegion3D.bake_navigation_mesh()` and the `bake_finished` signal; `Viewport.world_3d` / `own_world_3d`; `physics/3d/physics_engine` (`DEFAULT` currently means GodotPhysics3D; Jolt can be selected); CSG nodes (`CSGBox3D`, `CSGCombiner3D`, …); `GridMap.set_cell_item` | `doc/classes/`, `modules/csg/doc_classes/` |
 
 ---

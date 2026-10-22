@@ -1,10 +1,13 @@
 extends RefCounted
 
+const AddonInfo := preload("../../addon_info.gd")
 const CommandRouter := preload("../../commands/command_router.gd")
+const GameBoundsCommand := preload("game_bounds_command.gd")
 const GameInputCommand := preload("game_input_command.gd")
 const GamePropertiesGetCommand := preload("game_properties_get_command.gd")
 const GamePropertiesSetCommand := preload("game_properties_set_command.gd")
 const GameScene := preload("game_scene.gd")
+const GameScreenshotCommand := preload("game_screenshot_command.gd")
 const GameTreeCommand := preload("game_tree_command.gd")
 const GameWaitCommand := preload("game_wait_command.gd")
 const PropertyEditor := preload("../../scene/property_editor.gd")
@@ -15,10 +18,13 @@ static func build_router(scene_root_provider: Callable) -> CommandRouter:
 	var scene := GameScene.new(scene_root_provider)
 	var codec := VariantCodec.new()
 	var properties := PropertyEditor.new(codec)
+	var screenshot := GameScreenshotCommand.new(scene, ProjectSettings.globalize_path("res://").path_join(AddonInfo.CAPTURES_RELATIVE_PATH))
 	var router := CommandRouter.new()
 	router.register("tree", GameTreeCommand.new(scene))
 	router.register("properties.get", GamePropertiesGetCommand.new(scene, properties, codec))
 	router.register("properties.set", GamePropertiesSetCommand.new(scene, properties))
 	router.register("wait", GameWaitCommand.new(scene, codec))
-	router.register("input", GameInputCommand.new())
+	router.register("input", GameInputCommand.new(screenshot))
+	router.register("bounds", GameBoundsCommand.new(scene, codec))
+	router.register("screenshot", screenshot)
 	return router

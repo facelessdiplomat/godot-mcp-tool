@@ -16,6 +16,20 @@ class InputRecorder:
 		events.append(event)
 
 
+class FixedCapture:
+	extends "res://addons/godot_mcp_tool/commands/command.gd"
+
+	var outcome: Variant
+	var calls := 0
+
+	func _init(fixed_outcome: Variant) -> void:
+		outcome = fixed_outcome
+
+	func execute(_params: Dictionary) -> Variant:
+		calls += 1
+		return outcome
+
+
 var _recorder: InputRecorder
 var _command: GameInputCommand
 
@@ -27,7 +41,7 @@ func before_each() -> void:
 	InputMap.action_add_event(JUMP_ACTION, key)
 	_recorder = InputRecorder.new()
 	add_child_autofree(_recorder)
-	_command = GameInputCommand.new()
+	_command = GameInputCommand.new(FixedCapture.new({}))
 
 
 func after_each() -> void:
@@ -121,3 +135,23 @@ func test_explains_a_step_it_does_not_know() -> void:
 
 func test_requires_steps() -> void:
 	assert_true(await _command.execute({"steps": []}) is CommandError)
+
+
+func test_takes_a_screenshot_after_the_last_step() -> void:
+	var capture := FixedCapture.new({"path": "/captures/game-1-001.png"})
+	var result: Dictionary = await GameInputCommand.new(capture).execute({"steps": [{"action": JUMP_ACTION}], "screenshot": true})
+	assert_eq(result["screenshot"], {"path": "/captures/game-1-001.png"})
+
+
+func test_reports_a_screenshot_that_failed_after_the_input() -> void:
+	var capture := FixedCapture.new(CommandError.new(JsonRpc.OPERATION_FAILED, "The game runs without a window (headless), so it cannot render a screenshot"))
+	var result: Dictionary = await GameInputCommand.new(capture).execute({"steps": [{"action": JUMP_ACTION}], "screenshot": true})
+	assert_eq(result["steps"], 1)
+	assert_string_contains(result["screenshot_error"], "without a window")
+
+
+func test_takes_no_screenshot_unless_asked() -> void:
+	var capture := FixedCapture.new({"path": "/captures/game-1-001.png"})
+	var result: Dictionary = await GameInputCommand.new(capture).execute({"steps": [{"action": JUMP_ACTION}]})
+	assert_eq(capture.calls, 0)
+	assert_false(result.has("screenshot"))

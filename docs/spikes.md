@@ -27,7 +27,7 @@ Update the engine deliberately: pull `master`, rebuild, rerun `npm test`, `npm r
 | 5 | Can agent runs avoid the pause on script errors, and can a paused game be resumed? | `--ignore-error-breaks` via `_run_scene` prevents the pause. Without it, the raw debugger message `continue` resumes the game, and custom captures keep working while it is paused | A `game_continue` capability is possible; the runtime agent can report state while the game is paused |
 | 6 | Does the addon run in `godot --headless --editor`? | Yes: the bridge starts, writes the discovery file, and the full integration test passes against it | Windowless editor mode is viable for CI and milestone 4 |
 | 7 | Can `--check-only --script` replace the editor for validation? | Not reliably: the exit code is always 0, and references to autoloads are reported as errors | Demoted to a last-resort fallback that parses stderr and filters autoload false positives |
-| 8 | How does Claude Code pass text, `structuredContent` and images to the model? | Text: yes, but several text blocks may reach the model joined without a separator. `alwaysLoad` and the server instructions work. `structuredContent` and images are not checked yet: the server sends neither before milestone 2 | The new-error summary is appended to the last text block after a blank line; images are checked with `game_screenshot` in milestone 2 |
+| 8 | How does Claude Code pass text, `structuredContent` and images to the model? | Text: yes, but several text blocks may reach the model joined without a separator. `alwaysLoad` and the server instructions work. Images: an image block reaches the model as an image, PNG or JPEG, and the text block after it arrives intact. `structuredContent` is not checked: no tool sends it | The new-error summary is appended to the last text block after a blank line. A screenshot is one image block followed by one text block with the size, the notes and the file path |
 | 9 | Does the editor overwrite an agent's edit with a stale unsaved script tab? | Yes, both on `save_all_scenes()` and on running the game (`save_before_running` is on by default). `ScriptEditor.get_unsaved_files()` lists the file beforehand | Conflict detection before saving and running is mandatory in milestone 1 |
 | 10 | Does a symlinked addon work in a separate project? | Yes: `test-project` uses a relative symlink, the editor loads the plugin and imports work | Confirmed |
 | 11 | Can we render from an extra camera in the editor and in the game? | Yes, with a `SubViewport` that shares the scene's `World3D`: 19 ms in the game, 13–44 ms in an unfocused editor with `RenderingServer.force_draw()`. The editor's preview sun and sky belong to that world | Confirmed, with two corrections to the plan (§9.8) |
@@ -129,6 +129,15 @@ on `test-project`:
   scene, the run with its output, and a deliberate script error with its summary in the next response and its stack
   in `game_get_output`.
 
+Images were checked the same day, after milestone 2 added the screenshot tools, with a windowed editor on
+`test-project`:
+
+- `editor_screenshot` (from the editor camera and as a contact sheet of four views), `game_screenshot` (the window,
+  and two views as JPEG) and `game_input` with `screenshot: true` each returned an image block and a text block.
+- The model received the image itself, then a line `[Image: source: …/tool-results/mcp-godot-blob-….png]` that
+  Claude Code adds after saving the image in the session folder, then our text block unchanged.
+- A 1280×724 contact sheet and a 1152×648 game screenshot came through without a size warning.
+
 ### 9. Stale script overwrite
 
 Sequence: a script is open in the script editor with an unsaved change ("editor B"); the agent writes "agent C" to
@@ -200,4 +209,4 @@ Two traps found on the way:
 
 | # | What is left | Needs |
 |---|---|---|
-| 8 | How Claude Code shows images and `structuredContent` to the model | `game_screenshot` in milestone 2 |
+| 8 | Whether Claude Code gives the model `structuredContent` instead of the text blocks | a tool that returns `structuredContent`; none does yet |

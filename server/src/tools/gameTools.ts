@@ -3,13 +3,14 @@ import type { EditorGateway } from '../editor/EditorGateway.js';
 import type { GameOutputCursor } from '../runtime/GameOutputCursor.js';
 import { changingAnnotations, readingAnnotations } from './annotations.js';
 import { BridgeTool } from './bridge/BridgeTool.js';
+import { type CaptureReader, createGameScreenshotTool } from './captureTools.js';
 import { formatLogEntries, logEntrySchema } from './formatting/logEntries.js';
 import { createGameGetPropertiesTool, createGameGetTreeTool, createGameSetPropertiesTool, createGameWaitTool } from './gameInspectionTools.js';
 import { createGameInputTool } from './inputTools.js';
 import { textResult } from './results.js';
 import type { Tool } from './Tool.js';
 
-export function createGameTools(game: EditorGateway, cursor: GameOutputCursor): Tool[] {
+export function createGameTools(game: EditorGateway, cursor: GameOutputCursor, readCapture: CaptureReader): Tool[] {
   return [
     createGameRunTool(game, cursor),
     createGameStopTool(game),
@@ -18,7 +19,8 @@ export function createGameTools(game: EditorGateway, cursor: GameOutputCursor): 
     createGameGetPropertiesTool(game),
     createGameSetPropertiesTool(game),
     createGameWaitTool(game),
-    createGameInputTool(game),
+    createGameInputTool(game, readCapture),
+    createGameScreenshotTool(game, readCapture),
   ];
 }
 

@@ -127,7 +127,7 @@ describe('game tools', () => {
   });
 
   it('loads game_run and game_get_output up front', () => {
-    const tools = createGameTools(new FakeEditorGateway(), new GameOutputCursor());
+    const tools = createGameTools(new FakeEditorGateway(), new GameOutputCursor(), () => Buffer.alloc(0));
 
     expect(tools.map((tool) => [tool.name, tool.definition.alwaysLoad])).toEqual([
       ['game_run', true],
@@ -138,6 +138,7 @@ describe('game tools', () => {
       ['game_set_properties', false],
       ['game_wait', false],
       ['game_input', false],
+      ['game_screenshot', false],
     ]);
   });
 

@@ -22,6 +22,11 @@ export interface ToolOutcome {
   readonly isError: boolean;
 }
 
+export interface ImageOutcome extends ToolOutcome {
+  readonly image: Buffer | undefined;
+  readonly mimeType: string | undefined;
+}
+
 export async function waitFor(condition: () => boolean, timeoutMs: number): Promise<void> {
   const deadline = Date.now() + timeoutMs;
   while (!condition()) {
@@ -32,10 +37,18 @@ export async function waitFor(condition: () => boolean, timeoutMs: number): Prom
   }
 }
 
-export async function startHeadlessEditor(projectRoot: string, languageServerPort?: number): Promise<ChildProcess> {
-  const discovery = new DiscoveryFileReader(projectRoot, isProcessAlive);
+export function startHeadlessEditor(projectRoot: string, languageServerPort?: number): Promise<ChildProcess> {
   const portArguments = languageServerPort === undefined ? [] : ['--lsp-port', String(languageServerPort)];
-  const editorProcess = spawn(godotBinary, ['--headless', '--editor', '--path', projectRoot, ...portArguments], { stdio: 'ignore' });
+  return startEditor(projectRoot, ['--headless', ...portArguments]);
+}
+
+export function startWindowedEditor(projectRoot: string): Promise<ChildProcess> {
+  return startEditor(projectRoot, []);
+}
+
+async function startEditor(projectRoot: string, extraArguments: readonly string[]): Promise<ChildProcess> {
+  const discovery = new DiscoveryFileReader(projectRoot, isProcessAlive);
+  const editorProcess = spawn(godotBinary, ['--editor', '--path', projectRoot, ...extraArguments], { stdio: 'ignore' });
   await waitFor(() => {
     const discovered = discovery.read();
     return discovered.kind === 'found' && discovered.endpoint.pid === editorProcess.pid;
@@ -81,6 +94,18 @@ export class McpSession {
     const result = await this.client.callTool({ name, arguments: toolArguments });
     const [content] = result.content;
     return { text: content?.type === 'text' ? content.text : '', isError: result.isError === true };
+  }
+
+  async callForImage(name: string, toolArguments: Record<string, unknown> = {}): Promise<ImageOutcome> {
+    const result = await this.client.callTool({ name, arguments: toolArguments });
+    const texts = result.content.flatMap((content) => (content.type === 'text' ? [content.text] : []));
+    const image = result.content.find((content) => content.type === 'image');
+    return {
+      text: texts.join('\n'),
+      isError: result.isError === true,
+      image: image === undefined ? undefined : Buffer.from(image.data, 'base64'),
+      mimeType: image?.mimeType,
+    };
   }
 
   async close(): Promise<void> {

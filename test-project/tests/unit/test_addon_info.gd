@@ -11,3 +11,7 @@ func test_version_matches_plugin_cfg() -> void:
 
 func test_discovery_file_lives_inside_the_godot_folder() -> void:
 	assert_true(AddonInfo.DISCOVERY_RELATIVE_PATH.begins_with(".godot/"))
+
+
+func test_captures_live_inside_the_godot_folder() -> void:
+	assert_true(AddonInfo.CAPTURES_RELATIVE_PATH.begins_with(".godot/"))

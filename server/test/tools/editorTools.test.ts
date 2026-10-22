@@ -4,14 +4,15 @@ import { createEditorTools } from '../../src/tools/editorTools.js';
 import { FakeEditorGateway } from '../support/FakeEditorGateway.js';
 
 describe('createEditorTools', () => {
-  const tools = createEditorTools(new FakeEditorGateway());
+  const tools = createEditorTools(new FakeEditorGateway(), () => Buffer.alloc(0));
 
-  it('offers the editor tools of the first milestone', () => {
+  it('offers the editor tools', () => {
     expect(tools.map((tool) => tool.name)).toEqual([
       'project_info',
       'project_settings_get',
       'project_settings_set',
       'editor_rescan',
+      'editor_screenshot',
       'input_map_get',
       'input_map_set',
       'scene_create',
@@ -21,6 +22,7 @@ describe('createEditorTools', () => {
       'node_add',
       'node_delete',
       'node_get_properties',
+      'node_get_bounds',
       'node_set_properties',
     ]);
   });

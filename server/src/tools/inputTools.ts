@@ -1,7 +1,9 @@
+import type { CallToolResult } from '@modelcontextprotocol/server';
 import * as z from 'zod/v4';
 import type { EditorGateway } from '../editor/EditorGateway.js';
 import { changingAnnotations, readingAnnotations } from './annotations.js';
 import { BridgeTool } from './bridge/BridgeTool.js';
+import { type CaptureReader, captureSchema, describeGameCapture, presentCapture, screenshotAllowanceMs } from './captureTools.js';
 import { errorResult, textResult } from './results.js';
 
 const defaultDeadzone = 0.2;
@@ -37,6 +39,8 @@ const playedInputSchema = z.object({
   waited_ms: z.number(),
   released: z.array(z.string()),
   held: z.array(z.string()),
+  screenshot: captureSchema.optional(),
+  screenshot_error: z.string().optional(),
 });
 
 type PlayedInput = z.infer<typeof playedInputSchema>;
@@ -187,24 +191,37 @@ const gameInputInput = z.object({
       'Input to play in order, such as [{"action": "move_forward", "ms": 1000}, {"action": "jump"}, {"mouse_motion": [120, 0]}, {"click": [640, 360]}, {"wait_ms": 300}].',
     ),
   release_at_end: z.boolean().default(true).describe('Release every action and key that is still held after the last step. Default: true.'),
+  screenshot: z
+    .boolean()
+    .default(false)
+    .describe('Take a screenshot of the game window right after the last step, as game_screenshot does, so that it shows the moment the input ends.'),
 });
 
-export function createGameInputTool(game: EditorGateway): BridgeTool<typeof gameInputInput, PlayedInput> {
+export function createGameInputTool(game: EditorGateway, readCapture: CaptureReader): BridgeTool<typeof gameInputInput, PlayedInput> {
   return new BridgeTool(game, {
     name: 'game_input',
     definition: {
       title: 'Play input into the game',
       description:
-        'Play input into the running game step by step: hold input actions or keys for a time, move and click the mouse, type text, wait. Use it to try gameplay, such as walking forward for a second and then jumping, then check the result with game_get_properties or game_wait. Actions must exist in the project when the game starts. Needs a game started from the editor.',
+        'Play input into the running game step by step: hold input actions or keys for a time, move and click the mouse, type text, wait. Use it to try gameplay, such as walking forward for a second and then jumping, then check the result with game_get_properties, game_wait, or a screenshot taken right after the last step (screenshot: true). Actions must exist in the project when the game starts. Needs a game started from the editor.',
       inputSchema: gameInputInput,
       annotations: changingAnnotations({ destructive: false, idempotent: false }),
       alwaysLoad: false,
     },
     method: 'game.input',
     responseSchema: playedInputSchema,
-    timeoutMs: ({ steps }) => inputAllowanceMs + steps.reduce((total, step) => total + estimatedDurationMs(step), 0),
-    present: (played) => textResult(describePlayedInput(played)),
+    timeoutMs: ({ steps, screenshot }) =>
+      inputAllowanceMs + (screenshot ? screenshotAllowanceMs : 0) + steps.reduce((total, step) => total + estimatedDurationMs(step), 0),
+    present: (played) => presentPlayedInput(played, readCapture),
   });
+}
+
+function presentPlayedInput(played: PlayedInput, readCapture: CaptureReader): CallToolResult {
+  const summary = describePlayedInput(played);
+  if (played.screenshot !== undefined) {
+    return presentCapture(played.screenshot, `${summary}\n${describeGameCapture(played.screenshot, true)}`, readCapture);
+  }
+  return textResult(played.screenshot_error === undefined ? summary : `${summary}\nNo screenshot: ${played.screenshot_error}`);
 }
 
 function estimatedDurationMs(step: InputStep): number {

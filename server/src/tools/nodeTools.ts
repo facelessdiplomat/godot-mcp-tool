@@ -26,6 +26,20 @@ const updatedNodeSchema = applyReportSchema.extend({ scene: z.string(), path: z.
 
 type UpdatedNode = z.infer<typeof updatedNodeSchema>;
 
+const nodeBoundsSchema = z.object({
+  scene: z.string(),
+  path: z.string(),
+  type: z.string(),
+  position: z.string(),
+  size: z.string(),
+  center: z.string(),
+  end: z.string(),
+  visual_count: z.number(),
+  collision_count: z.number(),
+});
+
+type NodeBounds = z.infer<typeof nodeBoundsSchema>;
+
 const nodeAddInput = z.object({
   type: z
     .string()
@@ -108,6 +122,60 @@ export function createNodeGetPropertiesTool(editor: EditorGateway): BridgeTool<t
     responseSchema: propertyListSchema,
     present: (list) => textResult(formatPropertyList(list)),
   });
+}
+
+const nodeGetBoundsInput = z.object({
+  path: z
+    .string()
+    .min(1)
+    .describe('Path of the node relative to the scene root, such as "Level/Crate"; "." measures the whole scene. With in_game, a path in the running game, such as "Player".'),
+  scene: sceneToRead,
+  in_game: z.boolean().default(false).describe('Measure the node in the running game instead, where it may have moved. Needs a game started from the editor.'),
+});
+
+export function createNodeGetBoundsTool(editor: EditorGateway): BridgeTool<typeof nodeGetBoundsInput, NodeBounds> {
+  return new BridgeTool(editor, {
+    name: 'node_get_bounds',
+    definition: {
+      title: 'Node bounds',
+      description:
+        'Measure the box that a 3D node and its children take up in world coordinates: center, size and corners, from its meshes and CSG shapes, or from its collision shapes when it has none. Use it to check placement and scale, such as whether a crate rests on the floor or a door is wide enough for the player.',
+      inputSchema: nodeGetBoundsInput,
+      annotations: readingAnnotations,
+      alwaysLoad: false,
+    },
+    method: 'node.get_bounds',
+    responseSchema: nodeBoundsSchema,
+    present: (bounds, input) => textResult(describeBounds(bounds, input.in_game)),
+  });
+}
+
+function describeBounds(bounds: NodeBounds, inGame: boolean): string {
+  const place = inGame ? `the running game${bounds.scene === '' ? '' : ` (${bounds.scene})`}` : bounds.scene;
+  return [
+    `${capitalized(formatNodePath(bounds.path))} (${bounds.type}) in ${place}, in world coordinates:`,
+    `center ${bounds.center}, size ${bounds.size}`,
+    `from ${bounds.position} to ${bounds.end}`,
+    describeMeasuredNodes(bounds),
+  ].join('\n');
+}
+
+function describeMeasuredNodes(bounds: NodeBounds): string {
+  if (bounds.visual_count > 0) {
+    return `Measured from ${counted(bounds.visual_count, 'visual node')}.`;
+  }
+  if (bounds.collision_count > 0) {
+    return `No visual nodes, so measured from ${counted(bounds.collision_count, 'collision shape')}.`;
+  }
+  return 'There are no visual nodes or collision shapes below it, so this is only its position.';
+}
+
+function counted(count: number, noun: string): string {
+  return `${String(count)} ${noun}${count === 1 ? '' : 's'}`;
+}
+
+function capitalized(text: string): string {
+  return text.charAt(0).toUpperCase() + text.slice(1);
 }
 
 const nodeSetPropertiesInput = z.object({

@@ -7,6 +7,7 @@ const FakeScriptEditorAccess := preload("res://tests/support/fake_script_editor_
 const JsonRpc := preload("res://addons/godot_mcp_tool/bridge/json_rpc.gd")
 const NodeAddCommand := preload("res://addons/godot_mcp_tool/commands/node/node_add_command.gd")
 const NodeDeleteCommand := preload("res://addons/godot_mcp_tool/commands/node/node_delete_command.gd")
+const NodeGetBoundsCommand := preload("res://addons/godot_mcp_tool/commands/node/node_get_bounds_command.gd")
 const NodeGetPropertiesCommand := preload("res://addons/godot_mcp_tool/commands/node/node_get_properties_command.gd")
 const NodeSetPropertiesCommand := preload("res://addons/godot_mcp_tool/commands/node/node_set_properties_command.gd")
 const PlainUndoHistory := preload("res://addons/godot_mcp_tool/scene/plain_undo_history.gd")
@@ -174,3 +175,28 @@ func test_requires_properties_to_set() -> void:
 	_add_owned(_root, CharacterBody3D.new(), "Player")
 	var error: Variant = await NodeSetPropertiesCommand.new(_context).execute({"path": "Player"})
 	assert_eq((error as CommandError).code, JsonRpc.INVALID_PARAMS)
+
+
+func test_measures_the_bounds_of_a_node_in_the_scene() -> void:
+	var crate := _add_owned(_root, Node3D.new(), "Crate") as Node3D
+	crate.position = Vector3(4, 0, 0)
+	var mesh := MeshInstance3D.new()
+	var box := BoxMesh.new()
+	box.size = Vector3(2, 2, 2)
+	mesh.mesh = box
+	mesh.position = Vector3(0, 1, 0)
+	_add_owned(crate, mesh, "Mesh")
+	var result: Dictionary = await NodeGetBoundsCommand.new(_context, null).execute({"path": "Crate"})
+	assert_eq(result["scene"], "res://levels/arena.tscn")
+	assert_eq(result["path"], "Crate")
+	assert_eq(result["position"], "Vector3(3, 0, -1)")
+	assert_eq(result["size"], "Vector3(2, 2, 2)")
+	assert_eq(result["visual_count"], 1)
+
+
+func test_explains_bounds_of_a_node_that_is_not_3d() -> void:
+	_add_owned(_root, Node.new(), "Logic")
+	var error: Variant = await NodeGetBoundsCommand.new(_context, null).execute({"path": "Logic"})
+	assert_true(error is CommandError)
+	assert_string_contains((error as CommandError).message, "not a 3D node")
+
