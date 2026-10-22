@@ -2,6 +2,7 @@ extends "../command.gd"
 
 const ChangeSet := preload("../../scene/change_set.gd")
 const EditingContext := preload("../../scene/editing_context.gd")
+const IndefiniteArticle := preload("../../util/indefinite_article.gd")
 const NavigationBakeReport := preload("../../navigation/navigation_bake_report.gd")
 const NodeFactory := preload("../../scene/node_factory.gd")
 const NodeLocator := preload("../../scene/node_locator.gd")
@@ -67,7 +68,7 @@ static func _regions_to_bake(scene_root: Node, region_path: String) -> Variant:
 		if not node is NavigationRegion3D:
 			return CommandError.new(
 				JsonRpc.INVALID_PARAMS,
-				"%s is a %s, not a NavigationRegion3D" % [region_path, NodeFactory.display_class(node)],
+				"%s is %s, not a NavigationRegion3D" % [region_path, IndefiniteArticle.before(NodeFactory.display_class(node))],
 				"Pass the path of a NavigationRegion3D, or leave path out to bake every one in the scene.",
 			)
 		return [node]

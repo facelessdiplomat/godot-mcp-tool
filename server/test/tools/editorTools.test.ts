@@ -40,6 +40,8 @@ describe('createEditorTools', () => {
       'animation_get',
       'animation_set',
       'animation_delete',
+      'animation_tree_get',
+      'animation_tree_set',
       'autoload_add',
       'autoload_remove',
       'node_set_groups',

@@ -555,7 +555,7 @@ right angles and in structured spatial checks.
 | `navigation_bake` | Bake the `NavigationMesh` of a `NavigationRegion3D`, or of every one in the scene, as one Undo step; report the polygons and the covered area of each, the reason when a region gets none (no geometry under it, or an agent too large), and a `cell_size` or `cell_height` finer than the navigation map | 4 | W | E |
 | `gridmap_set_cells` / `gridmap_get_cells` | `GridMap` (3D tiles) — only if evaluations show it's needed | 4 | R/W | E |
 | `animation_get` / `animation_set` / `animation_delete` | Animations of an `AnimationPlayer`: list them or read one track by track with its keys; create or replace one from property tracks (`Door:position`, `Door:position:y`, `.:visible`) with interpolation, update mode and loop by name; delete one. Each change is one Undo step | 4 | R/W | E |
-| `animation_tree_*` | Basic `AnimationTree` state machines | 4 | W | E |
+| `animation_tree_get` / `animation_tree_set` | An `AnimationTree` as a state machine: read its states, transitions and conditions; set it up whole from states that each play an animation and transitions with a condition, an expression, a cross-fade, a switch mode and a priority, as one Undo step | 4 | R/W | E |
 
 Import settings live in the `.import` file next to the asset: the importer options in `[params]`, and the settings of
 a model's nodes in `_subresources`, keyed `"PATH:Body"` by the node's path in the imported scene. Options are
@@ -1333,7 +1333,10 @@ the next call showed a ⚠.
       whole from property tracks, as one Undo step; key values go through the codec by the type of the property,
       values that cannot blend change in steps, and a track that cannot be used is rejected with the reason while the
       others are kept; scenario `docs/evals/animate-a-door.md`.
-- [ ] `AnimationTree` state machines.
+- [x] `animation_tree_get` / `animation_tree_set`: an `AnimationTree` is set up as a state machine of states that play
+      animations of its `AnimationPlayer` and transitions with conditions, expressions, cross-fades and switch modes,
+      as one Undo step; transitions advance by themselves from Start and with a condition or expression, and a
+      machine that nothing leaves Start from comes with a warning; scenario `docs/evals/character-states.md`.
 - [ ] `gridmap_*` if evaluations show the need.
 - [ ] Windowless mode: scene operations through the headless editor or `--headless --script` (based on spike 6);
       a TCP transport for the runtime agent when the game runs as a process (port and token passed as user
@@ -1670,6 +1673,7 @@ Checked against the sources in `~/Software/godot` (`master`, 4.8-beta, commit `6
 | Outside the editor, parsing visual meshes for a bake warns once that it had to read RenderingServer meshes at runtime; CSG shapes always hand over their visual mesh, even when only static colliders are parsed | `scene/resources/3d/navigation_mesh_source_geometry_data_3d.cpp`, `modules/csg/csg_shape.cpp` |
 | The engine warns when a navigation mesh with a finer `cell_size` or `cell_height` than its map is added to the map, during the map's next sync rather than at the assignment; with the defaults (0.25) a 20 × 20 floor whose top is at 0 bakes to 2 polygons covering 19 × 19 at height 0.5 | `modules/navigation_3d/nav_region_3d.cpp`, observed on 4.8 |
 | `AnimationLibrary.add_animation()` replaces an animation of the same name; animation names cannot be empty or contain `/ : , [`, and `library/name` addresses a library other than the default `""` one, which an `AnimationPlayer` does not have until an animation is added. Track paths are relative to the player's `root_node`, `".."` by default | `scene/resources/animation_library.cpp`, `scene/animation/animation_mixer.cpp` |
+| A new `AnimationNodeStateMachine` has the states `Start` and `End`; a transition cannot leave `End`, enter `Start`, join a state to itself or repeat one, and state names cannot contain `/`. A new `AnimationTree` is active, takes expressions on itself (`advance_expression_base_node` is `.`), and lists `parameters/conditions/<name>` among its properties, so a condition can be set like a property; `get("parameters/playback").get_current_node()` works in an `Expression` | `scene/animation/animation_node_state_machine.cpp`, `scene/animation/animation_tree.h`, observed on 4.8 |
 | `JSON.stringify` sorts the keys of dictionaries by default, so the bridge does not keep their order; ordered data travels as arrays | `core/io/json.h` (`sort_keys = true`) |
 | `InputMap` matches an event of an action against an incoming event only when the action's event has the device `ALL_DEVICES` (-1, not exposed to scripts) or the same device; new `InputEventKey` and mouse events get `DEVICE_ID_KEYBOARD` (16) and `DEVICE_ID_MOUSE` (32), joypad events default to device 0, the first gamepad, and the editor's Input Map dialog stores "All Devices" | `core/input/input_map.cpp`, `core/input/input_event.cpp`, `editor/settings/input_event_configuration_dialog.cpp` |
 | The analyzer reports a member that a class lacks when it is read through the class (`Player.SPEEDD` is a parse error), but a method or property that the type of a variable lacks (`player.dashh()` on a `Player` or a `CharacterBody3D` variable) compiles: only the `unsafe_method_access` and `unsafe_property_access` warnings report it, and both are off by default. `:=` cannot infer the type of a member that the static type lacks, so it works on a variable typed with the `class_name` of its script and fails on one typed with the native base | observed on 4.8 with `--check-only` |

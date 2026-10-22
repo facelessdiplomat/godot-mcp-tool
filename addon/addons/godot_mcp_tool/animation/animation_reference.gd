@@ -1,6 +1,7 @@
 extends RefCounted
 
 const CommandError := preload("../commands/command_error.gd")
+const IndefiniteArticle := preload("../util/indefinite_article.gd")
 const JsonRpc := preload("../bridge/json_rpc.gd")
 const NodeFactory := preload("../scene/node_factory.gd")
 const NodeLocator := preload("../scene/node_locator.gd")
@@ -19,7 +20,7 @@ static func find_player(scene_root: Node, player_path: String) -> Variant:
 	if not node is AnimationPlayer:
 		return CommandError.new(
 			JsonRpc.INVALID_PARAMS,
-			"%s is a %s, not an AnimationPlayer" % [player_path, NodeFactory.display_class(node)],
+			"%s is %s, not an AnimationPlayer" % [player_path, IndefiniteArticle.before(NodeFactory.display_class(node))],
 			"Add an AnimationPlayer with node_add; its tracks animate the nodes under its parent.",
 		)
 	return node

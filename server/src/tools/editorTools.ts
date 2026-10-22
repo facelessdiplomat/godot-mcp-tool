@@ -1,5 +1,6 @@
 import type { EditorGateway } from '../editor/EditorGateway.js';
 import { createAnimationDeleteTool, createAnimationGetTool, createAnimationSetTool } from './animationTools.js';
+import { createAnimationTreeGetTool, createAnimationTreeSetTool } from './animationTreeTools.js';
 import { createAssetImportSettingsGetTool, createAssetImportSettingsSetTool } from './assetTools.js';
 import { createAutoloadAddTool, createAutoloadRemoveTool } from './autoloadTools.js';
 import { createSceneBatchEditTool } from './batchTools.js';
@@ -62,6 +63,8 @@ export function createEditorTools(editor: EditorGateway, readCapture: CaptureRea
     createAnimationGetTool(editor),
     createAnimationSetTool(editor),
     createAnimationDeleteTool(editor),
+    createAnimationTreeGetTool(editor),
+    createAnimationTreeSetTool(editor),
     createAutoloadAddTool(editor),
     createAutoloadRemoveTool(editor),
     createNodeSetGroupsTool(editor),
