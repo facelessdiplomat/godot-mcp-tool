@@ -1,6 +1,8 @@
 extends RefCounted
 
 const AddonInfo := preload("../addon_info.gd")
+const AssetImportSettingsGetCommand := preload("asset/asset_import_settings_get_command.gd")
+const AssetImportSettingsSetCommand := preload("asset/asset_import_settings_set_command.gd")
 const AutoloadAddCommand := preload("project/autoload_add_command.gd")
 const AutoloadRegistry := preload("../editor/autoload_registry.gd")
 const AutoloadRemoveCommand := preload("project/autoload_remove_command.gd")
@@ -56,6 +58,7 @@ const SCREENSHOT_TIMEOUT_MSEC := 30_000
 
 static func build_router(context: EditingContext, runtime: RuntimeContext, read_indentation: Callable, save_project_settings: Callable, autoloads: AutoloadRegistry, is_unsafe_allowed: Callable) -> CommandRouter:
 	var captures := ProjectSettings.globalize_path("res://").path_join(AddonInfo.CAPTURES_RELATIVE_PATH)
+	var file_system := EditorFileSystemAccess.new()
 	var router := CommandRouter.new()
 	router.register("ping", PingCommand.new())
 	router.register("project.info", ProjectInfoCommand.new(read_indentation))
@@ -63,9 +66,11 @@ static func build_router(context: EditingContext, runtime: RuntimeContext, read_
 	router.register("project.settings_set", ProjectSettingsSetCommand.new(context.codec, save_project_settings))
 	router.register("autoload.add", AutoloadAddCommand.new(autoloads, save_project_settings))
 	router.register("autoload.remove", AutoloadRemoveCommand.new(autoloads, save_project_settings))
-	router.register("editor.rescan", EditorRescanCommand.new(EditorFileSystemAccess.new(), EditorScriptEditorAccess.new()))
+	router.register("editor.rescan", EditorRescanCommand.new(file_system, EditorScriptEditorAccess.new()))
 	router.register("editor.screenshot", EditorScreenshotCommand.new(context, EditorViewportAccess.new(), captures))
 	router.register("editor.select", EditorSelectCommand.new(context))
+	router.register("asset.import_settings_get", AssetImportSettingsGetCommand.new(context.codec))
+	router.register("asset.import_settings_set", AssetImportSettingsSetCommand.new(context.codec, file_system))
 	router.register("input_map.get", InputMapGetCommand.new())
 	router.register("input_map.set", InputMapSetCommand.new(save_project_settings))
 	router.register("scene.create", SceneCreateCommand.new(context))

@@ -10,6 +10,7 @@ export const serverInstructions = [
   '- After writing or changing .gd files, check them with script_validate before running. Then check the result with game_run and read errors with game_get_output. Run the GUT or gdUnit4 tests of the project with test_run.',
   '- To check how the running game behaves, play input with game_input (actions come from input_map_set), wait for a state with game_wait and read nodes with game_get_properties; getters such as is_on_floor() work there; game_pause freezes the game and game_step advances it by exact physics frames. Tool calls sent in one message run at the same time, so read the state in a later message than the game_input or game_wait it depends on.',
   '- Check 3D placement and scale with numbers first (node_get_bounds), then look: game_screenshot shows the game window or views of its 3D world, editor_screenshot renders the open scene. One picture of a 3D scene can mislead, so use views from several angles, such as ["front", "top", "iso"].',
+  '- Imported models often arrive in centimeters: read their size with asset_import_settings_get and fix it with nodes/root_scale in asset_import_settings_set rather than by scaling nodes.',
   '- When a result reports new errors (⚠), read them with game_get_output before you continue.',
 ].join('\n');
 

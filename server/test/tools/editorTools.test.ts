@@ -34,6 +34,8 @@ describe('createEditorTools', () => {
       'resource_create',
       'resource_get',
       'resource_set_properties',
+      'asset_import_settings_get',
+      'asset_import_settings_set',
       'autoload_add',
       'autoload_remove',
       'node_set_groups',

@@ -19,5 +19,9 @@ func applied_scans() -> int:
 	return _applied_scans
 
 
+func reimport(paths: PackedStringArray) -> void:
+	EditorInterface.get_resource_filesystem().reimport_files(paths)
+
+
 func _count_applied_scan(_sources_exist: bool) -> void:
 	_applied_scans += 1

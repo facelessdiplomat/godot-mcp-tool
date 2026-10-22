@@ -98,7 +98,7 @@ export function createResourceSetPropertiesTool(editor: EditorGateway): BridgeTo
     definition: {
       title: 'Set resource properties',
       description:
-        'Set several properties of a resource file such as a material or physics material as one Undo step and save the file, so the scenes that use it, the game and the tests see the change at once. Every value is read back: the result lists what applied, what was rejected and why, and what the engine changed. Imported files such as textures and models are changed through their import settings instead.',
+        'Set several properties of a resource file such as a material or physics material as one Undo step and save the file, so the scenes that use it, the game and the tests see the change at once. Every value is read back: the result lists what applied, what was rejected and why, and what the engine changed. Imported files such as textures and models are changed through their import settings instead, with asset_import_settings_set.',
       inputSchema: resourceSetPropertiesInput,
       annotations: changingAnnotations({ destructive: true, idempotent: true }),
       alwaysLoad: false,

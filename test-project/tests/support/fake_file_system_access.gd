@@ -3,6 +3,7 @@ extends "res://addons/godot_mcp_tool/editor/file_system_access.gd"
 var scanning := false
 var scan_requests := 0
 var applied := 0
+var reimported: Array = []
 
 
 func is_scanning() -> bool:
@@ -25,3 +26,7 @@ func finish_scan_thread() -> void:
 func apply_scan() -> void:
 	scanning = false
 	applied += 1
+
+
+func reimport(paths: PackedStringArray) -> void:
+	reimported.append(paths)

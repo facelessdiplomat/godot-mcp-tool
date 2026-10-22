@@ -551,10 +551,19 @@ right angles and in structured spatial checks.
 |---|---|---|---|---|
 | `views` option of `editor_screenshot` and `game_screenshot` | Render from preset angles (`front`, `back`, `left`, `right`, `top`, `iso`) framed on the whole scene or on a node's bounds, or from given viewpoints (`position`, `look_at`, `fov`); up to six views in one labelled contact sheet. Uses a temporary `Camera3D` in a `SubViewport` that shares the scene's `World3D`; the user's editor camera and the game's active camera stay untouched | 2 | R | E/G |
 | `node_get_bounds` | Global AABB (center, size) of a 3D node and its subtree — for placement and scale checks | 2 | R | E/G |
-| `asset_import_settings_get` / `asset_import_settings_set` | Import options of 3D models (glTF, FBX, `.blend`): scale, root type, collision generation, material extraction; then reimport | 4 | R/W | E |
+| `asset_import_settings_get` / `asset_import_settings_set` | Import options of any imported file from its `.import` file (`nodes/root_scale`, `nodes/root_type`, `materials/extract`, texture and sound options), and for 3D models the settings of their nodes, such as collision generation; `set` reimports at once and reports the size, nodes and collision shapes of the imported scene before and after | 4 | R/W | E |
 | `navigation_bake` | Bake the `NavigationMesh` of a `NavigationRegion3D`, wait for `bake_finished`, report the result | 4 | W | E |
 | `gridmap_set_cells` / `gridmap_get_cells` | `GridMap` (3D tiles) — only if evaluations show it's needed | 4 | R/W | E |
 | `animation_*` | `AnimationPlayer` tracks and keys; basic `AnimationTree` state machines | 4 | W | E |
+
+Import settings live in the `.import` file next to the asset: the importer options in `[params]`, and the settings of
+a model's nodes in `_subresources`, keyed `"PATH:Body"` by the node's path in the imported scene. Options are
+typed after their current values, a few enums take names (`materials/extract`); node settings come from a list
+taken from the engine's importer, so a misspelled one is rejected with a suggestion instead of being written.
+`EditorFileSystem.reimport_files()` reimports at once, and scenes that instance the model get the new result.
+Collision shapes of primitive types are not fitted to the mesh: the importer builds them from `primitive/*`
+settings in the model's own units, multiplied by the root scale and placed from the node's origin, so the result
+lists every collision shape with its dimensions next to the size of the scene.
 
 Materials, environments, primitive meshes and collision shapes need no dedicated tools: they are sub-resources
 (`{"new": "StandardMaterial3D", "albedo_color": "#c04020"}`, `{"new": "BoxShape3D", "size": [1, 2, 1]}`) handled by
@@ -1064,7 +1073,7 @@ godot-mcp-tool/
 │   ├── protocol.md               bridge protocol (milestone 1)
 │   ├── tools.md                  tool reference (generated from the schemas, milestone 5)
 │   ├── spikes.md                 spike results and the pinned engine commit (milestone 0)
-│   └── evals/                    evaluation tasks (milestone 5)
+│   └── evals/                    evaluation scenarios, one per capability (from milestone 4)
 ├── server/                       MCP server (TypeScript)
 │   ├── src/
 │   │   ├── index.ts              entry point (stdio)
@@ -1312,7 +1321,11 @@ the next call showed a ⚠.
 
 ### Milestone 4 — 3D tooling and advanced features
 
-- [ ] 3D first: `asset_import_settings_*`, `navigation_bake`, `animation_*`; `gridmap_*` if evaluations show the need.
+- [x] `asset_import_settings_get` / `asset_import_settings_set`: importer options, settings of a model's nodes such as
+      generated collision, and a reimport whose result shows the size and the collision shapes of the imported scene
+      before and after (§8.9); scenario `docs/evals/import-a-character.md`.
+- [ ] `navigation_bake`.
+- [ ] `animation_*`; `gridmap_*` if evaluations show the need.
 - [ ] Windowless mode: scene operations through the headless editor or `--headless --script` (based on spike 6);
       a TCP transport for the runtime agent when the game runs as a process (port and token passed as user
       arguments after `--`).
@@ -1323,6 +1336,12 @@ the next call showed a ⚠.
 **Done when** every capability is covered by its own scenario in `docs/evals/`, for example: "import a glTF
 character, scale it to 1.8 m, add a capsule collision", "bake navigation for the arena and make an enemy follow the
 player".
+
+Order of work: 3D first, each capability with its scenario in `docs/evals/` and an automated test of it —
+`asset_import_settings_get` / `asset_import_settings_set` after a spike on reimporting; `navigation_bake`;
+`animation_*`, tracks and keys before `AnimationTree`; then the file tools (`filesystem_move`, `filesystem_delete`,
+`resource_find_usages`); `export_project`; debugging through DAP; the windowless mode last, because it changes how
+every scene tool reaches a scene.
 
 ### Milestone 5 — Polish and distribution
 
@@ -1636,6 +1655,9 @@ Checked against the sources in `~/Software/godot` (`master`, 4.8-beta, commit `6
 | `--doctool <folder> --gdscript-docs res://` with `--path` writes one XML file per script, named after its `class_name` (or the quoted file name), with descriptions from `##` comments; a script that does not parse is skipped with an error | `main/main.cpp`, observed on 4.8 |
 | Bound callables are equal when their base callable and bound arguments are equal, so `disconnect` works with a callable bound again; a non-tool script in the editor has a placeholder instance whose `has_method` checks the script and its base scripts | `core/variant/callable_bind.cpp`, `core/object/script_language.cpp` |
 | GDScript files may preload each other, and a script may preload itself | observed on 4.8 |
+| A `.import` file holds every importer option with its value in `[params]` after the first import, and the settings of parts of a model in `_subresources` (`nodes` keyed `"PATH:<node path>"`, `meshes` and `materials` by name); `EditorFileSystem.reimport_files()` returns after the import, and `resources_reimported` arrives within the call | `editor/import/3d/resource_importer_scene.cpp`, observed on 4.8 |
+| Generated collision of the primitive types (Box, Sphere, Cylinder, Capsule) is built from `primitive/size`, `primitive/radius`, `primitive/height` and `primitive/position` (defaults 2×2×2, 1, 1, origin) times the applied root scale, not fitted to the mesh | `editor/import/3d/resource_importer_scene.h` |
+| `JSON.stringify` sorts the keys of dictionaries by default, so the bridge does not keep their order; ordered data travels as arrays | `core/io/json.h` (`sort_keys = true`) |
 | `InputMap` matches an event of an action against an incoming event only when the action's event has the device `ALL_DEVICES` (-1, not exposed to scripts) or the same device; new `InputEventKey` and mouse events get `DEVICE_ID_KEYBOARD` (16) and `DEVICE_ID_MOUSE` (32), joypad events default to device 0, the first gamepad, and the editor's Input Map dialog stores "All Devices" | `core/input/input_map.cpp`, `core/input/input_event.cpp`, `editor/settings/input_event_configuration_dialog.cpp` |
 | The analyzer reports a member that a class lacks when it is read through the class (`Player.SPEEDD` is a parse error), but a method or property that the type of a variable lacks (`player.dashh()` on a `Player` or a `CharacterBody3D` variable) compiles: only the `unsafe_method_access` and `unsafe_property_access` warnings report it, and both are off by default. `:=` cannot infer the type of a member that the static type lacks, so it works on a variable typed with the `class_name` of its script and fails on one typed with the native base | observed on 4.8 with `--check-only` |
 | 3D: `NavigationRegion3D.bake_navigation_mesh()` and the `bake_finished` signal; `Viewport.world_3d` / `own_world_3d`; `physics/3d/physics_engine` (`DEFAULT` currently means GodotPhysics3D; Jolt can be selected); CSG nodes (`CSGBox3D`, `CSGCombiner3D`, …); `GridMap.set_cell_item` | `doc/classes/`, `modules/csg/doc_classes/` |

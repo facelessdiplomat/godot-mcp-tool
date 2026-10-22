@@ -11,3 +11,7 @@ func scan() -> void:
 
 func applied_scans() -> int:
 	return 0
+
+
+func reimport(_paths: PackedStringArray) -> void:
+	pass

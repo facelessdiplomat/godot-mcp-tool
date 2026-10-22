@@ -39,7 +39,7 @@ static func load_changeable(resource_path: String) -> Variant:
 	if location_error != null:
 		return location_error
 	if FileAccess.file_exists(resource_path + ".import"):
-		return CommandError.new(JsonRpc.INVALID_PARAMS, "%s is imported, so Godot builds it from the source file" % resource_path, "Change its import settings in the editor's Import dock instead.")
+		return CommandError.new(JsonRpc.INVALID_PARAMS, "%s is imported, so Godot builds it from the source file" % resource_path, "Change its import settings with asset_import_settings_set instead.")
 	return load_existing(resource_path)
 
 

@@ -1,4 +1,5 @@
 import type { EditorGateway } from '../editor/EditorGateway.js';
+import { createAssetImportSettingsGetTool, createAssetImportSettingsSetTool } from './assetTools.js';
 import { createAutoloadAddTool, createAutoloadRemoveTool } from './autoloadTools.js';
 import { createSceneBatchEditTool } from './batchTools.js';
 import { type CaptureReader, createEditorScreenshotTool } from './captureTools.js';
@@ -53,6 +54,8 @@ export function createEditorTools(editor: EditorGateway, readCapture: CaptureRea
     createResourceCreateTool(editor),
     createResourceGetTool(editor),
     createResourceSetPropertiesTool(editor),
+    createAssetImportSettingsGetTool(editor),
+    createAssetImportSettingsSetTool(editor),
     createAutoloadAddTool(editor),
     createAutoloadRemoveTool(editor),
     createNodeSetGroupsTool(editor),
