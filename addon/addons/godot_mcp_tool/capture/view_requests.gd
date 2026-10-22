@@ -3,11 +3,13 @@ extends RefCounted
 const CameraViews := preload("camera_views.gd")
 const CommandError := preload("../commands/command_error.gd")
 const JsonRpc := preload("../bridge/json_rpc.gd")
+const NumberText := preload("../util/number_text.gd")
 
 const DEFAULT_FOV := 50.0
 const MINIMUM_FOV := 1.0
 const MAXIMUM_FOV := 179.0
 const MAXIMUM_VIEWS := 6
+const POINT_DECIMALS := 2
 const SHEET_GAP := 8
 const CELL_ASPECT := 16.0 / 9.0
 const VIEW_FORMS := "a preset name such as \"iso\", {\"preset\": \"front\", \"target\": \"Player\"}, or {\"position\": [0, 10, 10], \"look_at\": [0, 0, 0]}"
@@ -120,8 +122,4 @@ static func _point_of(value: Variant) -> Variant:
 
 
 static func _point_text(point: Vector3) -> String:
-	return "(%s, %s, %s)" % [_number_text(point.x), _number_text(point.y), _number_text(point.z)]
-
-
-static func _number_text(value: float) -> String:
-	return str(roundi(value)) if is_equal_approx(value, roundf(value)) else String.num(value, 2)
+	return "(%s, %s, %s)" % [NumberText.of(point.x, POINT_DECIMALS), NumberText.of(point.y, POINT_DECIMALS), NumberText.of(point.z, POINT_DECIMALS)]

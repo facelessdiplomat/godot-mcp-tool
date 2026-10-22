@@ -16,3 +16,4 @@ When running one, record whether it passed, the number of tool calls and the tok
 | Scenario | Capability | Automated test |
 |---|---|---|
 | [import-a-character.md](import-a-character.md) | `asset_import_settings_get`, `asset_import_settings_set` | `server/test/integration/assetImport.test.ts` |
+| [follow-the-player.md](follow-the-player.md) | `navigation_bake` | `server/test/integration/navigationBake.test.ts` |

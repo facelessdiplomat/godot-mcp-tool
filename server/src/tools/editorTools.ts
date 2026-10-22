@@ -4,6 +4,7 @@ import { createAutoloadAddTool, createAutoloadRemoveTool } from './autoloadTools
 import { createSceneBatchEditTool } from './batchTools.js';
 import { type CaptureReader, createEditorScreenshotTool } from './captureTools.js';
 import { createInputMapGetTool, createInputMapSetTool } from './inputTools.js';
+import { createNavigationBakeTool } from './navigationTools.js';
 import { createNodeDuplicateTool, createNodeReparentTool } from './nodeStructureTools.js';
 import {
   createNodeAddTool,
@@ -56,6 +57,7 @@ export function createEditorTools(editor: EditorGateway, readCapture: CaptureRea
     createResourceSetPropertiesTool(editor),
     createAssetImportSettingsGetTool(editor),
     createAssetImportSettingsSetTool(editor),
+    createNavigationBakeTool(editor),
     createAutoloadAddTool(editor),
     createAutoloadRemoveTool(editor),
     createNodeSetGroupsTool(editor),

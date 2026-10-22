@@ -36,6 +36,7 @@ describe('createEditorTools', () => {
       'resource_set_properties',
       'asset_import_settings_get',
       'asset_import_settings_set',
+      'navigation_bake',
       'autoload_add',
       'autoload_remove',
       'node_set_groups',

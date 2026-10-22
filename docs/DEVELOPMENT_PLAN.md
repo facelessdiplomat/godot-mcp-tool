@@ -552,7 +552,7 @@ right angles and in structured spatial checks.
 | `views` option of `editor_screenshot` and `game_screenshot` | Render from preset angles (`front`, `back`, `left`, `right`, `top`, `iso`) framed on the whole scene or on a node's bounds, or from given viewpoints (`position`, `look_at`, `fov`); up to six views in one labelled contact sheet. Uses a temporary `Camera3D` in a `SubViewport` that shares the scene's `World3D`; the user's editor camera and the game's active camera stay untouched | 2 | R | E/G |
 | `node_get_bounds` | Global AABB (center, size) of a 3D node and its subtree — for placement and scale checks | 2 | R | E/G |
 | `asset_import_settings_get` / `asset_import_settings_set` | Import options of any imported file from its `.import` file (`nodes/root_scale`, `nodes/root_type`, `materials/extract`, texture and sound options), and for 3D models the settings of their nodes, such as collision generation; `set` reimports at once and reports the size, nodes and collision shapes of the imported scene before and after | 4 | R/W | E |
-| `navigation_bake` | Bake the `NavigationMesh` of a `NavigationRegion3D`, wait for `bake_finished`, report the result | 4 | W | E |
+| `navigation_bake` | Bake the `NavigationMesh` of a `NavigationRegion3D`, or of every one in the scene, as one Undo step; report the polygons and the covered area of each, the reason when a region gets none (no geometry under it, or an agent too large), and a `cell_size` or `cell_height` finer than the navigation map | 4 | W | E |
 | `gridmap_set_cells` / `gridmap_get_cells` | `GridMap` (3D tiles) — only if evaluations show it's needed | 4 | R/W | E |
 | `animation_*` | `AnimationPlayer` tracks and keys; basic `AnimationTree` state machines | 4 | W | E |
 
@@ -1324,7 +1324,10 @@ the next call showed a ⚠.
 - [x] `asset_import_settings_get` / `asset_import_settings_set`: importer options, settings of a model's nodes such as
       generated collision, and a reimport whose result shows the size and the collision shapes of the imported scene
       before and after (§8.9); scenario `docs/evals/import-a-character.md`.
-- [ ] `navigation_bake`.
+- [x] `navigation_bake`: bakes one `NavigationRegion3D` or every one of the scene on the main thread, after a frame so
+      that CSG shapes added just before have their meshes, records the new mesh data as one Undo step (the editor's
+      own bake has none), and reports each region's polygons and covered area, or why it got none; scenario
+      `docs/evals/follow-the-player.md`.
 - [ ] `animation_*`; `gridmap_*` if evaluations show the need.
 - [ ] Windowless mode: scene operations through the headless editor or `--headless --script` (based on spike 6);
       a TCP transport for the runtime agent when the game runs as a process (port and token passed as user
@@ -1657,6 +1660,9 @@ Checked against the sources in `~/Software/godot` (`master`, 4.8-beta, commit `6
 | GDScript files may preload each other, and a script may preload itself | observed on 4.8 |
 | A `.import` file holds every importer option with its value in `[params]` after the first import, and the settings of parts of a model in `_subresources` (`nodes` keyed `"PATH:<node path>"`, `meshes` and `materials` by name); `EditorFileSystem.reimport_files()` returns after the import, and `resources_reimported` arrives within the call | `editor/import/3d/resource_importer_scene.cpp`, observed on 4.8 |
 | Generated collision of the primitive types (Box, Sphere, Cylinder, Capsule) is built from `primitive/size`, `primitive/radius`, `primitive/height` and `primitive/position` (defaults 2×2×2, 1, 1, origin) times the applied root scale, not fitted to the mesh | `editor/import/3d/resource_importer_scene.h` |
+| `NavigationRegion3D.bake_navigation_mesh(false)` parses the source geometry and bakes on the main thread and emits `bake_finished` before it returns; the editor's Bake button bakes on a thread and records no Undo step. A CSG shape builds its mesh in a deferred call, so a CSG node added in the same frame contributes no geometry; one frame later it does | `scene/3d/navigation/navigation_region_3d.cpp`, `modules/navigation_3d/editor/navigation_region_3d_editor_plugin.cpp`, observed on 4.8 |
+| Outside the editor, parsing visual meshes for a bake warns once that it had to read RenderingServer meshes at runtime; CSG shapes always hand over their visual mesh, even when only static colliders are parsed | `scene/resources/3d/navigation_mesh_source_geometry_data_3d.cpp`, `modules/csg/csg_shape.cpp` |
+| The engine warns when a navigation mesh with a finer `cell_size` or `cell_height` than its map is added to the map, during the map's next sync rather than at the assignment; with the defaults (0.25) a 20 × 20 floor whose top is at 0 bakes to 2 polygons covering 19 × 19 at height 0.5 | `modules/navigation_3d/nav_region_3d.cpp`, observed on 4.8 |
 | `JSON.stringify` sorts the keys of dictionaries by default, so the bridge does not keep their order; ordered data travels as arrays | `core/io/json.h` (`sort_keys = true`) |
 | `InputMap` matches an event of an action against an incoming event only when the action's event has the device `ALL_DEVICES` (-1, not exposed to scripts) or the same device; new `InputEventKey` and mouse events get `DEVICE_ID_KEYBOARD` (16) and `DEVICE_ID_MOUSE` (32), joypad events default to device 0, the first gamepad, and the editor's Input Map dialog stores "All Devices" | `core/input/input_map.cpp`, `core/input/input_event.cpp`, `editor/settings/input_event_configuration_dialog.cpp` |
 | The analyzer reports a member that a class lacks when it is read through the class (`Player.SPEEDD` is a parse error), but a method or property that the type of a variable lacks (`player.dashh()` on a `Player` or a `CharacterBody3D` variable) compiles: only the `unsafe_method_access` and `unsafe_property_access` warnings report it, and both are off by default. `:=` cannot infer the type of a member that the static type lacks, so it works on a variable typed with the `class_name` of its script and fails on one typed with the native base | observed on 4.8 with `--check-only` |
