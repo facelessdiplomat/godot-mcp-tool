@@ -5,10 +5,19 @@ import { DiscoveryFileReader, isProcessAlive } from './bridge/DiscoveryFileReade
 import { EditorConnection, type EditorSession, UnavailableEditor } from './bridge/EditorConnection.js';
 import { GodotBinaryLocator } from './godot/GodotBinaryLocator.js';
 import { GodotCli } from './godot/GodotCli.js';
+import { NodeProcessLauncher } from './process/ProcessLauncher.js';
 import { NodeProcessRunner } from './process/ProcessRunner.js';
 import { ProjectLocator } from './project/ProjectLocator.js';
+import { ErrorSummary } from './runtime/ErrorSummary.js';
+import { GameGatewayRouter } from './runtime/GameGatewayRouter.js';
+import { GameOutputCursor } from './runtime/GameOutputCursor.js';
+import { LocalGameGateway } from './runtime/LocalGameGateway.js';
 import { createMcpServer } from './server/createMcpServer.js';
+import { serverInstructions } from './server/serverInstructions.js';
 import { BRIDGE_PROTOCOL_VERSION, SERVER_NAME, SERVER_VERSION } from './serverInfo.js';
+import { createEditorTools } from './tools/editorTools.js';
+import { ErrorReportingTool } from './tools/ErrorReportingTool.js';
+import { createGameTools } from './tools/gameTools.js';
 import { GodotStatusTool } from './tools/GodotStatusTool.js';
 
 export interface ApplicationEnvironment {
@@ -25,11 +34,6 @@ export interface Application {
 
 const bridgeRequestTimeoutMs = 30_000;
 
-const serverInstructions = [
-  'Tools for building a game in the Godot engine through the running Godot editor.',
-  'Call godot_status to see which project is used and whether the Godot editor is connected.',
-].join('\n');
-
 export function createApplication(environment: ApplicationEnvironment): Application {
   const project = new ProjectLocator(environment.variables, environment.workingDirectory).locate();
   const editor: EditorSession = project.found
@@ -43,12 +47,22 @@ export function createApplication(environment: ApplicationEnvironment): Applicat
           }),
       )
     : new UnavailableEditor('No Godot project was found, so there is no editor to connect to.');
+  const errorSummary = new ErrorSummary();
+  editor.onNotification((connectionNumber, method, params) => {
+    errorSummary.observe(connectionNumber, method, params);
+  });
   const processRunner = new NodeProcessRunner();
   const binaryLocator = new GodotBinaryLocator({
     variables: environment.variables,
     platform: environment.platform,
     homeDirectory: environment.homeDirectory,
     isExecutableFile,
+  });
+  const localGame = new LocalGameGateway({
+    projectRoot: project.found ? project.root : undefined,
+    locateBinary: () => binaryLocator.locate(),
+    launcher: new NodeProcessLauncher(),
+    headless: environment.variables['GODOT_MCP_HEADLESS'] === '1',
   });
   const tools = [
     new GodotStatusTool({
@@ -57,12 +71,15 @@ export function createApplication(environment: ApplicationEnvironment): Applicat
       binaryLocator,
       readVersion: (executablePath) => new GodotCli(processRunner, executablePath).version(),
     }),
-  ];
+    ...createEditorTools(editor),
+    ...createGameTools(new GameGatewayRouter(editor, localGame), new GameOutputCursor()),
+  ].map((tool) => new ErrorReportingTool(tool, errorSummary));
 
   return {
     createMcpServer: () =>
       createMcpServer({ name: SERVER_NAME, version: SERVER_VERSION, instructions: serverInstructions, tools }),
     shutdown: () => {
+      localGame.shutdown();
       editor.close();
     },
   };

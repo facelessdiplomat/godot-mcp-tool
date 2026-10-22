@@ -1,0 +1,42 @@
+import { describe, expect, it } from 'vitest';
+import * as z from 'zod/v4';
+import { createEditorTools } from '../../src/tools/editorTools.js';
+import { FakeEditorGateway } from '../support/FakeEditorGateway.js';
+
+describe('createEditorTools', () => {
+  const tools = createEditorTools(new FakeEditorGateway());
+
+  it('offers the editor tools of the first milestone', () => {
+    expect(tools.map((tool) => tool.name)).toEqual([
+      'project_info',
+      'project_settings_get',
+      'project_settings_set',
+      'editor_rescan',
+      'scene_create',
+      'scene_open',
+      'scene_save',
+      'scene_get_tree',
+      'node_add',
+      'node_delete',
+      'node_get_properties',
+      'node_set_properties',
+    ]);
+  });
+
+  it('loads the core editing loop up front', () => {
+    expect(tools.filter((tool) => tool.definition.alwaysLoad).map((tool) => tool.name)).toEqual([
+      'scene_get_tree',
+      'node_add',
+      'node_set_properties',
+    ]);
+  });
+
+  it('describes every parameter', () => {
+    for (const tool of tools) {
+      const properties = z.toJSONSchema(tool.definition.inputSchema, { io: 'input' }).properties ?? {};
+      for (const [parameterName, parameter] of Object.entries(properties)) {
+        expect(typeof parameter === 'object' ? parameter.description : undefined, `${tool.name}.${parameterName}`).toBeTruthy();
+      }
+    }
+  });
+});

@@ -31,7 +31,7 @@ export class GodotStatusTool implements Tool<typeof inputSchema> {
 
   constructor(private readonly dependencies: GodotStatusDependencies) {}
 
-  async execute(_input: z.infer<typeof inputSchema>): Promise<CallToolResult> {
+  async execute(_input: z.input<typeof inputSchema>): Promise<CallToolResult> {
     const editorStatus = await this.dependencies.editor.status();
     const statusLines = [this.describeProject(), describeEditor(editorStatus), await this.describeBinary(editorStatus)];
     return textResult(statusLines.join('\n'));

@@ -16,7 +16,7 @@
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "lint": "eslint . && node tools/check-gdscript-comments.js ../addon ../test-project/tests",
+    "lint": "eslint . && node tools/check-gdscript-comments.js ../addon ../test-project/tests test/integration/fixtures",
     "test": "vitest run",
     "test:integration": "vitest run --config vitest.integration.config.ts",
     "test:watch": "vitest"

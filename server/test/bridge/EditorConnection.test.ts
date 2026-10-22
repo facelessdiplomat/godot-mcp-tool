@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import type { EditorBridge, HelloResult } from '../../src/bridge/BridgeClient.js';
+import type { EditorBridge, HelloResult, NotificationListener } from '../../src/bridge/BridgeClient.js';
 import type { BridgeEndpoint, DiscoveryResult, DiscoverySource } from '../../src/bridge/DiscoveryFileReader.js';
-import { EditorConnection } from '../../src/bridge/EditorConnection.js';
+import { EditorConnection, UnavailableEditor } from '../../src/bridge/EditorConnection.js';
+import { EditorUnavailableError } from '../../src/editor/EditorGateway.js';
 
 const endpoint: BridgeEndpoint = {
   protocol: 1,
@@ -37,6 +38,8 @@ class FakeBridge implements EditorBridge {
   isOpen = false;
   connectCalls = 0;
   closeCalls = 0;
+  readonly requests: { method: string; params: Record<string, unknown> | undefined; timeoutMs: number | undefined }[] = [];
+  requestResult: unknown = { ok: true };
 
   constructor(private readonly outcome: HelloResult | Error) {}
 
@@ -49,11 +52,22 @@ class FakeBridge implements EditorBridge {
     return Promise.resolve(this.outcome);
   }
 
-  request(): Promise<unknown> {
-    return Promise.resolve(undefined);
+  request(method: string, params?: Record<string, unknown>, timeoutMs?: number): Promise<unknown> {
+    this.requests.push({ method, params, timeoutMs });
+    return Promise.resolve(this.requestResult);
   }
 
-  onNotification(): void {}
+  notificationListeners: NotificationListener[] = [];
+
+  onNotification(listener: NotificationListener): void {
+    this.notificationListeners.push(listener);
+  }
+
+  notify(method: string, params: unknown): void {
+    for (const listener of this.notificationListeners) {
+      listener(method, params);
+    }
+  }
 
   close(): void {
     this.closeCalls += 1;
@@ -147,5 +161,57 @@ describe('EditorConnection', () => {
     connection.close();
 
     expect(bridge.closeCalls).toBe(1);
+  });
+
+  it('connects on the first request and sends it over the bridge', async () => {
+    const bridge = new FakeBridge(hello);
+    bridge.requestResult = { scene: 'res://main.tscn' };
+    const { connection } = connectionWith({ kind: 'found', endpoint }, [bridge]);
+
+    const response = await connection.request('scene.get_tree', { max_depth: 2 }, { timeoutMs: 5000 });
+
+    expect(response).toEqual({ scene: 'res://main.tscn' });
+    expect(bridge.connectCalls).toBe(1);
+    expect(bridge.requests).toEqual([{ method: 'scene.get_tree', params: { max_depth: 2 }, timeoutMs: 5000 }]);
+  });
+
+  it('refuses a request with the reason when the editor is not reachable', async () => {
+    const { connection } = connectionWith({ kind: 'missing', path: '/projects/game/.godot/godot_mcp_tool/bridge.json' }, []);
+
+    const request = connection.request('ping', {});
+
+    await expect(request).rejects.toBeInstanceOf(EditorUnavailableError);
+    await expect(request).rejects.toThrow('plugin');
+  });
+});
+
+describe('EditorConnection notifications', () => {
+  it('passes notifications on with the number of the connection', async () => {
+    const first = new FakeBridge(hello);
+    const second = new FakeBridge(hello);
+    const { connection } = connectionWith({ kind: 'found', endpoint }, [first, second]);
+    const received: [number, string, unknown][] = [];
+    connection.onNotification((connectionNumber, method, params) => {
+      received.push([connectionNumber, method, params]);
+    });
+
+    await connection.status();
+    first.notify('log.status', { errors: 1 });
+    first.isOpen = false;
+    await connection.status();
+    second.notify('log.status', { errors: 0 });
+
+    expect(received).toEqual([
+      [1, 'log.status', { errors: 1 }],
+      [2, 'log.status', { errors: 0 }],
+    ]);
+  });
+});
+
+describe('UnavailableEditor', () => {
+  it('refuses every request with its reason', async () => {
+    const editor = new UnavailableEditor('No Godot project was found.');
+
+    await expect(editor.request('ping', {})).rejects.toThrow(new EditorUnavailableError('No Godot project was found.'));
   });
 });

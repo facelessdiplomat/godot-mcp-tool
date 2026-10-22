@@ -653,6 +653,15 @@ What we do:
 - UIDs (Godot 4.4+): a new script gets its `.uid` file only after a scan, so a new file can be referenced only after
   a sync. Files must be moved together with their `.uid`/`.import` files (`filesystem_move`).
 
+How it is implemented (milestone 1): the addon relies on the engine's own check. `ScriptEditor.reload_open_files()`
+compares each open tab's last known modification time with the disk; tabs without unsaved changes reload silently
+(auto-reload is on by default in 4.8), and tabs with unsaved changes raise the "Files have been modified outside
+Godot" dialog. The addon looks for that dialog right after the call and turns it into `CONFLICT` with the file
+paths; the dialog stays open, so the user decides which version to keep. When there is no conflict, the response
+lists the unsaved script tabs that the save writes to disk, so the agent knows to re-read them. File times have
+one-second resolution, so a disk change within the same second as the editor's last load goes unnoticed.
+`scene_open` needs no check: opening a scene saves nothing.
+
 ### 9.4 Unopened scenes, parallel work, modal dialogs
 
 - While the editor is connected, all scene edits go **through the editor**: the scene is opened
@@ -1028,23 +1037,30 @@ the spike findings are written down and the plan is adjusted.
 
 Server:
 
-- [ ] Bridge client: discovery, handshake, lazy connect, reconnects, timeouts, errors turned into hints; clean exit
+- [x] Bridge client: discovery, handshake, lazy connect, reconnects, timeouts, errors turned into hints; clean exit
       when stdin closes.
-- [ ] Log store with cursors; the new-error summary in every response; formatters; size limits.
-- [ ] Tools: `godot_status`, `project_info`, `project_settings_get/set`, `editor_rescan`, `scene_create`,
+- [x] Log store with cursors; the new-error summary in every response; formatters; size limits.
+- [x] Tools: `godot_status`, `project_info`, `project_settings_get/set`, `editor_rescan`, `scene_create`,
       `scene_open`, `scene_save`, `scene_get_tree`, `node_add`, `node_delete`, `node_get_properties`,
       `node_set_properties`, `game_run`, `game_stop`, `game_get_output`.
-- [ ] Server instructions v1 (§8.11), `alwaysLoad` for the core.
-- [ ] `game_run` without the editor: a `godot --path …` process with a window, capturing stdout/stderr.
+- [x] Server instructions v1 (§8.11), `alwaysLoad` for the core.
+- [x] `game_run` without the editor: a `godot --path …` process with a window. The runtime agent writes structured
+      output to `.godot/godot_mcp_tool/local_game.ndjson`; the process output is kept for games that exit early.
+      `GODOT_MCP_HEADLESS=1` runs such games without a window (CI, tests).
 
 Addon:
 
-- [ ] Command dispatcher with a per-frame time budget; several clients.
-- [ ] Variant codec v1 (numbers, strings, vectors, colors, resources by path, `{"new": …}` sub-resources, enums,
+- [x] Command dispatcher; several clients.
+- [ ] A per-frame time budget for the dispatcher: not needed so far, because requests are handled as they arrive and
+      long commands wait between frames. Revisit with heavier commands.
+- [x] Variant codec v1 (numbers, strings, vectors, colors, resources by path, `{"new": …}` sub-resources, enums,
       `NodePath`, `Array[T]`) and read-back verification.
-- [ ] Scene and node commands through `EditorUndoRedoManager` with the correct `owner`.
-- [ ] Sync with the disk and conflict detection before saving and running (§9.3).
-- [ ] A minimal runtime agent: `ready` and logs via `Logger`; `Logger` in the editor; the game log file path.
+- [x] Scene and node commands through `EditorUndoRedoManager` with the correct `owner`.
+- [x] Sync with the disk and conflict detection before saving and running (§9.3).
+- [x] A minimal runtime agent: `ready` and logs via `Logger`; `Logger` in the editor. The agent is registered as the
+      first autoload, `GodotMcpRuntime`.
+- [ ] The game log file path in the discovery file: not needed so far, since runs without the editor write structured
+      output and early failures come from the process output.
 
 Tests come first for every task (TDD, §11.3): unit (TS with a fake bridge; GDScript for the codec), contract tests,
 an integration happy path.
@@ -1054,6 +1070,9 @@ an integration happy path.
 make it the main scene, run it and show the output." Every change can be undone with Ctrl+Z in the editor.
 A deliberate script error shows up in `game_get_output` with file, line and stack, and its summary arrives in the
 very next tool response.
+
+Status: the scenario passes as the automated acceptance test `server/test/integration/mvpScenario.test.ts` against
+a headless editor, Ctrl+Z included. The check in a live Claude Code session with a windowed editor is still to do.
 
 ### Milestone 2 — "Eyes and hands"
 
@@ -1350,7 +1369,11 @@ Checked against the sources in `~/Software/godot` (`master`, 4.8-beta, commit `6
 | `EditorInterface`: `play_main_scene/play_current_scene/play_custom_scene/stop_playing_scene`, `open_scene_from_path`, `save_scene(_as)`, `get_editor_viewport_2d/3d`, `get_editor_undo_redo`, `get_open_scene_roots`, `close_scene`; `get_unsaved_scenes` since 4.7 | `doc/classes/EditorInterface.xml`, `CHANGELOG.md` |
 | `EditorFileSystem`: `scan`, `scan_sources`, `update_file`, `reimport_files`; signals `filesystem_changed`, `resources_reimported`, `script_classes_updated` | `doc/classes/EditorFileSystem.xml` |
 | Before running, the editor saves everything: `run/auto_save/save_before_running` = `true`; saving a scene calls `ScriptEditorPlugin::save_external_data()` → `save_all_scripts()`, which writes unsaved script tabs without comparing with the disk | `editor/settings/editor_settings.cpp`, `editor/script/script_editor_plugin.cpp` |
-| `ScriptEditor.reload_open_files()` reloads files changed on disk; `ScriptEditor.get_unsaved_files()`; the editor checks script modification times itself when its window gains focus | `doc/classes/ScriptEditor.xml`, `editor/script/script_editor_plugin.cpp` |
+| `ScriptEditor.reload_open_files()` compares each tab's last known modification time (one-second resolution) with the disk: tabs without unsaved changes reload silently when auto-reload is on, tabs with unsaved changes raise the "Files have been modified outside Godot" dialog; `ScriptEditor.get_unsaved_files()`; the editor checks script modification times itself when its window gains focus | `doc/classes/ScriptEditor.xml`, `editor/script/script_editor_plugin.cpp` |
+| An autoload added with `EditorPlugin.add_autoload_singleton` reaches `project.godot` only when `ProjectSettingsEditor` saves 1.5 s later, so a game started sooner runs without it; the addon calls `ProjectSettings.save()` itself | `editor/settings/editor_autoload_settings.cpp`, `editor/settings/project_settings_editor.cpp` |
+| Game output and errors forwarded by the debugger go straight to the editor's Output panel and do not pass through `Logger`s registered in the editor | `editor/debugger/script_editor_debugger.cpp` |
+| `Node3D.rotation_degrees`, `global_position` and `transform` have no `PROPERTY_USAGE_EDITOR`; the inspector shows `rotation` in degrees, but it is stored in radians | `scene/3d/node_3d.cpp` |
+| Scenes saved by 4.8 carry `unique_id=` in every `[node …]` header | saved `.tscn` files |
 | `TCPServer.listen(port, bind_address = "*")` listens on all interfaces by default; `get_local_port()` | `doc/classes/TCPServer.xml` |
 | The maximum debugger message size is 8 MiB | `core/debugger/remote_debugger_peer.cpp` |
 | LSP: port 6005, starts when the editor is ready, up to 8 clients; `didOpen` → parser + analyzer → `publishDiagnostics` | `modules/gdscript/language_server/` |
@@ -1358,7 +1381,7 @@ Checked against the sources in `~/Software/godot` (`master`, 4.8-beta, commit `6
 | CLI: `--headless`, `--editor`, `--path`, `--scene`, `--check-only` (with `--script`), `--import`, `--doctool [path]` (implies headless), `--gdscript-docs`, `--lsp-port`, `--dap-port`, `--quit-after`, `--fixed-fps`, `--ignore-error-breaks`, `--export-release/--export-debug/--export-pack` | `main/main.cpp` |
 | Feature tags `editor_runtime`, `editor_hint`, `embedded_in_editor` | `core/os/os.cpp` |
 | File logging is on for desktop: `debug/file_logging/enable_file_logging.pc = true`, path `user://logs/godot.log` | `main/main.cpp` |
-| Editor settings: `text_editor/behavior/files/auto_reload_scripts_on_external_change`, `interface/editor/timers/unfocused_low_processor_mode_sleep_usec` = 100000 | `editor/settings/editor_settings.cpp` |
+| Editor settings: `text_editor/behavior/files/auto_reload_scripts_on_external_change` = `true`, `interface/editor/timers/unfocused_low_processor_mode_sleep_usec` = 100000 | `editor/settings/editor_settings.cpp` |
 | `JSON.from_native/to_native` (since 4.3), `ClassDB.class_get_property_default_value`, `ProjectSettings.get_global_class_list` | `doc/classes/` |
 | 3D: `NavigationRegion3D.bake_navigation_mesh()` and the `bake_finished` signal; `Viewport.world_3d` / `own_world_3d`; `physics/3d/physics_engine` (`DEFAULT` currently means GodotPhysics3D; Jolt can be selected); CSG nodes (`CSGBox3D`, `CSGCombiner3D`, …); `GridMap.set_cell_item` | `doc/classes/`, `modules/csg/doc_classes/` |
 

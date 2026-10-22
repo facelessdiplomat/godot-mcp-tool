@@ -2,6 +2,8 @@ extends RefCounted
 
 const BridgeConnection := preload("bridge_connection.gd")
 
+var last_activity_msec := -1
+
 var _tcp_server := TCPServer.new()
 var _connections: Array[BridgeConnection] = []
 var _create_session: Callable
@@ -29,8 +31,15 @@ func poll() -> void:
 		if peer != null:
 			_connections.append(BridgeConnection.new(peer, _create_session.call()))
 	for connection in _connections:
-		connection.poll()
+		if connection.poll() > 0:
+			last_activity_msec = Time.get_ticks_msec()
 	_connections = _connections.filter(func(connection: BridgeConnection) -> bool: return not connection.is_closed)
+
+
+func broadcast(message: Dictionary) -> void:
+	for connection in _connections:
+		if connection.session.is_authenticated:
+			connection.send(message)
 
 
 func stop() -> void:

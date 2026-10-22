@@ -8,15 +8,27 @@ const JsonRpc := preload("json_rpc.gd")
 var is_authenticated := false
 var should_close := false
 
+const STATUS_NOTIFICATION := "log.status"
+
 var _authenticator: Authenticator
 var _router: CommandRouter
 var _build_hello_payload: Callable
+var _read_status: Callable
+var _last_sent_status: Variant = null
+var _notifications: Array = []
 
 
-func _init(authenticator: Authenticator, router: CommandRouter, build_hello_payload: Callable) -> void:
+func _init(authenticator: Authenticator, router: CommandRouter, build_hello_payload: Callable, read_status: Callable = Callable()) -> void:
 	_authenticator = authenticator
 	_router = router
 	_build_hello_payload = build_hello_payload
+	_read_status = read_status
+
+
+func take_notifications() -> Array:
+	var taken := _notifications
+	_notifications = []
+	return taken
 
 
 func handle_line(line: String) -> Dictionary:
@@ -37,7 +49,7 @@ func handle_line(line: String) -> Dictionary:
 	if not is_authenticated:
 		should_close = true
 		return JsonRpc.failure(request_id, JsonRpc.UNAUTHORIZED, "Send hello with the token before %s" % method)
-	return _run_command(request_id, method, params)
+	return await _run_command(request_id, method, params)
 
 
 func _answer_hello(request_id: Variant, params: Dictionary) -> Dictionary:
@@ -46,6 +58,7 @@ func _answer_hello(request_id: Variant, params: Dictionary) -> Dictionary:
 		should_close = true
 		return JsonRpc.failure(request_id, rejection.code, rejection.message, rejection.hint)
 	is_authenticated = true
+	_queue_status_if_changed()
 	return JsonRpc.success(request_id, _build_hello_payload.call())
 
 
@@ -57,10 +70,21 @@ func _run_command(request_id: Variant, method: String, params: Dictionary) -> Di
 			JsonRpc.METHOD_NOT_FOUND,
 			"Unknown method %s" % method,
 			"Available methods: %s" % ", ".join(_router.methods()))
-	var outcome: Variant = command.execute(params)
+	var outcome: Variant = await command.execute(params)
+	_queue_status_if_changed()
 	if outcome is CommandError:
 		return JsonRpc.failure(request_id, outcome.code, outcome.message, outcome.hint)
 	return JsonRpc.success(request_id, outcome)
+
+
+func _queue_status_if_changed() -> void:
+	if not _read_status.is_valid():
+		return
+	var status: Variant = _read_status.call()
+	if status == _last_sent_status:
+		return
+	_last_sent_status = status
+	_notifications.append(JsonRpc.make_notification(STATUS_NOTIFICATION, status))
 
 
 static func _normalize_request_id(request_id: Variant) -> Variant:

@@ -1,3 +1,4 @@
+import { type EditorGateway, type EditorRequestOptions, EditorUnavailableError } from '../editor/EditorGateway.js';
 import { describeError } from '../util/errors.js';
 import type { EditorBridge, HelloResult } from './BridgeClient.js';
 import type { BridgeEndpoint, DiscoverySource } from './DiscoveryFileReader.js';
@@ -10,7 +11,10 @@ export interface EditorStatusProvider {
   status(): Promise<EditorStatus>;
 }
 
-export interface EditorSession extends EditorStatusProvider {
+export type ConnectionNotificationListener = (connectionNumber: number, method: string, params: unknown) => void;
+
+export interface EditorSession extends EditorStatusProvider, EditorGateway {
+  onNotification(listener: ConnectionNotificationListener): void;
   close(): void;
 }
 
@@ -18,6 +22,8 @@ export class EditorConnection implements EditorSession {
   private bridge: EditorBridge | undefined;
   private hello: HelloResult | undefined;
   private connectionInProgress: Promise<EditorStatus> | undefined;
+  private connectionCount = 0;
+  private readonly notificationListeners: ConnectionNotificationListener[] = [];
 
   constructor(
     private readonly discovery: DiscoverySource,
@@ -37,6 +43,21 @@ export class EditorConnection implements EditorSession {
     } finally {
       this.connectionInProgress = undefined;
     }
+  }
+
+  async request(method: string, params: Record<string, unknown>, options: EditorRequestOptions = {}): Promise<unknown> {
+    const editorStatus = await this.status();
+    if (!editorStatus.connected) {
+      throw new EditorUnavailableError(editorStatus.reason);
+    }
+    if (this.bridge === undefined) {
+      throw new EditorUnavailableError('The connection to the editor closed before the request was sent.');
+    }
+    return this.bridge.request(method, params, options.timeoutMs);
+  }
+
+  onNotification(listener: ConnectionNotificationListener): void {
+    this.notificationListeners.push(listener);
   }
 
   close(): void {
@@ -68,6 +89,13 @@ export class EditorConnection implements EditorSession {
   private async connectTo(endpoint: BridgeEndpoint): Promise<EditorStatus> {
     this.close();
     const bridge = this.createBridge(endpoint);
+    this.connectionCount += 1;
+    const connectionNumber = this.connectionCount;
+    bridge.onNotification((method, params) => {
+      for (const listener of this.notificationListeners) {
+        listener(connectionNumber, method, params);
+      }
+    });
     try {
       const hello = await bridge.connect();
       this.bridge = bridge;
@@ -89,6 +117,12 @@ export class UnavailableEditor implements EditorSession {
   status(): Promise<EditorStatus> {
     return Promise.resolve({ connected: false, reason: this.reason });
   }
+
+  request(_method: string, _params: Record<string, unknown>): Promise<unknown> {
+    return Promise.reject(new EditorUnavailableError(this.reason));
+  }
+
+  onNotification(): void {}
 
   close(): void {}
 }

@@ -7,10 +7,11 @@ export interface ToolDefinition<InputSchema extends z.ZodObject> {
   readonly inputSchema: InputSchema;
   readonly annotations: ToolAnnotations;
   readonly alwaysLoad: boolean;
+  readonly showsErrors?: boolean | undefined;
 }
 
 export interface Tool<InputSchema extends z.ZodObject = z.ZodObject> {
   readonly name: string;
   readonly definition: ToolDefinition<InputSchema>;
-  execute(input: z.infer<InputSchema>): Promise<CallToolResult>;
+  execute(input: z.input<InputSchema>): Promise<CallToolResult>;
 }

@@ -1,0 +1,66 @@
+extends RefCounted
+
+const DEFAULT_CAPACITY := 2000
+
+var last_seq := 0
+var error_count := 0
+var warning_count := 0
+
+var _capacity: int
+var _entries: Array = []
+var _latest_error := {}
+
+
+func _init(capacity: int = DEFAULT_CAPACITY) -> void:
+	_capacity = capacity
+
+
+func append(entry: Dictionary, source: String) -> void:
+	last_seq += 1
+	var stored := entry.duplicate()
+	stored["seq"] = last_seq
+	stored["source"] = source
+	_entries.append(stored)
+	if _entries.size() > _capacity:
+		_entries.pop_front()
+	match stored.get("level"):
+		"error":
+			error_count += 1
+			_latest_error = _summary_of(stored)
+		"warning":
+			warning_count += 1
+
+
+func entries_after(after_seq: int, levels: PackedStringArray, limit: int) -> Dictionary:
+	var oldest_seq: int = _entries[0]["seq"] if not _entries.is_empty() else last_seq + 1
+	var selected: Array = []
+	var next_after := last_seq
+	var more := false
+	for entry in _entries:
+		if entry["seq"] <= after_seq:
+			continue
+		if not levels.is_empty() and not str(entry.get("level")) in levels:
+			continue
+		if selected.size() >= limit:
+			more = true
+			next_after = selected.back()["seq"]
+			break
+		selected.append(entry)
+	return {
+		"entries": selected,
+		"more": more,
+		"next_after": maxi(next_after, after_seq),
+		"skipped": maxi(0, oldest_seq - after_seq - 1),
+		"last_seq": last_seq,
+	}
+
+
+func status() -> Dictionary:
+	return {"last_seq": last_seq, "errors": error_count, "warnings": warning_count, "latest_error": _latest_error}
+
+
+static func _summary_of(entry: Dictionary) -> Dictionary:
+	var summary := {"seq": entry["seq"], "source": entry["source"], "message": entry.get("message", "")}
+	if entry.has("location"):
+		summary["location"] = entry["location"]
+	return summary

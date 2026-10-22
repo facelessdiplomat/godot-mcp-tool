@@ -8,6 +8,14 @@ const INVALID_PARAMS := -32602
 const INTERNAL_ERROR := -32603
 const UNAUTHORIZED := -32001
 const PROTOCOL_MISMATCH := -32002
+const EDITOR_BUSY := -32003
+const NOT_FOUND := -32004
+const NO_SCENE := -32005
+const GAME_NOT_RUNNING := -32006
+const CONFLICT := -32007
+const TIMEOUT := -32008
+const UNSAFE_DISABLED := -32009
+const OPERATION_FAILED := -32010
 
 
 static func success(request_id: Variant, result: Variant) -> Dictionary:
