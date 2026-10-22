@@ -7,6 +7,7 @@ var unsaved_roots: Array[Node] = []
 var closed_paths := PackedStringArray()
 var selected_nodes: Array[Node] = []
 var selected_file := ""
+var reloaded_paths := PackedStringArray()
 
 
 func edited_scene_root() -> Node:
@@ -46,6 +47,10 @@ func close_scene(scene_root: Node) -> Error:
 		edited_root.free()
 		edited_root = null
 	return OK
+
+
+func reload_scene(scene_path: String) -> void:
+	reloaded_paths.append(scene_path)
 
 
 func select_nodes(nodes: Array[Node]) -> void:

@@ -15,3 +15,7 @@ func applied_scans() -> int:
 
 func reimport(_paths: PackedStringArray) -> void:
 	pass
+
+
+func update_files(_paths: PackedStringArray) -> void:
+	pass

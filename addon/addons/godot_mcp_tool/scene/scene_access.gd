@@ -33,6 +33,10 @@ func close_scene(_scene_root: Node) -> Error:
 	return ERR_UNAVAILABLE
 
 
+func reload_scene(_scene_path: String) -> void:
+	pass
+
+
 func select_nodes(_nodes: Array[Node]) -> void:
 	pass
 

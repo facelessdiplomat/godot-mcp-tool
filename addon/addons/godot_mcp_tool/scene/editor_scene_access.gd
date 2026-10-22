@@ -51,6 +51,10 @@ func close_scene(scene_root: Node) -> Error:
 	return close_error
 
 
+func reload_scene(scene_path: String) -> void:
+	EditorInterface.reload_scene_from_path(scene_path)
+
+
 func select_nodes(nodes: Array[Node]) -> void:
 	var selection := EditorInterface.get_selection()
 	selection.clear()

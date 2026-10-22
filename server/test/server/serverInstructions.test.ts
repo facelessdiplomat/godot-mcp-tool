@@ -14,9 +14,13 @@ describe('serverInstructions', () => {
     expect(serverInstructions).toContain('Tool calls sent in one message run at the same time, so read the state in a later message than the game_input or game_wait it depends on.');
   });
 
+  it('sends file moves and renames through filesystem_move', () => {
+    expect(serverInstructions).toContain('Move or rename project files with filesystem_move');
+  });
+
   it('names only tools that exist', async () => {
     const toolNames = await registeredToolNames();
-    const mentionedTools = serverInstructions.match(/\b(?:godot|project|editor|scene|node|game|docs|signal|script|input)_[a-z_]+\b/g) ?? [];
+    const mentionedTools = serverInstructions.match(/\b(?:godot|project|editor|scene|node|game|docs|signal|script|input|asset|filesystem|resource|test)_[a-z_]+\b/g) ?? [];
 
     expect(mentionedTools.length).toBeGreaterThan(5);
     for (const toolName of mentionedTools) {

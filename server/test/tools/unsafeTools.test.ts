@@ -1,6 +1,6 @@
 import type { CallToolResult } from '@modelcontextprotocol/server';
 import { describe, expect, it } from 'vitest';
-import { createEditorRunScriptTool, createGameEvalTool, createNodeCallMethodTool } from '../../src/tools/unsafeTools.js';
+import { createEditorRunScriptTool, createFilesystemDeleteTool, createGameEvalTool, createNodeCallMethodTool } from '../../src/tools/unsafeTools.js';
 import { FakeEditorGateway } from '../support/FakeEditorGateway.js';
 
 function textOf(result: CallToolResult): string {
@@ -46,10 +46,97 @@ describe('unsafe tools', () => {
     expect(textOf(result)).toBe('position on Player in the running game = Vector3(0, 1, 0)  [Vector3]');
   });
 
+  it('filesystem_delete deletes nothing while the project uses the files, and lists the uses', async () => {
+    const editor = new FakeEditorGateway()
+      .respondTo('filesystem.delete', {
+        deleted: [],
+        blocked: true,
+        failed: [],
+        used_by: [{ path: 'res://crate.tscn', uses: ['res://materials/ice.tres'] }],
+        settings: [{ name: 'application/run/main_scene', value: 'res://levels/arena.tscn' }],
+        code: [{ path: 'res://menu.gd', line: 8, text: 'get_tree().change_scene_to_file("res://levels/arena.tscn")' }],
+      })
+      .respondTo('filesystem.delete', {
+        deleted: [],
+        blocked: true,
+        failed: [],
+        used_by: [],
+        settings: [],
+        code: [{ path: 'res://loot.gd', line: 3, text: 'const TABLE := "res://loot_table.json"' }],
+      });
+
+    const several = await createFilesystemDeleteTool(editor).execute({ paths: ['res://materials/ice.tres', 'res://levels/arena.tscn'] });
+    const one = await createFilesystemDeleteTool(editor).execute({ paths: ['res://loot_table.json'] });
+
+    expect(editor.requests[0]?.params).toEqual({ paths: ['res://materials/ice.tres', 'res://levels/arena.tscn'], force: false });
+    expect(several.isError).toBe(true);
+    expect(textOf(several)).toBe(
+      [
+        'Nothing was deleted: the project still uses these files.',
+        'Used by:',
+        '- res://crate.tscn: res://materials/ice.tres',
+        'Project settings: application/run/main_scene = res://levels/arena.tscn',
+        'Named in code:',
+        '- res://menu.gd:8: get_tree().change_scene_to_file("res://levels/arena.tscn")',
+        'Change those first, or pass force: true to delete anyway.',
+      ].join('\n'),
+    );
+    expect(textOf(one)).toBe(
+      [
+        'Nothing was deleted: the project still uses res://loot_table.json.',
+        'Named in code:',
+        '- res://loot.gd:3: const TABLE := "res://loot_table.json"',
+        'Change those first, or pass force: true to delete anyway.',
+      ].join('\n'),
+    );
+  });
+
+  it('filesystem_delete reports what went to the trash and what still refers to it', async () => {
+    const editor = new FakeEditorGateway().respondTo('filesystem.delete', {
+      deleted: ['res://materials/ice.tres'],
+      blocked: false,
+      failed: [{ path: 'res://locked.tres', reason: 'Permission denied' }],
+      used_by: [{ path: 'res://crate.tscn', uses: ['res://materials/ice.tres'] }],
+      settings: [{ name: 'rendering/environment/defaults/default_environment', value: '' }],
+      code: [{ path: 'res://crate.gd', line: 3, text: 'const SKIN := preload("res://materials/ice.tres")' }],
+    });
+
+    const result = await createFilesystemDeleteTool(editor).execute({ paths: ['res://materials/ice.tres', 'res://locked.tres'], force: true });
+
+    expect(textOf(result)).toBe(
+      [
+        'Moved res://materials/ice.tres to the system trash; it can be restored from there.',
+        'These files still refer to the deleted files:',
+        '- res://crate.tscn: res://materials/ice.tres',
+        'Cleared project settings: rendering/environment/defaults/default_environment',
+        'Scripts still name the deleted files:',
+        '- res://crate.gd:3: const SKIN := preload("res://materials/ice.tres")',
+        'Could not move to the trash:',
+        '- res://locked.tres: Permission denied',
+      ].join('\n'),
+    );
+  });
+
+  it('filesystem_delete fails when nothing could be moved to the trash', async () => {
+    const editor = new FakeEditorGateway().respondTo('filesystem.delete', {
+      deleted: [],
+      blocked: false,
+      failed: [{ path: 'res://locked.tres', reason: 'Permission denied' }],
+      used_by: [],
+      settings: [],
+      code: [],
+    });
+
+    const result = await createFilesystemDeleteTool(editor).execute({ paths: ['res://locked.tres'] });
+
+    expect(result.isError).toBe(true);
+    expect(textOf(result)).toBe(['Nothing was deleted.', 'Could not move to the trash:', '- res://locked.tres: Permission denied'].join('\n'));
+  });
+
   it('asks the user before every call', () => {
     const editor = new FakeEditorGateway();
 
-    for (const tool of [createEditorRunScriptTool(editor), createNodeCallMethodTool(editor), createGameEvalTool(editor)]) {
+    for (const tool of [createEditorRunScriptTool(editor), createNodeCallMethodTool(editor), createGameEvalTool(editor), createFilesystemDeleteTool(editor)]) {
       expect(tool.definition.requiresUserInteraction).toBe(true);
       expect(tool.definition.annotations.destructiveHint).toBe(true);
     }

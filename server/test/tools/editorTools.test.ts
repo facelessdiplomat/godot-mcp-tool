@@ -34,6 +34,8 @@ describe('createEditorTools', () => {
       'resource_create',
       'resource_get',
       'resource_set_properties',
+      'resource_find_usages',
+      'filesystem_move',
       'asset_import_settings_get',
       'asset_import_settings_set',
       'navigation_bake',

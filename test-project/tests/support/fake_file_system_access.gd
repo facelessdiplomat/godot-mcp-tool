@@ -4,6 +4,8 @@ var scanning := false
 var scan_requests := 0
 var applied := 0
 var reimported: Array = []
+var updated_files := PackedStringArray()
+var applies_scans_at_once := false
 
 
 func is_scanning() -> bool:
@@ -12,6 +14,9 @@ func is_scanning() -> bool:
 
 func scan() -> void:
 	scan_requests += 1
+	if applies_scans_at_once:
+		applied += 1
+		return
 	scanning = true
 
 
@@ -30,3 +35,7 @@ func apply_scan() -> void:
 
 func reimport(paths: PackedStringArray) -> void:
 	reimported.append(paths)
+
+
+func update_files(paths: PackedStringArray) -> void:
+	updated_files.append_array(paths)

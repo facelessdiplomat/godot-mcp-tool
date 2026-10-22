@@ -25,7 +25,9 @@ are described in the files linked at the end.
    `node_` tools, connect signals with `signal_connect`. Shared materials and other resources: `resource_create`,
    `resource_set_properties`.
 3. **Project setup**: input actions with `input_map_set`, settings with `project_settings_set`, global singletons
-   with `autoload_add`, groups with `node_set_groups`.
+   with `autoload_add`, groups with `node_set_groups`. Move or rename files and folders with `filesystem_move`, never
+   with shell commands: it updates the scenes, resources and settings that use them and lists the scripts to change.
+   Before deleting a file, check with `resource_find_usages` that nothing uses it.
 4. **Save** with `scene_save`. Changes stay unsaved until then; `game_run` saves first, but `test_run` reads the files
    on disk.
 5. **Run** with `game_run` and read errors with `game_get_output`. A ⚠ line in any result means new errors: read them

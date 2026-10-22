@@ -2,6 +2,7 @@ import * as z from 'zod/v4';
 import type { EditorGateway } from '../editor/EditorGateway.js';
 import { changingAnnotations, readingAnnotations } from './annotations.js';
 import { BridgeTool } from './bridge/BridgeTool.js';
+import { counted } from './formatting/counting.js';
 import {
   applyReportSchema,
   formatApplyReport,
@@ -226,10 +227,6 @@ function describeMeasuredNodes(bounds: NodeBounds): string {
     return `No visual nodes, so measured from ${counted(bounds.collision_count, 'collision shape')}.`;
   }
   return 'There are no visual nodes or collision shapes below it, so this is only its position.';
-}
-
-function counted(count: number, noun: string): string {
-  return `${String(count)} ${noun}${count === 1 ? '' : 's'}`;
 }
 
 function capitalized(text: string): string {

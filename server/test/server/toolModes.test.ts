@@ -42,17 +42,21 @@ describe('tool modes', () => {
     expect(prompts).toEqual(['fix_last_run', 'playtest']);
 
     expect(names).toContain('node_add');
+    expect(names).toContain('filesystem_move');
     expect(names).not.toContain('editor_run_script');
     expect(names).not.toContain('game_eval');
     expect(names).not.toContain('node_call_method');
+    expect(names).not.toContain('filesystem_delete');
   });
 
   it('offers the unsafe tools with GODOT_MCP_UNSAFE and has the client confirm each call', async () => {
     const { names, instructions, meta } = await listedTools({ GODOT_MCP_UNSAFE: '1' });
 
-    expect(names).toEqual(expect.arrayContaining(['editor_run_script', 'game_eval', 'node_call_method']));
+    expect(names).toEqual(expect.arrayContaining(['editor_run_script', 'game_eval', 'node_call_method', 'filesystem_delete']));
     expect(meta.get('game_eval')).toEqual({ 'anthropic/requiresUserInteraction': true });
+    expect(meta.get('filesystem_delete')).toEqual({ 'anthropic/requiresUserInteraction': true });
     expect(instructions).toContain('editor_run_script, game_eval and node_call_method are on');
+    expect(instructions).toContain('Delete project files with filesystem_delete');
   });
 
   it('offers only reading tools in read-only mode and says so', async () => {
@@ -63,7 +67,10 @@ describe('tool modes', () => {
 
     expect(names).toContain('scene_get_tree');
     expect(names).toContain('godot_status');
+    expect(names).toContain('resource_find_usages');
     expect(names).not.toContain('node_add');
+    expect(names).not.toContain('filesystem_move');
+    expect(names).not.toContain('filesystem_delete');
     expect(names).not.toContain('game_run');
     expect(names).not.toContain('game_eval');
     expect(instructions).toContain('read-only mode');

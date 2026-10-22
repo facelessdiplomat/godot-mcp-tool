@@ -23,5 +23,10 @@ func reimport(paths: PackedStringArray) -> void:
 	EditorInterface.get_resource_filesystem().reimport_files(paths)
 
 
+func update_files(paths: PackedStringArray) -> void:
+	for path in paths:
+		EditorInterface.get_resource_filesystem().update_file(path)
+
+
 func _count_applied_scan(_sources_exist: bool) -> void:
 	_applied_scans += 1

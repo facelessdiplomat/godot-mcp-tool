@@ -1,5 +1,6 @@
 import type { ScriptProblem } from '../../scripts/ScriptProblem.js';
 import type { ScriptReport, ValidationResult } from '../../scripts/ScriptValidator.js';
+import { counted } from './counting.js';
 
 const listedNames = 10;
 
@@ -9,10 +10,10 @@ export function formatValidation(result: ValidationResult): string {
   const fine = result.reports.filter((report) => report.problems.length === 0).map((report) => report.resourcePath);
   const lines: string[] = [];
   if (withProblems.length === 0) {
-    lines.push(`No problems in ${countOf(result.reports.length, 'script')}: ${listNames(fine)} (checked with ${via}).`);
+    lines.push(`No problems in ${counted(result.reports.length, 'script')}: ${listNames(fine)} (checked with ${via}).`);
   } else {
     const problems = withProblems.flatMap((report) => report.problems);
-    lines.push(`${describeCounts(problems)} in ${String(withProblems.length)} of ${countOf(result.reports.length, 'script')} (checked with ${via}).`);
+    lines.push(`${describeCounts(problems)} in ${String(withProblems.length)} of ${counted(result.reports.length, 'script')} (checked with ${via}).`);
   }
   if (result.fallbackReason !== undefined) {
     lines.push(`The language server was not used: ${result.fallbackReason}`);
@@ -39,15 +40,11 @@ function describeCounts(problems: readonly ScriptProblem[]): string {
   const warnings = problems.filter((problem) => problem.severity === 'warning').length;
   const notes = problems.length - errors - warnings;
   const parts = [
-    ...(errors > 0 ? [countOf(errors, 'error')] : []),
-    ...(warnings > 0 ? [countOf(warnings, 'warning')] : []),
-    ...(notes > 0 ? [countOf(notes, 'note')] : []),
+    ...(errors > 0 ? [counted(errors, 'error')] : []),
+    ...(warnings > 0 ? [counted(warnings, 'warning')] : []),
+    ...(notes > 0 ? [counted(notes, 'note')] : []),
   ];
   return parts.length <= 1 ? parts.join('') : `${parts.slice(0, -1).join(', ')} and ${parts.at(-1) ?? ''}`;
-}
-
-function countOf(count: number, noun: string): string {
-  return `${String(count)} ${noun}${count === 1 ? '' : 's'}`;
 }
 
 function listNames(names: readonly string[]): string {

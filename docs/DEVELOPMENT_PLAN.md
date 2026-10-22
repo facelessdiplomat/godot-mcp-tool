@@ -417,7 +417,20 @@ reads either one.
 | `editor_screenshot` | Render of the 3D scene open in the editor from the editor camera or from given views (§8.9), without the grid and gizmos; says when the editor's preview sun and sky light it. 2D scenes and UI are checked with `game_screenshot`; a capture of the whole editor window is not planned yet | 2 | R | E |
 | `editor_select` | Select nodes or files so the user sees what the agent is talking about | 3 | W (harmless) | E |
 | `editor_run_script` | Run a GDScript snippet in the editor context — an escape hatch, disabled by default | 3 | D | E |
-| `filesystem_move` / `filesystem_delete` | Move and delete files together with their `.uid`/`.import` files, checking dependencies | 4 | D | E |
+| `filesystem_move` | Move or rename a file or folder as the FileSystem dock does: its `.import`/`.uid` files go along, text scenes and resources that refer to it get the new path, open scenes and cached resources follow, project settings are updated; scripts that name the old path and binary scenes are listed | 4 | W | E |
+| `filesystem_delete` | Move files or folders to the system trash with their `.import`/`.uid` files; deletes nothing while the project uses them unless forced, never the file of an autoload — disabled by default (§8.12) | 4 | D | E |
+
+`filesystem_move` follows the dock (Appendix B): it moves the files on disk, points cached resources and open scenes at
+the new paths, tells `EditorFileSystem` about the old and new path of every file so that UIDs follow at once, rewrites
+the `path=` of `[ext_resource]` lines in `.tscn` and `.tres` files that use them, reloads those that are open, updates
+project settings such as the main scene and autoloads, and rescans. `ResourceLoader.rename_dependencies` is not bound
+for scripts, so binary `.scn` and `.res` users are listed instead: they load through the UID and are fixed by saving
+them in the editor. Code that names a moved file by UID keeps working; lines that name the old `res://` path are
+listed for the agent to change. A move is refused while a scene it changes is open with unsaved changes, and a
+case-only rename works on case-insensitive disks. `filesystem_delete` checks the same uses as
+`resource_find_usages` — dependencies, project settings, and scripts or shaders that name the path or the UID — and
+deletes nothing while any of them exists unless `force` is set; with `force`, it clears the project settings, as the
+dock's delete does. Neither is recorded for Undo; the trash and a move back are the way back.
 
 ### 8.3 Scenes
 
@@ -451,7 +464,7 @@ reads either one.
 | `resource_create` | Create a `.tres` (material, environment, theme, curve, custom `Resource`) with properties | 3 | W | E |
 | `resource_get` | Type, properties, dependencies | 3 | R | E |
 | `resource_set_properties` | Change resource properties | 3 | W | E |
-| `resource_find_usages` | Who references a file (reverse dependencies) | 4 | R | E |
+| `resource_find_usages` | What uses a file or the files of a folder: scenes and resources through their dependencies, project settings, and lines of scripts and shaders that name its path or UID (code in `res://addons/` only for files of addons) | 4 | R | E |
 
 `resource_create` writes the new `.tres` file at once and never replaces an existing one. `resource_set_properties`
 changes the resource that the editor holds, as one Undo step, and saves the file right away, so the game, tests run
@@ -623,7 +636,7 @@ Connected to Godot <version>, project "<name>" (3D). Indentation: <tabs | N spac
 - `GODOT_MCP_READ_ONLY=1` exposes read-only tools only (those annotated `readOnlyHint`); `GODOT_MCP_DISABLE=tool1,tool2`
   turns off individual tools. `godot_status` names the modes that differ from the defaults, unknown names in
   `GODOT_MCP_DISABLE` included, and the server instructions say when the server is read-only.
-- Dangerous tools (`editor_run_script`, `game_eval`, `node_call_method`, later `filesystem_delete`) need two switches:
+- Dangerous tools (`editor_run_script`, `game_eval`, `node_call_method`, `filesystem_delete`) need two switches:
   `GODOT_MCP_UNSAFE=1` registers them in the server, and the editor runs them only when the project allows them in
   Project → Tools → Godot MCP Tool → Allow Unsafe Tools. That switch is kept in the editor's project metadata
   (`.godot/editor/project_metadata.cfg`), so it belongs to one user and one project and never reaches version control;
@@ -1343,7 +1356,10 @@ the next call showed a ⚠.
       arguments after `--`).
 - [ ] Debugging through DAP: breakpoints, stack, variables.
 - [ ] `export_project`.
-- [ ] `filesystem_move`, `filesystem_delete`, `resource_find_usages`.
+- [x] `filesystem_move`, `filesystem_delete`, `resource_find_usages`: files and folders move as in the FileSystem dock,
+      with their `.import` and `.uid` files, the scenes, resources and project settings that use them, open scenes
+      and UIDs; scripts that name an old path are listed to change; deleting moves files to the system trash and
+      refuses files still in use unless forced; scenario `docs/evals/tidy-the-project.md`.
 
 **Done when** every capability is covered by its own scenario in `docs/evals/`, for example: "import a glTF
 character, scale it to 1.8 m, add a capsule collision", "bake navigation for the arena and make an enemy follow the
@@ -1674,6 +1690,11 @@ Checked against the sources in `~/Software/godot` (`master`, 4.8-beta, commit `6
 | The engine warns when a navigation mesh with a finer `cell_size` or `cell_height` than its map is added to the map, during the map's next sync rather than at the assignment; with the defaults (0.25) a 20 × 20 floor whose top is at 0 bakes to 2 polygons covering 19 × 19 at height 0.5 | `modules/navigation_3d/nav_region_3d.cpp`, observed on 4.8 |
 | `AnimationLibrary.add_animation()` replaces an animation of the same name; animation names cannot be empty or contain `/ : , [`, and `library/name` addresses a library other than the default `""` one, which an `AnimationPlayer` does not have until an animation is added. Track paths are relative to the player's `root_node`, `".."` by default | `scene/resources/animation_library.cpp`, `scene/animation/animation_mixer.cpp` |
 | A new `AnimationNodeStateMachine` has the states `Start` and `End`; a transition cannot leave `End`, enter `Start`, join a state to itself or repeat one, and state names cannot contain `/`. A new `AnimationTree` is active, takes expressions on itself (`advance_expression_base_node` is `.`), and lists `parameters/conditions/<name>` among its properties, so a condition can be set like a property; `get("parameters/playback").get_current_node()` works in an `Expression` | `scene/animation/animation_node_state_machine.cpp`, `scene/animation/animation_tree.h`, observed on 4.8 |
+| The FileSystem dock moves a file with its `.import` and `.uid` files, points open scenes and cached resources at the new path, calls `EditorFileSystem::update_files` for the old and new paths, which moves the UID in the UID cache and drops the old imported files, rewrites the users with `ResourceLoader::rename_dependencies` (not bound for scripts), reloads open users, updates project settings that held the old path and rescans; its delete moves files to the trash with `OS.move_to_trash` and sets project settings that pointed at them to `""` | `editor/docks/filesystem_dock.cpp`, `editor/file_system/dependency_editor.cpp`, `editor/file_system/editor_file_system.cpp` |
+| A text scene or resource loads an `[ext_resource]` through its UID when the UID cache knows it, and through `path` only otherwise, so after a file moves on disk, loading a user fails with "Cannot open file" until `EditorFileSystem.update_file` or a scan points the UID at the new path. A moved imported file is imported again at its new path by the next scan | `scene/resources/resource_format_text.cpp`, observed on 4.8 |
+| `ResourceLoader.get_resource_uid()` reads the UID from the file (the header, or the `.uid` file of a script) only in the editor; elsewhere, also in GUT runs with `-s`, it asks the UID cache, and `ResourceUID.add_id` registers one there | `core/io/resource_loader.cpp`, `main/main.cpp` |
+| Dropping a resource into the script editor with Ctrl adds `const … = preload("uid://…")` by default (`text_editor/behavior/files/drop_preload_resources_as_uid`), so scripts name files by UID as well as by path; GDScript preloads are not listed by `ResourceLoader.get_dependencies` | `editor/script/script_text_editor.cpp`, `editor/settings/editor_settings.cpp`, observed on 4.8 |
+| `DirAccess.is_case_sensitive(path)` is false on a default macOS volume, where `FileAccess.file_exists` finds `player.gd` when `Player.gd` exists; `DirAccess.rename_absolute` changes only the case of a name there | `platform/macos/dir_access_macos.mm`, observed on 4.8 |
 | `JSON.stringify` sorts the keys of dictionaries by default, so the bridge does not keep their order; ordered data travels as arrays | `core/io/json.h` (`sort_keys = true`) |
 | `InputMap` matches an event of an action against an incoming event only when the action's event has the device `ALL_DEVICES` (-1, not exposed to scripts) or the same device; new `InputEventKey` and mouse events get `DEVICE_ID_KEYBOARD` (16) and `DEVICE_ID_MOUSE` (32), joypad events default to device 0, the first gamepad, and the editor's Input Map dialog stores "All Devices" | `core/input/input_map.cpp`, `core/input/input_event.cpp`, `editor/settings/input_event_configuration_dialog.cpp` |
 | The analyzer reports a member that a class lacks when it is read through the class (`Player.SPEEDD` is a parse error), but a method or property that the type of a variable lacks (`player.dashh()` on a `Player` or a `CharacterBody3D` variable) compiles: only the `unsafe_method_access` and `unsafe_property_access` warnings report it, and both are off by default. `:=` cannot infer the type of a member that the static type lacks, so it works on a variable typed with the `class_name` of its script and fails on one typed with the native base | observed on 4.8 with `--check-only` |

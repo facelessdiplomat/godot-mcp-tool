@@ -6,6 +6,7 @@ import type { TestCaseResult } from '../testing/JUnitReport.js';
 import { testFrameworks } from '../testing/TestFrameworks.js';
 import { TestRunError, type TestRunRequest, type TestRunResult } from '../testing/TestRunner.js';
 import { changingAnnotations } from './annotations.js';
+import { counted } from './formatting/counting.js';
 import { errorResult, textResult } from './results.js';
 import type { Tool, ToolDefinition } from './Tool.js';
 
@@ -147,8 +148,4 @@ function describeFailure(testCase: TestCaseResult): string[] {
 function describeSkipped(testCase: TestCaseResult): string {
   const place = testCase.location ?? testCase.suite;
   return testCase.message === undefined ? `- ${testCase.name} (${place})` : `- ${testCase.name} (${place}): ${testCase.message}`;
-}
-
-function counted(count: number, noun: string): string {
-  return `${String(count)} ${noun}${count === 1 ? '' : 's'}`;
 }

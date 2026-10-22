@@ -38,7 +38,7 @@ import { createSceneGetTreeTool } from './tools/sceneTools.js';
 import { ScriptValidateTool } from './tools/scriptTools.js';
 import { TestRunTool } from './tools/TestRunTool.js';
 import type { Tool } from './tools/Tool.js';
-import { createEditorRunScriptTool, createGameEvalTool, createNodeCallMethodTool } from './tools/unsafeTools.js';
+import { createEditorRunScriptTool, createFilesystemDeleteTool, createGameEvalTool, createNodeCallMethodTool } from './tools/unsafeTools.js';
 import { userCacheDirectory } from './util/CacheDirectory.js';
 
 export interface ApplicationEnvironment {
@@ -136,7 +136,7 @@ export function createApplication(environment: ApplicationEnvironment): Applicat
     new DocsClassTool(docsSource),
     new DocsSearchTool(docsSource),
     ...createGameTools(gameGateway, new GameOutputCursor(), readFileSync),
-    ...(policy.unsafe ? [createEditorRunScriptTool(editor), createNodeCallMethodTool(editor), createGameEvalTool(gameGateway)] : []),
+    ...(policy.unsafe ? [createEditorRunScriptTool(editor), createNodeCallMethodTool(editor), createGameEvalTool(gameGateway), createFilesystemDeleteTool(editor)] : []),
   ];
   const selection = applyToolPolicy(plainTools, policy);
   toolNotes.push(...selection.notes);
