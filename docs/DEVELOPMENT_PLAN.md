@@ -789,10 +789,17 @@ they repeat its report or belong to an older version of the file. `test_run` doe
 reports as failing to load; since its tests run outside the bridge, it pings the connected editor after the run, so
 the errors the editor printed meanwhile arrive with its result rather than with the next call.
 
-A known gap, seen in the milestone 3 live run: an editor with a window loads a new script that sits in a new folder
-shortly after the scan that found it has been applied, so its parse errors arrive with the call after
-`editor_rescan`; a new script in an existing folder is loaded while the scan is applied and its errors come with
-`editor_rescan` itself. A headless editor loads neither. The engine path behind the delay is still to be found.
+`editor_rescan` returns only after the editor has applied the scan, so the parse errors of the scripts the editor
+loads meanwhile come with its result. An editor with a window loads every script that a scan found new or changed
+while it applies the scan, to update the script documentation (`_update_script_documentation`). When there is more
+than one such script, it shows a progress dialog for this work, and every update of the dialog runs a whole main
+loop iteration inside the apply: `process_frame` fires and the addon keeps answering requests before the scripts
+are loaded. So the addon does not count frames; it waits for `EditorFileSystem.sources_changed`, which the editor
+emits at the end of every applied scan. More than one script is common, because a rescan saves the file system
+cache before its new file tree replaces the old one, and the next rescan loads the scripts the previous one picked
+up again. This is the delay the milestone 3 live run saw with a new test script in a new folder: the folder plays no
+part, but a rescan right after one that picked up another script loads both and shows the dialog. A headless editor
+loads no scripts while it applies a scan and prints no parse errors for a new broken script.
 We don't parse the editor's Debugger tab or Output panel: that is brittle and depends on the editor's UI layout.
 
 Display rules, from spike 3: the message is `rationale` when it is not empty, otherwise `code` (engine errors keep the
@@ -1292,8 +1299,9 @@ load), `dash()`, 2 of 2 tests green, and a 3.5 m dash in the running game. It fo
   for all devices; it now stores every event for all devices (§9.9).
 - The editor's parse errors about the new test script reached the agent one call after `test_run`, as a ⚠ that
   repeated the load error `test_run` had reported, after the script was already fixed. `test_run` now pings the
-  editor after the run and leaves those errors out (§9.6). The underlying delay, a new script in a new folder, also
-  affects `editor_rescan` and is still open (§9.6).
+  editor after the run and leaves those errors out (§9.6). The underlying delay also affected `editor_rescan`: it
+  returned in the middle of the editor's apply of the scan whenever the editor showed a progress dialog for more
+  than one script; it now waits for the end of the apply (§9.6).
 - `project_info` listed 100 global classes, which in `test-project` were almost all gdUnit4's: about 11 KB of output
   on every first call. It now lists the project's own classes and counts those of each addon, and the overview of
   `test-project` takes under 1 KB (§8.1).
@@ -1578,7 +1586,8 @@ Checked against the sources in `~/Software/godot` (`master`, 4.8-beta, commit `6
 | `EditorPlugin._run_scene(scene, args)` can change the launch arguments; it is called for every way of running, including the main scene | `doc/classes/EditorPlugin.xml`, `editor/run/editor_run_bar.cpp` |
 | `EditorInterface`: `play_main_scene/play_current_scene/play_custom_scene/stop_playing_scene`, `open_scene_from_path`, `save_scene(_as)`, `get_editor_viewport_2d/3d`, `get_editor_undo_redo`, `get_open_scene_roots`, `close_scene`; `get_unsaved_scenes` since 4.7 | `doc/classes/EditorInterface.xml`, `CHANGELOG.md` |
 | `EditorFileSystem`: `scan`, `scan_sources`, `update_file`, `reimport_files`; signals `filesystem_changed`, `resources_reimported`, `script_classes_updated` | `doc/classes/EditorFileSystem.xml` |
-| `EditorFileSystem.is_scanning()` turns false when the scan thread ends; the editor applies the scan (new file tree, script classes, loading changed and new scripts) in its next `NOTIFICATION_PROCESS`, which comes after the `process_frame` signal, so waiting for the scan with `process_frame` needs one more frame. Only an editor with a window loads new scripts for their documentation: a headless editor runs in `cmdline_mode` and prints no parse errors for a new broken script | `editor/file_system/editor_file_system.cpp`, `editor/editor_node.cpp` |
+| `EditorFileSystem.is_scanning()` turns false when the scan thread ends; the editor applies the scan (new file tree, script classes, loading changed and new scripts) in its next `NOTIFICATION_PROCESS`, which comes after the `process_frame` signal. The scan thread of a rescan saves the file system cache before the new tree replaces the old one, so the cache on disk lags one scan behind, and the next rescan registers and loads the scripts this one found new or changed once more. Only an editor with a window loads new scripts for their documentation: a headless editor runs in `cmdline_mode` and prints no parse errors for a new broken script | `editor/file_system/editor_file_system.cpp`, `editor/editor_node.cpp` |
+| In an editor with a window, applying a scan with more than one script to register or document, or more than one scan action, shows a progress dialog, and every update of it runs a whole main loop iteration (`ProgressDialog::_update_ui` → `Main::iteration()`): `process_frame` fires and plugins process in the middle of the apply, and `Engine.get_process_frames()` changes only at the end of that inner iteration; a headless editor prints the progress instead. `sources_changed` is emitted at the end of every applied scan, of `scan()` and of `scan_sources()`, after the scripts are loaded | `editor/file_system/editor_file_system.cpp`, `editor/gui/progress_dialog.cpp`, `editor/editor_node.cpp`, `main/main.cpp`, observed on 4.8 |
 | Before running, the editor saves everything: `run/auto_save/save_before_running` = `true`; saving a scene calls `ScriptEditorPlugin::save_external_data()` → `save_all_scripts()`, which writes unsaved script tabs without comparing with the disk | `editor/settings/editor_settings.cpp`, `editor/script/script_editor_plugin.cpp` |
 | `ScriptEditor.reload_open_files()` compares each tab's last known modification time (one-second resolution) with the disk: tabs without unsaved changes reload silently when auto-reload is on, tabs with unsaved changes raise the "Files have been modified outside Godot" dialog; `ScriptEditor.get_unsaved_files()`; the editor checks script modification times itself when its window gains focus | `doc/classes/ScriptEditor.xml`, `editor/script/script_editor_plugin.cpp` |
 | An autoload added with `EditorPlugin.add_autoload_singleton` reaches `project.godot` only when `ProjectSettingsEditor` saves 1.5 s later, so a game started sooner runs without it; the addon calls `ProjectSettings.save()` itself | `editor/settings/editor_autoload_settings.cpp`, `editor/settings/project_settings_editor.cpp` |
