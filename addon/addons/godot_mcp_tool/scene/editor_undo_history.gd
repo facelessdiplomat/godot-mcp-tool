@@ -35,5 +35,5 @@ func add_undo_reference(object: Object) -> void:
 	_manager.add_undo_reference(object)
 
 
-func commit() -> void:
-	_manager.commit_action()
+func commit(execute: bool = true) -> void:
+	_manager.commit_action(execute)

@@ -15,7 +15,7 @@ func create(type_text: String) -> Variant:
 	var script := _global_script(type_text)
 	if script != null:
 		return _instantiate_script(type_text, script)
-	return CommandError.new(JsonRpc.NOT_FOUND, "Unknown node type %s" % type_text, _unknown_type_hint(type_text))
+	return CommandError.new(JsonRpc.NOT_FOUND, "Unknown node type %s" % type_text, unknown_type_hint(type_text))
 
 
 static func display_class_of_scene(packed_scene: PackedScene) -> String:
@@ -29,11 +29,23 @@ static func display_class_of_scene(packed_scene: PackedScene) -> String:
 	return "Node"
 
 
+static func is_known_class(class_text: String) -> bool:
+	return ClassDB.class_exists(class_text) or _global_script(class_text) != null
+
+
 static func display_class(object: Object) -> String:
 	var script := object.get_script() as Script
 	if script != null and not script.get_global_name().is_empty():
 		return script.get_global_name()
 	return object.get_class()
+
+
+static func unknown_type_hint(type_text: String) -> String:
+	var candidates: Array = Array(ClassDB.get_inheriters_from_class("Node"))
+	for global_class in ProjectSettings.get_global_class_list():
+		candidates.append(global_class["class"])
+	var similar := SimilarNames.hint(type_text, candidates)
+	return similar if not similar.is_empty() else TYPE_EXAMPLES
 
 
 func _instantiate_scene(scene_path: String, edit_state: int) -> Variant:
@@ -66,11 +78,3 @@ static func _global_script(type_text: String) -> Script:
 		if global_class["class"] == type_text:
 			return load(global_class["path"]) as Script
 	return null
-
-
-static func _unknown_type_hint(type_text: String) -> String:
-	var candidates: Array = Array(ClassDB.get_inheriters_from_class("Node"))
-	for global_class in ProjectSettings.get_global_class_list():
-		candidates.append(global_class["class"])
-	var similar := SimilarNames.hint(type_text, candidates)
-	return similar if not similar.is_empty() else TYPE_EXAMPLES

@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   createNodeAddTool,
   createNodeDeleteTool,
+  createNodeFindTool,
   createNodeGetBoundsTool,
   createNodeGetPropertiesTool,
   createNodeSetPropertiesTool,
@@ -155,5 +156,49 @@ describe('node tools', () => {
 
     expect(textOf(result)).toContain('The scene root (Node3D)');
     expect(textOf(result)).toContain('There are no visual nodes or collision shapes below it, so this is only its position.');
+  });
+
+  it('node_find lists the matching nodes with their paths', async () => {
+    const editor = new FakeEditorGateway().respondTo('node.find', {
+      scene: 'res://levels/arena.tscn',
+      matches: [
+        { path: 'Enemies/Goblin', type: 'CharacterBody3D', script: 'res://enemies/goblin.gd', groups: ['enemies'] },
+        { path: 'Crate', type: 'Node3D', instance: 'res://props/crate.tscn' },
+      ],
+      total: 2,
+      truncated: false,
+    });
+
+    const result = await createNodeFindTool(editor).execute({ group: 'enemies' });
+
+    expect(editor.requests[0]?.params).toEqual({ group: 'enemies', max_results: 50 });
+    expect(textOf(result)).toBe(
+      [
+        '2 nodes in res://levels/arena.tscn match:',
+        'Enemies/Goblin: CharacterBody3D [script res://enemies/goblin.gd] groups=enemies',
+        'Crate: Node3D [instance res://props/crate.tscn]',
+      ].join('\n'),
+    );
+  });
+
+  it('node_find says what it looked for when nothing matches', async () => {
+    const editor = new FakeEditorGateway().respondTo('node.find', { scene: 'res://levels/arena.tscn', matches: [], total: 0, truncated: false });
+
+    const result = await createNodeFindTool(editor).execute({ name: 'orc', type: 'CharacterBody3D' });
+
+    expect(textOf(result)).toBe('No node in res://levels/arena.tscn matches name "orc" and type CharacterBody3D.');
+  });
+
+  it('node_find tells how to see more matches', async () => {
+    const editor = new FakeEditorGateway().respondTo('node.find', {
+      scene: 'res://levels/arena.tscn',
+      matches: [{ path: 'Tree1', type: 'Node3D' }],
+      total: 40,
+      truncated: true,
+    });
+
+    const result = await createNodeFindTool(editor).execute({ name: 'Tree*', max_results: 1 });
+
+    expect(textOf(result)).toContain('Showing the first 1 of 40; narrow the search or raise max_results.');
   });
 });

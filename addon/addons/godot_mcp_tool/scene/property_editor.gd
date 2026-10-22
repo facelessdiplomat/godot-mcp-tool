@@ -1,5 +1,6 @@
 extends RefCounted
 
+const ChangeSet := preload("change_set.gd")
 const EnumOptions := preload("../codec/enum_options.gd")
 const SimilarNames := preload("../util/similar_names.gd")
 const UndoHistory := preload("undo_history.gd")
@@ -63,16 +64,22 @@ func describe(object: Object, requested_names: PackedStringArray, include_defaul
 	return entries
 
 
-func apply(object: Object, values: Dictionary, history: UndoHistory, action_name: String, context: Object) -> Dictionary:
+func plan(object: Object, values: Dictionary) -> Dictionary:
 	var decoding := _decode_all(object, values)
 	var decoded: Dictionary = decoding["decoded"]
-	if not decoded.is_empty():
-		history.begin(action_name, context)
-		for property_name in decoded:
-			history.add_do_property(object, property_name, decoded[property_name])
-			history.add_undo_property(object, property_name, object.get(property_name))
-		history.commit()
-	return _report(object, decoded, decoding["rejected"])
+	var changes := ChangeSet.new()
+	for property_name in decoded:
+		changes.add_do_property(object, property_name, decoded[property_name])
+		changes.add_undo_property(object, property_name, object.get(property_name))
+	return {"changes": changes, "decoded": decoded, "rejected": decoding["rejected"]}
+
+
+func apply(object: Object, values: Dictionary, history: UndoHistory, action_name: String, context: Object) -> Dictionary:
+	var planned := plan(object, values)
+	var changes: ChangeSet = planned["changes"]
+	if not changes.is_empty():
+		history.record(action_name, context, [changes])
+	return report(object, planned["decoded"], planned["rejected"])
 
 
 func assign(object: Object, values: Dictionary) -> Dictionary:
@@ -80,7 +87,19 @@ func assign(object: Object, values: Dictionary) -> Dictionary:
 	var decoded: Dictionary = decoding["decoded"]
 	for property_name in decoded:
 		object.set(property_name, decoded[property_name])
-	return _report(object, decoded, decoding["rejected"])
+	return report(object, decoded, decoding["rejected"])
+
+
+func report(object: Object, decoded: Dictionary, rejected: Array) -> Dictionary:
+	var applied: Array = []
+	var not_applied: Array = []
+	for property_name in decoded:
+		var actual: Variant = object.get(property_name)
+		if ValueComparison.matches(decoded[property_name], actual):
+			applied.append(property_name)
+		else:
+			not_applied.append({"name": property_name, "expected": _codec.encode(decoded[property_name]), "actual": _codec.encode(actual)})
+	return {"applied": applied, "rejected": rejected, "not_applied": not_applied}
 
 
 func _decode_all(object: Object, values: Dictionary) -> Dictionary:
@@ -99,18 +118,6 @@ func _decode_all(object: Object, values: Dictionary) -> Dictionary:
 		if property_name == SCRIPT_PROPERTY and outcome.value is Script:
 			properties.merge(_exported_script_properties(outcome.value))
 	return {"decoded": decoded, "rejected": rejected}
-
-
-func _report(object: Object, decoded: Dictionary, rejected: Array) -> Dictionary:
-	var applied: Array = []
-	var not_applied: Array = []
-	for property_name in decoded:
-		var actual: Variant = object.get(property_name)
-		if ValueComparison.matches(decoded[property_name], actual):
-			applied.append(property_name)
-		else:
-			not_applied.append({"name": property_name, "expected": _codec.encode(decoded[property_name]), "actual": _codec.encode(actual)})
-	return {"applied": applied, "rejected": rejected, "not_applied": not_applied}
 
 
 func _entry(property: Dictionary, value: Variant) -> Dictionary:

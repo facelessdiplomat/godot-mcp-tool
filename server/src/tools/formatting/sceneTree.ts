@@ -1,22 +1,28 @@
 import * as z from 'zod/v4';
 
-export interface SceneTreeNode {
-  readonly name: string;
+export interface NodeTraits {
   readonly type: string;
   readonly script?: string | undefined;
   readonly instance?: string | undefined;
   readonly groups?: readonly string[] | undefined;
+}
+
+export interface SceneTreeNode extends NodeTraits {
+  readonly name: string;
   readonly child_count?: number | undefined;
   readonly children?: readonly SceneTreeNode[] | undefined;
 }
 
+export const nodeTraitsSchema = z.object({
+  type: z.string(),
+  script: z.string().optional(),
+  instance: z.string().optional(),
+  groups: z.array(z.string()).optional(),
+});
+
 const sceneTreeNodeSchema: z.ZodType<SceneTreeNode> = z.lazy(() =>
-  z.object({
+  nodeTraitsSchema.extend({
     name: z.string(),
-    type: z.string(),
-    script: z.string().optional(),
-    instance: z.string().optional(),
-    groups: z.array(z.string()).optional(),
     child_count: z.number().int().optional(),
     children: z.array(sceneTreeNodeSchema).optional(),
   }),
@@ -62,8 +68,8 @@ function appendChildren(lines: string[], node: SceneTreeNode, indent: string): v
   }
 }
 
-function describeNode(node: SceneTreeNode): string {
-  const parts = [`${node.name}: ${node.type}`];
+export function formatNodeSummary(label: string, node: NodeTraits): string {
+  const parts = [`${label}: ${node.type}`];
   if (node.script !== undefined) {
     parts.push(`[script ${node.script}]`);
   }
@@ -73,10 +79,15 @@ function describeNode(node: SceneTreeNode): string {
   if (node.groups !== undefined && node.groups.length > 0) {
     parts.push(`groups=${node.groups.join(',')}`);
   }
-  if (node.children === undefined && node.child_count !== undefined && node.child_count > 0) {
-    parts.push(`(${String(node.child_count)} ${pluralizeChildren(node.child_count)} not shown)`);
-  }
   return parts.join(' ');
+}
+
+function describeNode(node: SceneTreeNode): string {
+  const summary = formatNodeSummary(node.name, node);
+  if (node.children === undefined && node.child_count !== undefined && node.child_count > 0) {
+    return `${summary} (${String(node.child_count)} ${pluralizeChildren(node.child_count)} not shown)`;
+  }
+  return summary;
 }
 
 function pluralizeChildren(count: number): string {

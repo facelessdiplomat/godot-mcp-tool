@@ -11,18 +11,19 @@ import {
   type PropertyList,
   propertyListSchema,
 } from './formatting/propertyReports.js';
+import { formatNodeSummary, nodeTraitsSchema } from './formatting/sceneTree.js';
 import { nodePath, propertyValues, sceneToChange, sceneToRead } from './parameters.js';
 import { errorResult, textResult } from './results.js';
 
-const addedNodeSchema = applyReportSchema.extend({ scene: z.string(), path: z.string(), type: z.string() });
+export const addedNodeSchema = applyReportSchema.extend({ scene: z.string(), path: z.string(), type: z.string() });
 
 type AddedNode = z.infer<typeof addedNodeSchema>;
 
-const deletedNodesSchema = z.object({ scene: z.string(), deleted: z.array(z.string()) });
+export const deletedNodesSchema = z.object({ scene: z.string(), deleted: z.array(z.string()) });
 
 type DeletedNodes = z.infer<typeof deletedNodesSchema>;
 
-const updatedNodeSchema = applyReportSchema.extend({ scene: z.string(), path: z.string() });
+export const updatedNodeSchema = applyReportSchema.extend({ scene: z.string(), path: z.string() });
 
 type UpdatedNode = z.infer<typeof updatedNodeSchema>;
 
@@ -40,7 +41,16 @@ const nodeBoundsSchema = z.object({
 
 type NodeBounds = z.infer<typeof nodeBoundsSchema>;
 
-const nodeAddInput = z.object({
+const foundNodesSchema = z.object({
+  scene: z.string(),
+  matches: z.array(nodeTraitsSchema.extend({ path: z.string() })),
+  total: z.number(),
+  truncated: z.boolean(),
+});
+
+type FoundNodes = z.infer<typeof foundNodesSchema>;
+
+export const nodeAddInput = z.object({
   type: z
     .string()
     .describe('What to add: an engine class such as "MeshInstance3D", a class_name from the project, or a scene to instance such as "res://props/crate.tscn".'),
@@ -71,7 +81,7 @@ export function createNodeAddTool(editor: EditorGateway): BridgeTool<typeof node
   });
 }
 
-const nodeDeleteInput = z.object({
+export const nodeDeleteInput = z.object({
   paths: z
     .array(z.string().min(1))
     .min(1)
@@ -95,6 +105,54 @@ export function createNodeDeleteTool(editor: EditorGateway): BridgeTool<typeof n
     present: ({ scene, deleted }) =>
       textResult(`Deleted ${deleted.join(', ')} from ${scene}. The scene has unsaved changes; Ctrl+Z in the editor brings them back.`),
   });
+}
+
+const nodeFindInput = z.object({
+  name: z.string().min(1).optional().describe('Part of the node name, or a pattern with * and ?, such as "Enemy*". Case does not matter.'),
+  type: z.string().min(1).optional().describe('A node class or class_name. Subclasses match too, so "Light3D" finds every light.'),
+  group: z.string().min(1).optional().describe('A group the node belongs to, such as "enemies".'),
+  script: z.string().min(1).optional().describe('The attached script, as a res:// path or a file name such as "player.gd".'),
+  scene: sceneToRead,
+  max_results: z.number().int().min(1).max(500).default(50).describe('The most nodes to list.'),
+});
+
+export function createNodeFindTool(editor: EditorGateway): BridgeTool<typeof nodeFindInput, FoundNodes> {
+  return new BridgeTool(editor, {
+    name: 'node_find',
+    definition: {
+      title: 'Find nodes',
+      description:
+        'Find nodes in a scene by name, type, group or attached script; every given criterion must match. Returns their paths for the other node tools. Nodes inside instanced scenes are not searched, only the instances themselves.',
+      inputSchema: nodeFindInput,
+      annotations: readingAnnotations,
+      alwaysLoad: false,
+    },
+    method: 'node.find',
+    responseSchema: foundNodesSchema,
+    present: (found, input) => textResult(describeFoundNodes(found, input)),
+  });
+}
+
+function describeFoundNodes(found: FoundNodes, input: z.output<typeof nodeFindInput>): string {
+  if (found.matches.length === 0) {
+    return `No node in ${found.scene} matches ${describeCriteria(input)}.`;
+  }
+  const heading = found.total === 1 ? `1 node in ${found.scene} matches:` : `${String(found.total)} nodes in ${found.scene} match:`;
+  const lines = [heading, ...found.matches.map((match) => formatNodeSummary(match.path, match))];
+  if (found.truncated) {
+    lines.push(`Showing the first ${String(found.matches.length)} of ${String(found.total)}; narrow the search or raise max_results.`);
+  }
+  return lines.join('\n');
+}
+
+function describeCriteria(input: z.output<typeof nodeFindInput>): string {
+  const criteria = [
+    input.name === undefined ? undefined : `name "${input.name}"`,
+    input.type === undefined ? undefined : `type ${input.type}`,
+    input.group === undefined ? undefined : `group "${input.group}"`,
+    input.script === undefined ? undefined : `script ${input.script}`,
+  ];
+  return criteria.filter((criterion) => criterion !== undefined).join(' and ');
 }
 
 const nodeGetPropertiesInput = z.object({
@@ -178,7 +236,7 @@ function capitalized(text: string): string {
   return text.charAt(0).toUpperCase() + text.slice(1);
 }
 
-const nodeSetPropertiesInput = z.object({
+export const nodeSetPropertiesInput = z.object({
   path: nodePath,
   properties: propertyValues,
   scene: sceneToChange,

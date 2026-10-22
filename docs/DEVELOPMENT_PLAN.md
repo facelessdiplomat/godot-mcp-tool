@@ -418,7 +418,7 @@ About 65 tools across all milestones; 16 in the MVP.
 | `scene_open` / `scene_close` | Open or close a scene in the editor | 1 / 3 | W | E |
 | `scene_save` | Save the current scene, a given scene, or all scenes | 1 | W | E |
 | `scene_get_tree` | Node tree: types, scripts, instances, groups; depth limit, filter; compact text | 1 | R | E (C — M4) |
-| `scene_batch_edit` | A list of operations (add, delete, set properties, reparent, connect a signal) as one Undo action; on the first error everything rolls back and the response names the failed operation | 2 | W | E |
+| `scene_batch_edit` | A list of operations as one Undo action: each is a node or signal tool (`node_add`, `node_delete`, `node_set_properties`, `node_reparent`, `node_duplicate`, `signal_connect`, `signal_disconnect`) with its parameters; later operations see the results of earlier ones. On the first error or rejected property everything rolls back and the response names the failed operation | 2 | W | E |
 
 ### 8.4 Nodes and signals
 
@@ -428,10 +428,10 @@ About 65 tools across all milestones; 16 in the MVP.
 | `node_delete` | Delete nodes (batch) | 1 | D | E |
 | `node_get_properties` | Node properties; by default only those that differ from defaults; types and enum options | 1 | R | E |
 | `node_set_properties` | Change properties, including `script` and resources by `res://` path; batch, with a per-property report | 1 | W | E |
-| `node_reparent` | Move, rename, reorder | 2 | W | E |
-| `node_duplicate` | Duplicate a node with its children | 2 | W | E |
-| `node_find` | Search by name, type, group, script | 2 | R | E |
-| `signal_list` / `signal_connect` / `signal_disconnect` | Persistent connections (`CONNECT_PERSIST`) in a scene; checks that the target method exists | 2 | R/W | E |
+| `node_reparent` | Move, rename, reorder; 3D nodes keep their world transform, and `NodePath` properties that pointed at the moved nodes are updated | 2 | W | E |
+| `node_duplicate` | Duplicate a node with its children, groups, scripts and signal connections; name, parent and properties for the copy | 2 | W | E |
+| `node_find` | Search by name (substring or `*` pattern), type (subclasses included), group, script | 2 | R | E |
+| `signal_list` / `signal_connect` / `signal_disconnect` | Persistent connections (`CONNECT_PERSIST`) in a scene; checks that the target method exists and takes the signal's arguments, and otherwise names the function to add | 2 | R/W | E |
 | `node_set_groups` | Add or remove groups | 3 | W | E |
 | `node_call_method` | Call a node method in the editor (e.g. `look_at`) | 3 | D | E |
 
@@ -625,6 +625,14 @@ whole batch.
   `add_undo_method`, `add_do_reference` for created nodes, `add_do_property` / `add_undo_property` for properties.
   We don't build our own snapshot-based undo (as Godlink did): with it, Ctrl+Z in the editor can't revert the
   agent's changes.
+- Commands build their do and undo steps as a change set first. A single tool records it as one action and lets
+  the history execute it. `scene_batch_edit` applies each operation's change set at once, so the next operation sees
+  its result, and records all of them at the end with `commit_action(false)`, which registers an action without
+  executing it again; the undo steps are recorded in reverse order of the operations, because the history runs them
+  in the order they were added. When an operation fails, the applied change sets are undone directly in reverse
+  order, nodes they created are freed, and nothing reaches the history.
+- Moving a node out of its parent clears the owners of the moved nodes, so `node_reparent` sets them again, as the
+  editor does. `node_duplicate` sets the owners of the copies itself, because `Node.duplicate()` leaves them empty.
 - Saving is explicit (`scene_save` or `save: true`), so the user can review and revert changes.
 
 ### 9.3 Source of truth: editor or disk
@@ -1105,7 +1113,12 @@ against a headless editor, Ctrl+Z included, and it passed in a live Claude Code 
 - [ ] `editor_launch`.
 - [x] `script_validate` (LSP and the fallback).
 - [ ] `docs_class`, `docs_search`: the `--doctool` cache, BBCode → Markdown, your own classes.
-- [ ] `scene_batch_edit`, `node_reparent`, `node_duplicate`, `node_find`, `signal_list/connect/disconnect`.
+- [x] `scene_batch_edit`: node and signal operations in one call and one Undo action, applied in order so later
+      operations use the nodes that earlier ones added or renamed; nothing changes when one fails.
+- [x] `node_reparent` (move, rename, reorder; keeps the world transform and updates `NodePath` properties),
+      `node_duplicate`, `node_find`.
+- [x] `signal_list`, `signal_connect`, `signal_disconnect`: persistent connections that are saved with the scene;
+      a missing or mismatched method is reported with the function to add.
 - [ ] Optional: a Claude Code `PostToolUse` hook for `.gd` files — after every script edit Claude immediately gets the
       diagnostics without a separate `script_validate` call. It is enabled in the game project's settings, at your
       discretion.
@@ -1423,6 +1436,11 @@ Checked against the sources in `~/Software/godot` (`master`, 4.8-beta, commit `6
 | `CanvasItem.queue_redraw()` draws through a deferred call. `SceneTree.process` emits `process_frame`, flushes the message queue, runs `_process` and flushes again, so a node added during a frame has drawn itself by the next `process_frame` | `scene/main/canvas_item.cpp`, `scene/main/scene_tree.cpp` |
 | `Viewport.get_visible_rect()` returns the 2D size override (the base size of the `canvas_items` stretch mode), while the root viewport's texture has the window's size in pixels | `scene/main/viewport.cpp` |
 | `Vector3.snapped(Vector3.ONE * 0.001)` leaves float32 noise such as `3.0000002`, and `String.num(10.0, 2)` gives `"10.0"`; the addon rounds with `(v * 1000.0).round() / 1000.0` and writes whole numbers itself | observed on 4.8 |
+| Removing a node from a parent in the tree clears the owner of every moved node whose owner is no longer an ancestor; `set_name` with a sibling's name silently adds a number | `scene/main/node.cpp` (`_propagate_after_exit_tree`, `_validate_child_name`) |
+| `Node.duplicate()` leaves the owners of the copies empty, except inside instanced scenes; `DUPLICATE_SIGNALS` copies persistent connections and retargets the ones inside the copied branch | `scene/main/node.cpp` |
+| `UndoRedo` runs undo operations in the order they were added; `commit_action(false)` registers an action without executing it | `core/object/undo_redo.cpp` |
+| Bound callables are equal when their base callable and bound arguments are equal, so `disconnect` works with a callable bound again; a non-tool script in the editor has a placeholder instance whose `has_method` checks the script and its base scripts | `core/variant/callable_bind.cpp`, `core/object/script_language.cpp` |
+| GDScript files may preload each other, and a script may preload itself | observed on 4.8 |
 | 3D: `NavigationRegion3D.bake_navigation_mesh()` and the `bake_finished` signal; `Viewport.world_3d` / `own_world_3d`; `physics/3d/physics_engine` (`DEFAULT` currently means GodotPhysics3D; Jolt can be selected); CSG nodes (`CSGBox3D`, `CSGCombiner3D`, …); `GridMap.set_cell_item` | `doc/classes/`, `modules/csg/doc_classes/` |
 
 ---

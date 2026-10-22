@@ -18,19 +18,33 @@ func describe(scene_root: Node, max_depth: int, max_nodes: int) -> Dictionary:
 	return _describe_node(scene_root, scene_root, 0, max_depth, max_nodes)
 
 
-func _describe_node(node: Node, scene_root: Node, depth: int, max_depth: int, max_nodes: int) -> Dictionary:
-	node_count += 1
-	var description := {"name": str(node.name), "type": NodeFactory.display_class(node)}
+static func traits_of(node: Node, scene_root: Node) -> Dictionary:
+	var traits := {"type": NodeFactory.display_class(node)}
 	var script := node.get_script() as Script
 	if script != null:
-		description["script"] = "built-in" if script.resource_path.contains("::") or script.resource_path.is_empty() else script.resource_path
+		traits["script"] = "built-in" if script.resource_path.contains("::") or script.resource_path.is_empty() else script.resource_path
 	var is_instance := node != scene_root and not node.scene_file_path.is_empty()
 	if is_instance:
-		description["instance"] = node.scene_file_path
+		traits["instance"] = node.scene_file_path
 	var groups := _visible_groups(node)
 	if not groups.is_empty():
-		description["groups"] = groups
-	var children := _scene_children(node, scene_root)
+		traits["groups"] = groups
+	return traits
+
+
+static func owned_children(node: Node, scene_root: Node) -> Array[Node]:
+	var children: Array[Node] = []
+	for child in node.get_children():
+		if child.owner == scene_root:
+			children.append(child)
+	return children
+
+
+func _describe_node(node: Node, scene_root: Node, depth: int, max_depth: int, max_nodes: int) -> Dictionary:
+	node_count += 1
+	var description := {"name": str(node.name)}
+	description.merge(traits_of(node, scene_root))
+	var children := node.get_children() if _include_unowned_children else owned_children(node, scene_root)
 	if children.is_empty():
 		return description
 	description["child_count"] = children.size()
@@ -45,14 +59,6 @@ func _describe_node(node: Node, scene_root: Node, depth: int, max_depth: int, ma
 		child_descriptions.append(_describe_node(child, scene_root, depth + 1, max_depth, max_nodes))
 	description["children"] = child_descriptions
 	return description
-
-
-func _scene_children(node: Node, scene_root: Node) -> Array[Node]:
-	var children: Array[Node] = []
-	for child in node.get_children():
-		if _include_unowned_children or child.owner == scene_root:
-			children.append(child)
-	return children
 
 
 static func _visible_groups(node: Node) -> Array:

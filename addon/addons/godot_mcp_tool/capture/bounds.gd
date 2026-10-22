@@ -1,5 +1,7 @@
 extends RefCounted
 
+const SpatialTransforms := preload("../scene/spatial_transforms.gd")
+
 
 static func measure(node: Node) -> Dictionary:
 	var visual := AABB()
@@ -10,16 +12,16 @@ static func measure(node: Node) -> Dictionary:
 		if subtree_node is GeometryInstance3D and not _is_particles(subtree_node):
 			var local_bounds := _local_bounds(subtree_node)
 			if local_bounds.size != Vector3.ZERO:
-				var world_bounds := _world_transform(subtree_node) * local_bounds
+				var world_bounds := SpatialTransforms.global_of(subtree_node) * local_bounds
 				visual = world_bounds if visual_count == 0 else visual.merge(world_bounds)
 				visual_count += 1
 		elif subtree_node is CollisionShape3D and (subtree_node as CollisionShape3D).shape != null:
-			var shape_bounds := _world_transform(subtree_node) * (subtree_node as CollisionShape3D).shape.get_debug_mesh().get_aabb()
+			var shape_bounds := SpatialTransforms.global_of(subtree_node) * (subtree_node as CollisionShape3D).shape.get_debug_mesh().get_aabb()
 			collision = shape_bounds if collision_count == 0 else collision.merge(shape_bounds)
 			collision_count += 1
 	var measured := visual if visual_count > 0 else collision
 	if visual_count == 0 and collision_count == 0:
-		measured = AABB(_world_transform(node).origin if node is Node3D else Vector3.ZERO, Vector3.ZERO)
+		measured = AABB(SpatialTransforms.global_of(node).origin, Vector3.ZERO)
 	return {"aabb": measured, "visual_count": visual_count, "collision_count": collision_count}
 
 
@@ -54,14 +56,3 @@ static func _local_bounds(geometry: GeometryInstance3D) -> AABB:
 		var mesh := (geometry as CSGMesh3D).mesh
 		return mesh.get_aabb() if mesh != null else AABB()
 	return geometry.get_aabb()
-
-
-static func _world_transform(node: Node3D) -> Transform3D:
-	if node.is_inside_tree():
-		return node.global_transform
-	var world := node.transform
-	var placed := node
-	while not placed.top_level and placed.get_parent() is Node3D:
-		placed = placed.get_parent() as Node3D
-		world = placed.transform * world
-	return world

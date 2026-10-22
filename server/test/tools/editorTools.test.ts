@@ -19,11 +19,18 @@ describe('createEditorTools', () => {
       'scene_open',
       'scene_save',
       'scene_get_tree',
+      'scene_batch_edit',
       'node_add',
       'node_delete',
+      'node_duplicate',
+      'node_reparent',
+      'node_find',
       'node_get_properties',
       'node_get_bounds',
       'node_set_properties',
+      'signal_list',
+      'signal_connect',
+      'signal_disconnect',
     ]);
   });
 
