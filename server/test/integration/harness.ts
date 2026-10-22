@@ -118,6 +118,7 @@ export interface TemporaryProjectOptions {
   readonly withTestHelper?: boolean;
   readonly mainScene?: string;
   readonly withRuntimeAutoload?: boolean;
+  readonly testFramework?: 'gut' | 'gdUnit4';
 }
 
 export class TemporaryProject {
@@ -151,6 +152,9 @@ export class TemporaryProject {
     symlinkSync(addonDirectory, join(this.root, 'addons', 'godot_mcp_tool'));
     if (options.withTestHelper === true) {
       symlinkSync(testHelperDirectory, join(this.root, 'addons', 'mcp_test_helper'));
+    }
+    if (options.testFramework !== undefined) {
+      symlinkSync(join(testProjectRoot, 'addons', options.testFramework), join(this.root, 'addons', options.testFramework));
     }
   }
 

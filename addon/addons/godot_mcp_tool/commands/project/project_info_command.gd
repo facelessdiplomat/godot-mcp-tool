@@ -1,6 +1,7 @@
 extends "../command.gd"
 
 const MAXIMUM_GLOBAL_CLASSES := 100
+const ADDONS_FOLDER := "res://addons/"
 
 var _read_indentation: Callable
 
@@ -57,9 +58,19 @@ static func _autoloads() -> Array:
 
 static func _describe_global_classes(global_classes: Array[Dictionary]) -> Array:
 	var described: Array = []
-	for global_class in global_classes.slice(0, MAXIMUM_GLOBAL_CLASSES):
+	for global_class in _project_classes_first(global_classes).slice(0, MAXIMUM_GLOBAL_CLASSES):
 		described.append({"name": str(global_class["class"]), "base": str(global_class["base"]), "path": str(global_class["path"])})
 	return described
+
+
+static func _project_classes_first(global_classes: Array[Dictionary]) -> Array[Dictionary]:
+	var project_classes := global_classes.filter(func(global_class: Dictionary) -> bool: return not _is_in_addons(global_class))
+	var addon_classes := global_classes.filter(_is_in_addons)
+	return project_classes + addon_classes
+
+
+static func _is_in_addons(global_class: Dictionary) -> bool:
+	return str(global_class["path"]).begins_with(ADDONS_FOLDER)
 
 
 static func _top_level_folders() -> Array:

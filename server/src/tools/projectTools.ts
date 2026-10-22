@@ -82,7 +82,7 @@ function describeGlobalClasses(info: ProjectInfo): string {
   const shown = info.global_classes.map((globalClass) => `${globalClass.name} extends ${globalClass.base} (${globalClass.path})`).join('; ');
   const count =
     info.global_classes.length < info.global_class_count
-      ? `${String(info.global_class_count)}, the first ${String(info.global_classes.length)} shown`
+      ? `${String(info.global_class_count)}, the first ${String(info.global_classes.length)} shown, the project's own before those of addons`
       : String(info.global_class_count);
   return `Global classes (${count}): ${shown}`;
 }

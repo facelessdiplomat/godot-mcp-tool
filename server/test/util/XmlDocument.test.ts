@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { parseXml } from '../../src/docs/XmlDocument.js';
+import { parseXml } from '../../src/util/XmlDocument.js';
 
 describe('parseXml', () => {
   it('reads elements, attributes and text', () => {
@@ -37,6 +37,12 @@ describe('parseXml', () => {
     expect(root.attributes['name']).toBe('"quoted"');
     expect(root.attributes['default']).toBe('<1>');
     expect(root.text).toBe("a & b 'c' AB");
+  });
+
+  it('keeps the content of CDATA sections as it is', () => {
+    const root = parseXml('<failure message="failed"><![CDATA[[<Node3D>] expected & got\n    at line 9]]></failure>');
+
+    expect(root.text).toBe('[<Node3D>] expected & got\n    at line 9');
   });
 
   it('skips comments', () => {

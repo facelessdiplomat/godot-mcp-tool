@@ -5,3 +5,4 @@ server/coverage/
 *.log
 .godot/
 test-project/addons/gut/
+test-project/addons/gdUnit4/

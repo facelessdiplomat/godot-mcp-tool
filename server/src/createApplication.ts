@@ -5,7 +5,7 @@ import { DiscoveryFileReader, isProcessAlive } from './bridge/DiscoveryFileReade
 import { DocsSource } from './docs/DocsSource.js';
 import { EditorLauncher, systemClock } from './editor/EditorLauncher.js';
 import { EditorConnection, type EditorSession, UnavailableEditor } from './bridge/EditorConnection.js';
-import { type BinaryLocator, GodotBinaryLocator } from './godot/GodotBinaryLocator.js';
+import { type BinaryLookup, GodotBinaryLocator } from './godot/GodotBinaryLocator.js';
 import { GodotCli } from './godot/GodotCli.js';
 import { LanguageServerClient } from './lsp/LanguageServerClient.js';
 import { NodeDetachedLauncher } from './process/DetachedLauncher.js';
@@ -21,6 +21,7 @@ import { ScriptValidator, ValidationUnavailableError } from './scripts/ScriptVal
 import { createMcpServer } from './server/createMcpServer.js';
 import { serverInstructions } from './server/serverInstructions.js';
 import { BRIDGE_PROTOCOL_VERSION, SERVER_NAME, SERVER_VERSION } from './serverInfo.js';
+import { TestRunner } from './testing/TestRunner.js';
 import { DocsClassTool, DocsSearchTool } from './tools/docsTools.js';
 import { EditorLaunchTool } from './tools/EditorLaunchTool.js';
 import { createEditorTools } from './tools/editorTools.js';
@@ -28,6 +29,7 @@ import { ErrorReportingTool } from './tools/ErrorReportingTool.js';
 import { createGameTools } from './tools/gameTools.js';
 import { GodotStatusTool } from './tools/GodotStatusTool.js';
 import { ScriptValidateTool } from './tools/scriptTools.js';
+import { TestRunTool } from './tools/TestRunTool.js';
 import type { Tool } from './tools/Tool.js';
 import { userCacheDirectory } from './util/CacheDirectory.js';
 
@@ -72,6 +74,10 @@ export function createApplication(environment: ApplicationEnvironment): Applicat
     isExecutableFile,
     lastEditorExecutable: () => discovery?.lastEditorExecutable(),
   });
+  const locateGodot = async (): Promise<BinaryLookup> => {
+    const editorStatus = await editor.status();
+    return binaryLocator.locate(editorStatus.connected ? editorStatus.hello.executablePath : undefined);
+  };
   const editorLauncher = new EditorLauncher({
     projectRoot: project.found ? project.root : undefined,
     editor,
@@ -83,10 +89,7 @@ export function createApplication(environment: ApplicationEnvironment): Applicat
   const docsSource = new DocsSource({
     projectRoot: project.found ? project.root : undefined,
     cacheDirectory: userCacheDirectory(environment),
-    locateBinary: async () => {
-      const editorStatus = await editor.status();
-      return binaryLocator.locate(editorStatus.connected ? editorStatus.hello.executablePath : undefined);
-    },
+    locateBinary: locateGodot,
     processRunner,
   });
   const localGame = new LocalGameGateway({
@@ -108,11 +111,14 @@ export function createApplication(environment: ApplicationEnvironment): Applicat
       createScriptValidator({
         projectRoot: project.found ? project.root : undefined,
         editor,
-        binaryLocator,
+        locateGodot,
         processRunner,
         languageServerPort: parsePort(environment.variables['GODOT_LSP_PORT']),
       }),
       errorSummary,
+    ),
+    new TestRunTool(
+      new TestRunner({ projectRoot: project.found ? project.root : undefined, editor, locateBinary: locateGodot, processRunner, now: () => Date.now() }),
     ),
     new DocsClassTool(docsSource),
     new DocsSearchTool(docsSource),
@@ -133,12 +139,12 @@ export function createApplication(environment: ApplicationEnvironment): Applicat
 interface ScriptValidatorSetup {
   readonly projectRoot: string | undefined;
   readonly editor: EditorSession;
-  readonly binaryLocator: BinaryLocator;
+  readonly locateGodot: () => Promise<BinaryLookup>;
   readonly processRunner: ProcessRunner;
   readonly languageServerPort: number | undefined;
 }
 
-function createScriptValidator({ projectRoot, editor, binaryLocator, processRunner, languageServerPort }: ScriptValidatorSetup): ScriptValidator {
+function createScriptValidator({ projectRoot, editor, locateGodot, processRunner, languageServerPort }: ScriptValidatorSetup): ScriptValidator {
   return new ScriptValidator({
     projectRoot,
     editor,
@@ -148,8 +154,7 @@ function createScriptValidator({ projectRoot, editor, binaryLocator, processRunn
     },
     connectLanguageServer: (address) => LanguageServerClient.connect(address),
     runCheckOnly: async (resourcePath) => {
-      const editorStatus = await editor.status();
-      const binary = binaryLocator.locate(editorStatus.connected ? editorStatus.hello.executablePath : undefined);
+      const binary = await locateGodot();
       if (!binary.found || projectRoot === undefined) {
         throw new ValidationUnavailableError(
           `The Godot editor is not connected, and scripts cannot be checked without it: ${binary.found ? 'no Godot project was found.' : binary.reason}`,

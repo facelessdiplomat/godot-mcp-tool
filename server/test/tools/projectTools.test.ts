@@ -44,6 +44,33 @@ describe('project tools', () => {
     );
   });
 
+  it('project_info says which global classes it shows when there are many', async () => {
+    const editor = new FakeEditorGateway().respondTo('project.info', {
+      name: 'Arena Shooter',
+      path: '/projects/arena',
+      main_scene: '',
+      features: [],
+      renderer: 'forward_plus',
+      physics_engine_3d: 'DEFAULT',
+      window: { width: 1152, height: 648, stretch_mode: 'disabled', stretch_aspect: 'keep' },
+      autoloads: [],
+      enabled_plugins: [],
+      global_classes: [
+        { name: 'PatrolPoint', base: 'Marker3D', path: 'res://ai/patrol_point.gd' },
+        { name: 'CmdOption', base: 'RefCounted', path: 'res://addons/gdUnit4/src/cmd/CmdOption.gd' },
+      ],
+      global_class_count: 240,
+      indentation: { style: 'tabs', size: 4 },
+      folders: [],
+    });
+
+    const text = textOf(await createProjectInfoTool(editor).execute({}));
+
+    expect(text).toContain(
+      "Global classes (240, the first 2 shown, the project's own before those of addons): PatrolPoint extends Marker3D (res://ai/patrol_point.gd); CmdOption extends RefCounted (res://addons/gdUnit4/src/cmd/CmdOption.gd)",
+    );
+  });
+
   it('project_settings_get lists values and unknown names', async () => {
     const editor = new FakeEditorGateway().respondTo('project.settings_get', {
       settings: [{ name: 'application/run/main_scene', value: 'res://main.tscn' }],

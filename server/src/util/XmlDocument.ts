@@ -12,7 +12,7 @@ interface OpenElement {
   text: string;
 }
 
-const tokenPattern = /<!--[\s\S]*?-->|<\?[\s\S]*?\?>|<\/([\w:.-]+)\s*>|<([\w:.-]+)((?:\s+[\w:.-]+\s*=\s*"[^"]*")*)\s*(\/?)>|([^<]+)/g;
+const tokenPattern = /<!\[CDATA\[([\s\S]*?)\]\]>|<!--[\s\S]*?-->|<\?[\s\S]*?\?>|<\/([\w:.-]+)\s*>|<([\w:.-]+)((?:\s+[\w:.-]+\s*=\s*"[^"]*")*)\s*(\/?)>|([^<]+)/g;
 const attributePattern = /([\w:.-]+)\s*=\s*"([^"]*)"/g;
 const namedEntities: Readonly<Record<string, string>> = { lt: '<', gt: '>', amp: '&', quot: '"', apos: "'" };
 
@@ -20,9 +20,11 @@ export function parseXml(source: string): XmlElement {
   const document: OpenElement = { name: '', attributes: {}, children: [], text: '' };
   const stack: OpenElement[] = [document];
   for (const token of source.matchAll(tokenPattern)) {
-    const [, closingName, openingName, attributeText, selfClosing, text] = token;
+    const [, characterData, closingName, openingName, attributeText, selfClosing, text] = token;
     const current = stack.at(-1) ?? document;
-    if (text !== undefined) {
+    if (characterData !== undefined) {
+      current.text += characterData;
+    } else if (text !== undefined) {
       current.text += decodeEntities(text);
     } else if (openingName !== undefined) {
       const element: OpenElement = { name: openingName, attributes: readAttributes(attributeText ?? ''), children: [], text: '' };

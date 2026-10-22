@@ -516,9 +516,21 @@ window coordinates (§9.9). `mouse_motion` is a relative movement, e.g. for mous
 
 | Tool | What it does | M | Kind | Needs |
 |---|---|---|---|---|
-| `test_run` | GUT or gdUnit4 tests (detected automatically), filter, JUnit report → summary and failed tests with `file:line` | 3 | R | C |
+| `test_run` | GUT or gdUnit4 tests (detected in `addons/`): folders, scripts, tests by name (GUT); JUnit report → summary, failed tests with `file:line`, test scripts that failed to load | 3 | W (runs project code) | C |
 | `export_project` | Export by preset (`--export-release` / `--export-debug`), checking export templates | 4 | W | C |
 | `debug_*` | Breakpoints, stack, variables — via the editor's DAP server (port 6006) | 4 | W | E |
+
+`test_run` brings the project up to date first: the connected editor rescans it, otherwise
+`godot --headless --import` runs, so the classes of new scripts are known. It then runs the framework's command line
+in a separate Godot process, headless unless asked otherwise, and reads its JUnit report from a folder of its own in
+`.godot/godot_mcp_tool/test_reports/`, removed after the run:
+GUT through `-s res://addons/gut/gut_cmdln.gd -gexit -gjunit_xml_file=… -gdir=…/-gtest=…/-gunit_test_name=…` (with no
+paths, `.gutconfig.json` decides when it exists); gdUnit4 through
+`-s res://addons/gdUnit4/bin/GdUnitCmdTool.gd --ignoreHeadlessMode -c -rd … -a …`. Without paths, `res://test` and
+`res://tests` run. GUT puts the failing line into the failure text ("at line 9"), gdUnit4 into the `message`
+attribute ("FAILED: res://test/player_test.gd:9"); both are read. `SCRIPT ERROR: Parse Error` lines of the output name
+test scripts that failed to load, whose tests are otherwise just missing from the report. gdUnit4 cannot pick single
+tests by name. Tests load scenes and resources from disk, so unsaved changes in the editor are not seen.
 
 ### 8.9 3D tools
 
@@ -1017,7 +1029,7 @@ godot-mcp-tool/
 │       ├── runtime/              autoload GodotMcpRuntime and its commands
 │       └── logging/              Logger subclass
 ├── test-project/                 3D Godot project for integration tests (addon symlinked)
-└── scripts/                      dev scripts: link-addon, inspector, release
+└── scripts/                      dev scripts: install GUT and gdUnit4, run the addon tests, release
 ```
 
 Naming: npm package `godot-mcp-tool`; the addon folder and the settings section are `godot_mcp_tool`; the autoload is
@@ -1187,7 +1199,9 @@ a window and the two renders when `GODOT_MCP_WINDOW_TESTS=1`), and it passed in 
 - [ ] `autoload_*`, `node_set_groups`, `editor_select`, `scene_close` (`input_map_*` moved to milestone 2).
 - [x] `resource_create`, `resource_get`, `resource_set_properties`: `.tres` files of engine classes and of the
       project's own classes, saved at once (§8.5).
-- [ ] `test_run` (GUT and gdUnit4, JUnit parsing).
+- [x] `test_run` (GUT and gdUnit4, JUnit parsing), checked against GUT 9.7.1 and gdUnit4 6.2.2 (§8.8).
+      `scripts/install-gdunit4.sh` installs gdUnit4 for the tests as the Asset Library package, without its own
+      tests; `project_info` lists the project's own global classes before those of addons.
 - [ ] Deterministic mode: `fixed_fps`, `game_pause`, `game_step` (§9.10).
 - [ ] `game_eval`, `game_performance`, `node_call_method`, `editor_run_script` — behind flags.
 - [ ] MCP resources and prompts; the companion skill (§8.10); read-only mode.
@@ -1490,6 +1504,8 @@ Checked against the sources in `~/Software/godot` (`master`, 4.8-beta, commit `6
 | `JSON.from_native/to_native` (since 4.3), `ClassDB.class_get_property_default_value`, `ProjectSettings.get_global_class_list` | `doc/classes/` |
 | A `Node3D` follows only a direct `Node3D` parent: under a plain `Node` its own transform is its global transform | `scene/3d/node_3d.cpp` |
 | `CanvasItem.queue_redraw()` draws through a deferred call. `SceneTree.process` emits `process_frame`, flushes the message queue, runs `_process` and flushes again, so a node added during a frame has drawn itself by the next `process_frame` | `scene/main/canvas_item.cpp`, `scene/main/scene_tree.cpp` |
+| GUT 9.7.1 on the command line: `-gdir` (with `-ginclude_subdirs`), `-gtest`, `-gunit_test_name`, `-gjunit_xml_file`, `-gexit`; it reads `res://.gutconfig.json` by default and exits with code 1 when a test fails. Its JUnit report puts the script path without `res://` into `classname` and the failing line as "at line N" at the end of the failure text | GUT `cli/gut_cli.gd`, `junit_xml_export.gd`, `gui/GutRunner.gd` |
+| gdUnit4 6.2.2 on the command line (`res://addons/gdUnit4/bin/GdUnitCmdTool.gd`, works on 4.8): it refuses headless mode without `--ignoreHeadlessMode`, stops at the first failure without `-c`, takes test suites or folders with `-a` but not single tests, resolves `-rd` inside the project and writes `report_<n>/results.xml` there, with `FAILED: <path>:<line>` in the `message` attribute and `package` set to the folder of the suite; it exits with code 100 when a test fails. The Asset Library package leaves out `addons/gdUnit4/test` | gdUnit4 `src/core/runners/GdUnitTestCIRunner.gd`, `src/reporters/xml/JUnitXmlReportWriter.gd`, `.gitattributes`, observed |
 | `GDScript.can_instantiate()` is false inside the editor for scripts without `@tool`, because scripting is disabled there; the editor creates an object of a `class_name` by instantiating the native base class and calling `set_script`, which gives it a placeholder instance that keeps the exported values | `modules/gdscript/gdscript.cpp`, `editor/editor_data.cpp` |
 | An `UndoRedo` property change on a `Resource` marks it as edited, and saving a scene also saves the edited external resources; `ResourceSaver.save` in the editor updates the file system dock through the save callback | `core/object/undo_redo.cpp`, `editor/editor_node.cpp` |
 | `var_to_str` writes a float that holds a single-precision value with the fewest digits for single precision (`0.05`), while `JSON.stringify` writes 15 significant digits of the double (`0.0500000007450581`) | observed on 4.8 |

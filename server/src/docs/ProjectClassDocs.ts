@@ -1,5 +1,5 @@
 import { type ClassDoc, type ConstantDoc, type EnumDoc, type MethodDoc, type ParameterDoc, parameterOf } from './ClassDoc.js';
-import { parseXml, type XmlElement } from './XmlDocument.js';
+import { parseXml, type XmlElement } from '../util/XmlDocument.js';
 
 export function readProjectClassDoc(xml: string, scriptPath: string | undefined): ClassDoc | undefined {
   const root = parseXml(xml);

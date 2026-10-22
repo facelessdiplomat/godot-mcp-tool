@@ -40,6 +40,7 @@ func test_describes_the_project() -> void:
 	assert_has(info["folders"], "tests")
 	var global_class_names: Array = (info["global_classes"] as Array).map(func(entry: Dictionary) -> String: return entry["name"])
 	assert_has(global_class_names, "PatrolPoint")
+	assert_false(str((info["global_classes"][0] as Dictionary)["path"]).begins_with("res://addons/"))
 	assert_true((info["window"] as Dictionary).has("width"))
 	assert_true(info.has("renderer"))
 	assert_true(info.has("physics_engine_3d"))
