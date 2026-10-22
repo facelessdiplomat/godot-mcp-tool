@@ -3,21 +3,7 @@ import { InMemoryTransport } from '@modelcontextprotocol/server';
 import { describe, expect, it } from 'vitest';
 import { createApplication } from '../../src/createApplication.js';
 import { serverInstructions } from '../../src/server/serverInstructions.js';
-
-async function registeredToolNames(): Promise<string[]> {
-  const application = createApplication({ variables: {}, workingDirectory: '/nonexistent', platform: process.platform, homeDirectory: '/nonexistent' });
-  const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
-  await application.createMcpServer().connect(serverTransport);
-  const client = new Client({ name: 'instructions-test', version: '1.0.0' });
-  await client.connect(clientTransport);
-  try {
-    const { tools } = await client.listTools();
-    return tools.map((tool) => tool.name);
-  } finally {
-    await client.close();
-    application.shutdown();
-  }
-}
+import { registeredToolNames } from '../support/registeredToolNames.js';
 
 describe('serverInstructions', () => {
   it('fits in what Claude Code loads at startup', () => {

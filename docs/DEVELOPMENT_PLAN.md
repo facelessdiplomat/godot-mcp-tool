@@ -554,14 +554,30 @@ most — so verification from several angles matters.
 
 ### 8.10 MCP resources, prompts and the companion skill
 
-- **Resources:** `godot://project`, `godot://scene/{path}`, `godot://docs/{class}`, `godot://logs/last-run`.
-  In Claude Code they can be mentioned as `@godot:godot://…`.
-- **Prompts** (they become `/mcp__godot__<name>` slash commands in Claude Code):
-  - `fix_last_run` — analyze and fix the errors of the last run;
-  - `playtest` — run the game, follow a scenario, take screenshots, report.
-- **Skill** (milestone 3): Claude Code truncates server instructions at 4,096 characters, so longer guidance goes
-  into a skill that loads on demand: GDScript 4 idioms, 3D conventions (units, axes, `CharacterBody3D` patterns),
-  and the "edit → validate → run → observe" workflow.
+- **Resources** are read-only views over tools and show the same text as the tool calls: `godot://project`
+  (`project_info`), `godot://scene/{+path}` (`scene_get_tree` of a scene file, such as
+  `godot://scene/levels/arena.tscn`), `godot://docs/{class}` (`docs_class`) and `godot://logs/last-run` (the output of
+  the last run from its start, up to 200 entries). The resource list names the project, the last-run log and every
+  scene of the project (addons and dot folders skipped), because the `@` menu of Claude Code offers the listed
+  resources, such as `@godot:godot://scene/main.tscn`; class references are read through the template. Resources stay
+  in the read-only mode.
+- **Prompts** become `/mcp__godot__<name>` commands in Claude Code, which splits their arguments at spaces, so every
+  argument is one word:
+  - `fix_last_run` reads the errors of the last run (up to 50) and hands them over with the steps to fix them:
+    `script_validate`, then `game_run` again until a run has no errors;
+  - `playtest [scene]` asks to playtest the game or one scene without changing the project: the input map and the
+    scene tree, `game_run`, screenshots from several views, input, waits and property reads, pause and step,
+    `game_performance`, then a report of what works and what does not.
+
+  Prompts are left out in the read-only mode: both need tools that the mode turns off.
+- **Skill** `plugin/skills/godot/`: `SKILL.md` (the "edit → validate → run → observe" loop with the tools and the
+  rules that prevent most mistakes) and the files it links, read on demand: `gdscript.md` (GDScript 4 idioms and the
+  Godot 3 code to avoid), `3d.md` (axes, units, a `CharacterBody3D` controller, cameras, collisions, light) and
+  `testing.md` (GUT tests and `test_run`). Claude Code truncates server instructions at 4,096 characters, so the longer
+  guidance lives here. The folder has the layout of a Claude Code plugin (`skills/<name>/SKILL.md`); milestone 5 adds
+  the manifest and `.mcp.json`. A unit test checks the frontmatter, the links, that `SKILL.md` stays under 500 lines,
+  that every tool it names exists and that GDScript samples are indented with tabs; the samples were compiled with
+  `--check-only` and the sample GUT test run against a scratch project.
 
 ### 8.11 Server instructions
 
@@ -1046,6 +1062,8 @@ godot-mcp-tool/
 │       ├── debugger/             EditorDebuggerPlugin
 │       ├── runtime/              autoload GodotMcpRuntime and its commands
 │       └── logging/              Logger subclass
+├── plugin/                       Claude Code plugin (manifest and .mcp.json in milestone 5)
+│   └── skills/godot/             the companion skill: SKILL.md, gdscript.md, 3d.md, testing.md
 ├── test-project/                 3D Godot project for integration tests (addon symlinked)
 └── scripts/                      dev scripts: install GUT and gdUnit4, run the addon tests, release
 ```
@@ -1226,7 +1244,7 @@ a window and the two renders when `GODOT_MCP_WINDOW_TESTS=1`), and it passed in 
 - [x] Deterministic mode: `fixed_fps`, `game_pause`, `game_step` (§9.10), and `game_performance`.
 - [x] `game_eval`, `node_call_method`, `editor_run_script` — behind flags; the read-only mode and `GODOT_MCP_DISABLE`
       (§8.12).
-- [ ] MCP resources and prompts; the companion skill (§8.10).
+- [x] MCP resources and prompts; the companion skill (§8.10).
 
 Order of work: the resource tools, which the scenario below needs for the `PhysicsMaterial`; `test_run`, which runs
 its GUT test; the small editor tools (`autoload_*`, `node_set_groups`, `editor_select`, `scene_close`); the
@@ -1254,8 +1272,9 @@ player".
 
 - [ ] An npm package with the addon bundled; `install-addon`, `update-addon` and `doctor` (environment diagnostics)
       commands.
-- [ ] A Claude Code plugin that bundles the MCP server configuration, the `.gd` validation hook and the skill
-      (the exact plugin format is checked at that point).
+- [ ] A Claude Code plugin that bundles the MCP server configuration, the `.gd` validation hook and the skill:
+      `plugin/` gains `.claude-plugin/plugin.json` and a `.mcp.json` that points at the server through
+      `${CLAUDE_PLUGIN_ROOT}`; the skill is already in `plugin/skills/godot/`.
 - [ ] An editor dock: status, a log of agent commands, toggles for dangerous features.
 - [ ] User documentation: how to connect and how to use (see [User documentation](#user-documentation)).
 - [ ] `CONTRIBUTING.md`, `SECURITY.md`.
@@ -1380,6 +1399,16 @@ ln -s ~/Projects/godot-mcp-tool/addon/addons/godot_mcp_tool <game>/addons/godot_
 While it is a symlink, add `addons/godot_mcp_tool` to the game's `.gitignore`: a symlink to an absolute local path
 is useless to anyone else. After publication, `install-addon` copies a release version of the addon that can be
 committed.
+
+Until the plugin of milestone 5 bundles it, the companion skill is linked the same way, and `.claude/skills/godot`
+goes into the game's `.gitignore` too:
+
+```bash
+ln -s ~/Projects/godot-mcp-tool/plugin/skills/godot <game>/.claude/skills/godot
+```
+
+In a session, `/mcp__godot__fix_last_run` and `/mcp__godot__playtest res://levels/arena.tscn` start the prompts, and
+`@godot:godot://scene/main.tscn` attaches the node tree of a scene to a message.
 
 In this repository, `.mcp.json` at the root starts `server/dist/index.js` for `test-project/`, so a Claude Code session
 opened here can use the server while it is being developed (run `npm run build` in `server/` first).
@@ -1550,6 +1579,7 @@ Checked against the sources in `~/Software/godot` (`master`, 4.8-beta, commit `6
 | `--doctool <folder> --gdscript-docs res://` with `--path` writes one XML file per script, named after its `class_name` (or the quoted file name), with descriptions from `##` comments; a script that does not parse is skipped with an error | `main/main.cpp`, observed on 4.8 |
 | Bound callables are equal when their base callable and bound arguments are equal, so `disconnect` works with a callable bound again; a non-tool script in the editor has a placeholder instance whose `has_method` checks the script and its base scripts | `core/variant/callable_bind.cpp`, `core/object/script_language.cpp` |
 | GDScript files may preload each other, and a script may preload itself | observed on 4.8 |
+| The analyzer reports a member that a class lacks when it is read through the class (`Player.SPEEDD` is a parse error), but a method or property that the type of a variable lacks (`player.dashh()` on a `Player` or a `CharacterBody3D` variable) compiles: only the `unsafe_method_access` and `unsafe_property_access` warnings report it, and both are off by default. `:=` cannot infer the type of a member that the static type lacks, so it works on a variable typed with the `class_name` of its script and fails on one typed with the native base | observed on 4.8 with `--check-only` |
 | 3D: `NavigationRegion3D.bake_navigation_mesh()` and the `bake_finished` signal; `Viewport.world_3d` / `own_world_3d`; `physics/3d/physics_engine` (`DEFAULT` currently means GodotPhysics3D; Jolt can be selected); CSG nodes (`CSGBox3D`, `CSGCombiner3D`, …); `GridMap.set_cell_item` | `doc/classes/`, `modules/csg/doc_classes/` |
 
 ---

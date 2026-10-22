@@ -1,10 +1,8 @@
-import { existsSync, readdirSync, statSync } from 'node:fs';
-import { isAbsolute, join, relative, resolve, sep } from 'node:path';
+import { existsSync, statSync } from 'node:fs';
+import { isAbsolute, relative, resolve } from 'node:path';
+import { filesInFolder, type ProjectFile, toResourcePath } from '../project/ProjectFiles.js';
 
-export interface ScriptFile {
-  readonly resourcePath: string;
-  readonly absolutePath: string;
-}
+export type ScriptFile = ProjectFile;
 
 export class ScriptPathError extends Error {
   override readonly name = 'ScriptPathError';
@@ -12,7 +10,6 @@ export class ScriptPathError extends Error {
 
 const resourcePrefix = 'res://';
 const scriptExtension = '.gd';
-const addonsFolder = 'addons';
 const maximumScripts = 200;
 
 export function findScripts(projectRoot: string, inputs: readonly string[]): ScriptFile[] {
@@ -39,30 +36,10 @@ function scriptsAt(projectRoot: string, input: string): ScriptFile[] {
     throw new ScriptPathError(`${resourcePath} does not exist.`);
   }
   if (statSync(absolutePath).isDirectory()) {
-    return scriptsInFolder(projectRoot, absolutePath);
+    return filesInFolder(projectRoot, absolutePath, [scriptExtension]);
   }
   if (!absolutePath.endsWith(scriptExtension)) {
     throw new ScriptPathError(`${resourcePath} is not a .gd script.`);
   }
   return [{ resourcePath, absolutePath }];
-}
-
-function scriptsInFolder(projectRoot: string, folder: string): ScriptFile[] {
-  const scripts: ScriptFile[] = [];
-  const entries = readdirSync(folder, { withFileTypes: true }).sort((left, right) => left.name.localeCompare(right.name));
-  for (const entry of entries) {
-    const entryPath = join(folder, entry.name);
-    if (entry.isDirectory()) {
-      if (!entry.name.startsWith('.') && entry.name !== addonsFolder) {
-        scripts.push(...scriptsInFolder(projectRoot, entryPath));
-      }
-    } else if (entry.name.endsWith(scriptExtension)) {
-      scripts.push({ resourcePath: toResourcePath(relative(projectRoot, entryPath)), absolutePath: entryPath });
-    }
-  }
-  return scripts;
-}
-
-function toResourcePath(pathInProject: string): string {
-  return `${resourcePrefix}${pathInProject.split(sep).join('/')}`;
 }

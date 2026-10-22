@@ -3,7 +3,15 @@ import { InMemoryTransport } from '@modelcontextprotocol/server';
 import { describe, expect, it } from 'vitest';
 import { createApplication } from '../../src/createApplication.js';
 
-async function listedTools(variables: Record<string, string>): Promise<{ readonly names: string[]; readonly instructions: string; readonly meta: Map<string, unknown> }> {
+interface ListedCapabilities {
+  readonly names: string[];
+  readonly instructions: string;
+  readonly meta: Map<string, unknown>;
+  readonly resourceTemplates: string[];
+  readonly prompts: string[];
+}
+
+async function listedTools(variables: Record<string, string>): Promise<ListedCapabilities> {
   const application = createApplication({ variables, workingDirectory: '/nonexistent', platform: process.platform, homeDirectory: '/nonexistent' });
   const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
   await application.createMcpServer().connect(serverTransport);
@@ -11,7 +19,15 @@ async function listedTools(variables: Record<string, string>): Promise<{ readonl
   await client.connect(clientTransport);
   try {
     const { tools } = await client.listTools();
-    return { names: tools.map((tool) => tool.name), instructions: client.getInstructions() ?? '', meta: new Map(tools.map((tool) => [tool.name, tool._meta])) };
+    const { resourceTemplates } = await client.listResourceTemplates();
+    const { prompts } = await client.listPrompts();
+    return {
+      names: tools.map((tool) => tool.name),
+      instructions: client.getInstructions() ?? '',
+      meta: new Map(tools.map((tool) => [tool.name, tool._meta])),
+      resourceTemplates: resourceTemplates.map((template) => template.uriTemplate),
+      prompts: prompts.map((prompt) => prompt.name),
+    };
   } finally {
     await client.close();
     application.shutdown();
@@ -19,8 +35,11 @@ async function listedTools(variables: Record<string, string>): Promise<{ readonl
 }
 
 describe('tool modes', () => {
-  it('leaves the unsafe tools out by default', async () => {
-    const { names } = await listedTools({});
+  it('leaves the unsafe tools out by default and offers the resources and prompts', async () => {
+    const { names, resourceTemplates, prompts } = await listedTools({});
+
+    expect(resourceTemplates).toEqual(['godot://scene/{+path}', 'godot://docs/{class}']);
+    expect(prompts).toEqual(['fix_last_run', 'playtest']);
 
     expect(names).toContain('node_add');
     expect(names).not.toContain('editor_run_script');
@@ -37,7 +56,10 @@ describe('tool modes', () => {
   });
 
   it('offers only reading tools in read-only mode and says so', async () => {
-    const { names, instructions } = await listedTools({ GODOT_MCP_READ_ONLY: '1', GODOT_MCP_UNSAFE: '1' });
+    const { names, instructions, prompts, resourceTemplates } = await listedTools({ GODOT_MCP_READ_ONLY: '1', GODOT_MCP_UNSAFE: '1' });
+
+    expect(prompts).toEqual([]);
+    expect(resourceTemplates).toHaveLength(2);
 
     expect(names).toContain('scene_get_tree');
     expect(names).toContain('godot_status');

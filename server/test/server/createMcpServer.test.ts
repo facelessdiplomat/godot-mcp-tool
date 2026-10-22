@@ -4,6 +4,8 @@ import { afterEach, describe, expect, it } from 'vitest';
 import * as z from 'zod/v4';
 import { createMcpServer } from '../../src/server/createMcpServer.js';
 import { textResult } from '../../src/tools/results.js';
+import type { McpPrompt } from '../../src/prompts/McpPrompt.js';
+import type { McpResource } from '../../src/resources/McpResource.js';
 import type { Tool, ToolDefinition } from '../../src/tools/Tool.js';
 
 const echoSchema = z.object({ text: z.string().describe('Text to return') });
@@ -86,6 +88,53 @@ describe('createMcpServer', () => {
     const { tools } = await client.listTools();
 
     expect(tools[0]?._meta).toEqual({ 'anthropic/requiresUserInteraction': true });
+  });
+
+  it('lists and reads resources, the concrete ones of a template included', async () => {
+    const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+    const scenes: McpResource = {
+      definition: { name: 'scene', uri: 'godot://scene/{+path}', title: 'Scene tree', description: 'The node tree of a scene.' },
+      read: (variables) => Promise.resolve(`tree of ${variables['path'] ?? ''}`),
+      list: () => [{ uri: 'godot://scene/levels/arena.tscn', name: 'res://levels/arena.tscn' }],
+    };
+    const project: McpResource = {
+      definition: { name: 'project', uri: 'godot://project', title: 'Project overview', description: 'The project.' },
+      read: () => Promise.resolve('Project: Arena'),
+    };
+    const server = createMcpServer({ name: 'godot', version: '0.1.0', instructions: 'Use these tools.', tools: [], resources: [project, scenes] });
+    await server.connect(serverTransport);
+    client = new Client({ name: 'test-client', version: '1.0.0' });
+    await client.connect(clientTransport);
+
+    const listed = await client.listResources();
+    const templates = await client.listResourceTemplates();
+    const tree = await client.readResource({ uri: 'godot://scene/levels/arena.tscn' });
+    const overview = await client.readResource({ uri: 'godot://project' });
+
+    expect(listed.resources.map((resource) => resource.uri)).toEqual(['godot://project', 'godot://scene/levels/arena.tscn']);
+    expect(templates.resourceTemplates.map((template) => template.uriTemplate)).toEqual(['godot://scene/{+path}']);
+    expect(tree.contents).toEqual([{ uri: 'godot://scene/levels/arena.tscn', mimeType: 'text/plain', text: 'tree of levels/arena.tscn' }]);
+    expect(overview.contents[0]).toMatchObject({ text: 'Project: Arena' });
+  });
+
+  it('gets prompts with their arguments', async () => {
+    const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+    const sceneArgs = z.object({ scene: z.string().optional().describe('The scene to look at.') });
+    const prompt: McpPrompt<typeof sceneArgs> = {
+      name: 'look',
+      definition: { title: 'Look', description: 'Look at a scene.', argsSchema: sceneArgs },
+      render: (args) => Promise.resolve(`Look at ${args.scene ?? 'the main scene'}.`),
+    };
+    const server = createMcpServer({ name: 'godot', version: '0.1.0', instructions: 'Use these tools.', tools: [], prompts: [prompt] });
+    await server.connect(serverTransport);
+    client = new Client({ name: 'test-client', version: '1.0.0' });
+    await client.connect(clientTransport);
+
+    const { prompts } = await client.listPrompts();
+    const result = await client.getPrompt({ name: 'look', arguments: { scene: 'res://arena.tscn' } });
+
+    expect(prompts[0]).toMatchObject({ name: 'look', title: 'Look', description: 'Look at a scene.', arguments: [{ name: 'scene', required: false }] });
+    expect(result.messages).toEqual([{ role: 'user', content: { type: 'text', text: 'Look at res://arena.tscn.' } }]);
   });
 
   it('calls a tool', async () => {

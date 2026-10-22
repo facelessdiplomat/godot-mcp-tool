@@ -11,8 +11,12 @@ import { LanguageServerClient } from './lsp/LanguageServerClient.js';
 import { NodeDetachedLauncher } from './process/DetachedLauncher.js';
 import { NodeProcessLauncher } from './process/ProcessLauncher.js';
 import { NodeProcessRunner, type ProcessRunner } from './process/ProcessRunner.js';
+import { FixLastRunPrompt } from './prompts/FixLastRunPrompt.js';
+import { PlaytestPrompt } from './prompts/PlaytestPrompt.js';
 import { readAutoloadNames } from './project/ProjectFile.js';
+import { listScenes } from './project/ProjectFiles.js';
 import { ProjectLocator } from './project/ProjectLocator.js';
+import { createGodotResources } from './resources/godotResources.js';
 import { ErrorSummary } from './runtime/ErrorSummary.js';
 import { GameGatewayRouter } from './runtime/GameGatewayRouter.js';
 import { GameOutputCursor } from './runtime/GameOutputCursor.js';
@@ -27,8 +31,10 @@ import { DocsClassTool, DocsSearchTool } from './tools/docsTools.js';
 import { EditorLaunchTool } from './tools/EditorLaunchTool.js';
 import { createEditorTools } from './tools/editorTools.js';
 import { ErrorReportingTool } from './tools/ErrorReportingTool.js';
-import { createGameTools } from './tools/gameTools.js';
+import { createGameGetOutputTool, createGameTools } from './tools/gameTools.js';
 import { GodotStatusTool } from './tools/GodotStatusTool.js';
+import { createProjectInfoTool } from './tools/projectTools.js';
+import { createSceneGetTreeTool } from './tools/sceneTools.js';
 import { ScriptValidateTool } from './tools/scriptTools.js';
 import { TestRunTool } from './tools/TestRunTool.js';
 import type { Tool } from './tools/Tool.js';
@@ -134,6 +140,14 @@ export function createApplication(environment: ApplicationEnvironment): Applicat
   const selection = applyToolPolicy(plainTools, policy);
   toolNotes.push(...selection.notes);
   const tools = selection.tools.map((tool) => new ErrorReportingTool(tool, errorSummary));
+  const resources = createGodotResources({
+    projectInfo: createProjectInfoTool(editor),
+    sceneTree: createSceneGetTreeTool(editor),
+    classDocs: new DocsClassTool(docsSource),
+    lastRunOutput: createGameGetOutputTool(gameGateway, new GameOutputCursor()),
+    listScenes: () => (project.found ? listScenes(project.root) : []),
+  });
+  const prompts = policy.readOnly ? [] : [new FixLastRunPrompt(gameGateway), new PlaytestPrompt()];
   const instructions = [
     serverInstructions,
     ...(policy.readOnly ? [readOnlyInstructions] : []),
@@ -142,7 +156,7 @@ export function createApplication(environment: ApplicationEnvironment): Applicat
 
   return {
     createMcpServer: () =>
-      createMcpServer({ name: SERVER_NAME, version: SERVER_VERSION, instructions, tools }),
+      createMcpServer({ name: SERVER_NAME, version: SERVER_VERSION, instructions, tools, resources, prompts }),
     shutdown: () => {
       localGame.shutdown();
       editor.close();
