@@ -1,6 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { DiscoveryFileReader, isProcessAlive } from '../../src/bridge/DiscoveryFileReader.js';
-import { editorStartupTimeoutMs, godotBinary, McpSession, TemporaryProject } from './harness.js';
+import { editorStartupTimeoutMs, godotBinary, McpSession, positionIn, stopDiscoveredEditor, TemporaryProject } from './harness.js';
 import { decodePng } from './pngImage.js';
 
 const windowed = process.env['GODOT_MCP_WINDOW_TESTS'] === '1';
@@ -30,11 +29,6 @@ const playerScript = (speedName: string): string =>
     '',
   ].join('\n');
 
-function positionOf(propertiesText: string): { readonly x: number; readonly y: number; readonly z: number } {
-  const match = /position = Vector3\((?<x>[^,]+), (?<y>[^,]+), (?<z>[^)]+)\)/.exec(propertiesText);
-  return { x: Number(match?.groups?.['x']), y: Number(match?.groups?.['y']), z: Number(match?.groups?.['z']) };
-}
-
 describe.skipIf(godotBinary === '')('the milestone 2 scenario: a third-person prototype', () => {
   let project: TemporaryProject | undefined;
   let session: McpSession | undefined;
@@ -63,10 +57,7 @@ describe.skipIf(godotBinary === '')('the milestone 2 scenario: a third-person pr
     await session?.call('game_stop');
     await session?.close();
     if (project !== undefined) {
-      const discovered = new DiscoveryFileReader(project.root, isProcessAlive).read();
-      if (discovered.kind === 'found') {
-        process.kill(discovered.endpoint.pid, 'SIGKILL');
-      }
+      stopDiscoveredEditor(project.root);
       project.remove();
     }
   });
@@ -146,7 +137,7 @@ describe.skipIf(godotBinary === '')('the milestone 2 scenario: a third-person pr
 
     expect(run.text).toMatch(/^The game is running res:\/\/levels\/arena\.tscn/);
     expect(landed.text).toMatch(/^"is_on_floor\(\)" became true on Player/);
-    startZ = positionOf(before.text).z;
+    startZ = positionIn(before.text).z;
   });
 
   it('walks forward while move_forward is held for a second', async () => {
@@ -154,7 +145,7 @@ describe.skipIf(godotBinary === '')('the milestone 2 scenario: a third-person pr
     const after = await tools().call('game_get_properties', { path: 'Player', names: ['position', 'is_on_floor()'] });
 
     expect(played.text).toMatch(/^Played 1 input step in \d+ ms\./);
-    expect(positionOf(after.text).z).toBeLessThan(startZ - 3);
+    expect(positionIn(after.text).z).toBeLessThan(startZ - 3);
     expect(after.text).toContain('is_on_floor() = true  [bool]');
   });
 

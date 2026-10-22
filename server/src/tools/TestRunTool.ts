@@ -1,5 +1,7 @@
 import type { CallToolResult } from '@modelcontextprotocol/server';
 import * as z from 'zod/v4';
+import type { ErrorDismissal } from '../runtime/ErrorSummary.js';
+import { isLoadErrorOf } from '../scripts/ScriptLoadErrors.js';
 import type { TestCaseResult } from '../testing/JUnitReport.js';
 import { testFrameworks } from '../testing/TestFrameworks.js';
 import { TestRunError, type TestRunRequest, type TestRunResult } from '../testing/TestRunner.js';
@@ -43,7 +45,10 @@ export class TestRunTool implements Tool<typeof testRunInput> {
     alwaysLoad: false,
   };
 
-  constructor(private readonly runner: TestRunService) {}
+  constructor(
+    private readonly runner: TestRunService,
+    private readonly editorErrors: ErrorDismissal,
+  ) {}
 
   async execute(input: z.input<typeof testRunInput>): Promise<CallToolResult> {
     const parsedInput = testRunInput.safeParse(input);
@@ -59,6 +64,7 @@ export class TestRunTool implements Tool<typeof testRunInput> {
         headless,
         timeoutMs,
       });
+      this.editorErrors.dismiss(isLoadErrorOf(result.loadErrors.map((loadError) => loadError.file)));
       return textResult(describeTestRun(result));
     } catch (error) {
       if (error instanceof TestRunError) {
@@ -96,13 +102,19 @@ function describeTestRun(result: TestRunResult): string {
 
 function summaryOf(result: TestRunResult): string {
   const where = result.selection.join(', ');
+  const unloadedScriptCount = new Set(result.loadErrors.map((loadError) => loadError.file)).size;
+  const unloaded = `${counted(unloadedScriptCount, 'test script')} failed to load`;
   if (result.cases.length === 0) {
+    if (unloadedScriptCount > 0) {
+      return `No tests ran with ${result.framework} in ${where}: ${unloaded}.`;
+    }
     const convention = testFrameworks.find((framework) => framework.name === result.framework)?.testConvention ?? '';
     return `${result.framework} found no tests in ${where}. ${convention}`.trimEnd();
   }
   const scriptCount = new Set(result.cases.map((testCase) => testCase.suite)).size;
   const seconds = (result.durationMs / 1000).toFixed(1);
-  return `Ran ${counted(result.cases.length, 'test')} in ${counted(scriptCount, 'script')} with ${result.framework} (${where}, ${seconds} s): ${outcomesOf(result.cases)}.`;
+  const outcomes = unloadedScriptCount > 0 ? `${outcomesOf(result.cases)}; ${unloaded}` : outcomesOf(result.cases);
+  return `Ran ${counted(result.cases.length, 'test')} in ${counted(scriptCount, 'script')} with ${result.framework} (${where}, ${seconds} s): ${outcomes}.`;
 }
 
 function outcomesOf(cases: readonly TestCaseResult[]): string {

@@ -529,8 +529,11 @@ paths, `.gutconfig.json` decides when it exists); gdUnit4 through
 `-s res://addons/gdUnit4/bin/GdUnitCmdTool.gd --ignoreHeadlessMode -c -rd … -a …`. Without paths, `res://test` and
 `res://tests` run. GUT puts the failing line into the failure text ("at line 9"), gdUnit4 into the `message`
 attribute ("FAILED: res://test/player_test.gd:9"); both are read. `SCRIPT ERROR: Parse Error` lines of the output name
-test scripts that failed to load, whose tests are otherwise just missing from the report. gdUnit4 cannot pick single
-tests by name. Tests load scenes and resources from disk, so unsaved changes in the editor are not seen.
+test scripts that failed to load, whose tests are otherwise just missing from the report; the summary counts them next
+to the outcomes ("all passed; 1 test script failed to load"), or says "No tests ran" when none loaded, so a run with
+missing tests never reads as green. The editor's own errors about those scripts are left out of the new-error summary
+(§9.6). gdUnit4 cannot pick single tests by name. Tests load scenes and resources from
+disk, so unsaved changes in the editor are not seen.
 
 ### 8.9 3D tools
 
@@ -775,7 +778,14 @@ only new ones, and the server uses the same cursors to add the new-error summary
 The addon sends the log status together with the response to each command, so an error printed after a response
 reaches the agent with the next call. A result can cover errors: `script_validate` reports the current state of the
 scripts it checked, so it leaves the editor's parse errors and failed loads of those scripts out of the summary —
-they repeat its report or belong to an older version of the file.
+they repeat its report or belong to an older version of the file. `test_run` does the same for the test scripts it
+reports as failing to load; since its tests run outside the bridge, it pings the connected editor after the run, so
+the errors the editor printed meanwhile arrive with its result rather than with the next call.
+
+A known gap, seen in the milestone 3 live run: an editor with a window loads a new script that sits in a new folder
+shortly after the scan that found it has been applied, so its parse errors arrive with the call after
+`editor_rescan`; a new script in an existing folder is loaded while the scan is applied and its errors come with
+`editor_rescan` itself. A headless editor loads neither. The engine path behind the delay is still to be found.
 We don't parse the editor's Debugger tab or Output panel: that is brittle and depends on the editor's UI layout.
 
 Display rules, from spike 3: the message is `rationale` when it is not empty, otherwise `code` (engine errors keep the
@@ -831,6 +841,10 @@ On a script error the editor's debugger pauses the game by default — to the ag
   (`canvas_items` / `viewport`) — otherwise clicks miss.
 - Relative mouse motion (`InputEventMouseMotion.relative`) drives mouse look, including when the mouse is captured.
 - Hold durations are given in physics frames or milliseconds: press, wait, release.
+- Devices: an event of an action matches only events from its own device unless its device is "all devices" (-1).
+  `input_map_set` stores every event for all devices, as the editor's Input Map does by default, so a gamepad
+  button works on any gamepad; events that `game_input` injects keep the devices of real ones (16 for the keyboard,
+  32 for the mouse), so they match both kinds of actions.
 
 ### 9.10 Deterministic playtesting
 
@@ -1254,6 +1268,32 @@ read-only mode; MCP resources, prompts and the skill; the acceptance test.
 **Done when** this passes: "Add a `dash` action (Shift and gamepad B), create a `PhysicsMaterial` for ice, write a GUT
 test for `Player.dash()` and run it" — the tests are green and nothing was done by hand.
 
+Status: done. The scenario passes as the automated acceptance test
+`server/test/integration/milestone3Scenario.test.ts`, headless or with a window when `GODOT_MCP_WINDOW_TESTS=1`. In
+a small game with a player and an arena it starts the editor with `editor_launch`, adds the `dash` action on Shift
+and gamepad B, creates `res://materials/ice.tres` and lays an icy patch with it, writes the GUT test for
+`Player.dash()` first (it does not load until the dash exists), adds `dash()`, checks both scripts, runs the tests
+green and dashes in the running game. Preparing it showed that `test_run` summed up a run whose only test script
+failed to load as "found no tests", with the naming convention as the hint, and that a run could say "all passed"
+while a test script had not loaded; the summary now counts the scripts that failed to load (§8.8).
+
+The live run in Claude Code on 2026-10-22 passed the same scenario in `test-project` with an editor window: the
+action, `res://prototype/ice.tres` under an icy patch measured to rest on the floor, the test first (red: it did not
+load), `dash()`, 2 of 2 tests green, and a 3.5 m dash in the running game. It found three problems:
+
+- `input_map_set` stored the gamepad B button for the first gamepad only (device 0), while the editor stores events
+  for all devices; it now stores every event for all devices (§9.9).
+- The editor's parse errors about the new test script reached the agent one call after `test_run`, as a ⚠ that
+  repeated the load error `test_run` had reported, after the script was already fixed. `test_run` now pings the
+  editor after the run and leaves those errors out (§9.6). The underlying delay, a new script in a new folder, also
+  affects `editor_rescan` and is still open (§9.6).
+- `project_info` lists 100 global classes, which in `test-project` are almost all gdUnit4's: about 9 KB of output on
+  every first call. Not fixed yet.
+
+A second live run with the fixes and a fresh editor saw `"device": -1` on both events of `dash` in `project.godot`,
+and a broken test in a new folder: the editor printed its parse errors, while neither the result of `test_run` nor
+the next call showed a ⚠.
+
 ### Milestone 4 — 3D tooling and advanced features
 
 - [ ] 3D first: `asset_import_settings_*`, `navigation_bake`, `animation_*`; `gridmap_*` if evaluations show the need.
@@ -1579,6 +1619,7 @@ Checked against the sources in `~/Software/godot` (`master`, 4.8-beta, commit `6
 | `--doctool <folder> --gdscript-docs res://` with `--path` writes one XML file per script, named after its `class_name` (or the quoted file name), with descriptions from `##` comments; a script that does not parse is skipped with an error | `main/main.cpp`, observed on 4.8 |
 | Bound callables are equal when their base callable and bound arguments are equal, so `disconnect` works with a callable bound again; a non-tool script in the editor has a placeholder instance whose `has_method` checks the script and its base scripts | `core/variant/callable_bind.cpp`, `core/object/script_language.cpp` |
 | GDScript files may preload each other, and a script may preload itself | observed on 4.8 |
+| `InputMap` matches an event of an action against an incoming event only when the action's event has the device `ALL_DEVICES` (-1, not exposed to scripts) or the same device; new `InputEventKey` and mouse events get `DEVICE_ID_KEYBOARD` (16) and `DEVICE_ID_MOUSE` (32), joypad events default to device 0, the first gamepad, and the editor's Input Map dialog stores "All Devices" | `core/input/input_map.cpp`, `core/input/input_event.cpp`, `editor/settings/input_event_configuration_dialog.cpp` |
 | The analyzer reports a member that a class lacks when it is read through the class (`Player.SPEEDD` is a parse error), but a method or property that the type of a variable lacks (`player.dashh()` on a `Player` or a `CharacterBody3D` variable) compiles: only the `unsafe_method_access` and `unsafe_property_access` warnings report it, and both are off by default. `:=` cannot infer the type of a member that the static type lacks, so it works on a variable typed with the `class_name` of its script and fails on one typed with the native base | observed on 4.8 with `--check-only` |
 | 3D: `NavigationRegion3D.bake_navigation_mesh()` and the `bake_finished` signal; `Viewport.world_3d` / `own_world_3d`; `physics/3d/physics_engine` (`DEFAULT` currently means GodotPhysics3D; Jolt can be selected); CSG nodes (`CSGBox3D`, `CSGCombiner3D`, …); `GridMap.set_cell_item` | `doc/classes/`, `modules/csg/doc_classes/` |
 

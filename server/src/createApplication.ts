@@ -131,6 +131,7 @@ export function createApplication(environment: ApplicationEnvironment): Applicat
     ),
     new TestRunTool(
       new TestRunner({ projectRoot: project.found ? project.root : undefined, editor, locateBinary: locateGodot, processRunner, now: () => Date.now() }),
+      errorSummary,
     ),
     new DocsClassTool(docsSource),
     new DocsSearchTool(docsSource),

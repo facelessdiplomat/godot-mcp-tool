@@ -163,13 +163,27 @@ describe('TestRunner', () => {
     expect(readdirSync(join(projectRoot, '.godot', 'godot_mcp_tool', 'test_reports'))).toEqual([]);
   });
 
-  it('lets the connected editor rescan the project instead of importing it', async () => {
+  it('lets the connected editor rescan the project instead of importing it, and hears from it after the run', async () => {
     editorStatus = connected;
 
     await testRunner().run(request());
 
-    expect(editorRequests).toEqual(['editor.rescan']);
+    expect(editorRequests).toEqual(['editor.rescan', 'ping']);
     expect(processes.runs.some((run) => run.args.includes('--import'))).toBe(false);
+  });
+
+  it('reports the run when the editor does not answer after it', async () => {
+    editorStatus = connected;
+    const runner = testRunner({
+      editor: {
+        status: () => Promise.resolve(editorStatus),
+        request: (method) => (method === 'ping' ? Promise.reject(new Error('The editor disconnected')) : Promise.resolve({ duration_ms: 5 })),
+      },
+    });
+
+    const result = await runner.run(request());
+
+    expect(result.cases).toHaveLength(2);
   });
 
   it('runs chosen folders, scripts and tests by name with GUT, with a window on request', async () => {

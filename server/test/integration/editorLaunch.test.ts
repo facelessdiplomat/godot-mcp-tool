@@ -1,6 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { DiscoveryFileReader, isProcessAlive } from '../../src/bridge/DiscoveryFileReader.js';
-import { editorStartupTimeoutMs, godotBinary, McpSession, TemporaryProject } from './harness.js';
+import { editorStartupTimeoutMs, godotBinary, McpSession, stopDiscoveredEditor, TemporaryProject } from './harness.js';
 
 describe.skipIf(godotBinary === '')('starting the editor from the server', () => {
   let project: TemporaryProject | undefined;
@@ -21,10 +20,7 @@ describe.skipIf(godotBinary === '')('starting the editor from the server', () =>
   afterAll(async () => {
     await session?.close();
     if (project !== undefined) {
-      const discovered = new DiscoveryFileReader(project.root, isProcessAlive).read();
-      if (discovered.kind === 'found') {
-        process.kill(discovered.endpoint.pid, 'SIGKILL');
-      }
+      stopDiscoveredEditor(project.root);
       project.remove();
     }
   });

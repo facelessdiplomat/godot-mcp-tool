@@ -56,6 +56,24 @@ async function startEditor(projectRoot: string, extraArguments: readonly string[
   return editorProcess;
 }
 
+export function stopDiscoveredEditor(projectRoot: string): void {
+  const discovered = new DiscoveryFileReader(projectRoot, isProcessAlive).read();
+  if (discovered.kind === 'found') {
+    process.kill(discovered.endpoint.pid, 'SIGKILL');
+  }
+}
+
+export interface Position {
+  readonly x: number;
+  readonly y: number;
+  readonly z: number;
+}
+
+export function positionIn(propertiesText: string): Position {
+  const match = /position = Vector3\((?<x>[^,]+), (?<y>[^,]+), (?<z>[^)]+)\)/.exec(propertiesText);
+  return { x: Number(match?.groups?.['x']), y: Number(match?.groups?.['y']), z: Number(match?.groups?.['z']) };
+}
+
 export function findFreePort(): Promise<number> {
   return new Promise((resolvePort, reject) => {
     const server = createServer();

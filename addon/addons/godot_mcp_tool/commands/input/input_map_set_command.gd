@@ -5,6 +5,7 @@ const InputEventCodec := preload("../../input/input_event_codec.gd")
 const Params := preload("../params.gd")
 
 const FORBIDDEN_NAME_CHARACTERS := ["/", ":", "\"", "="]
+const ALL_DEVICES := -1
 
 var _save_settings: Callable
 
@@ -83,5 +84,6 @@ static func _parse(description: Variant, current_deadzone: float) -> Variant:
 		var event: Variant = InputEventCodec.decode(event_description)
 		if event is String:
 			return event
+		(event as InputEvent).device = ALL_DEVICES
 		events.append(event)
 	return {"deadzone": deadzone, "events": events}

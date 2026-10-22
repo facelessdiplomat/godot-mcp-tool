@@ -89,15 +89,24 @@ export class TestRunner {
       if (reportFile === undefined) {
         throw new TestRunError(`${framework.name} wrote no test report (exit code ${String(result.exitCode)}). The end of its output:\n${lastLines(output)}`);
       }
-      return {
+      const testRun: TestRunResult = {
         framework: framework.name,
         selection: selection.description,
         cases: readJUnitReport(readFileSync(reportFile, 'utf8')),
         loadErrors: loadErrorsIn(output),
         durationMs,
       };
+      await this.refreshEditorLogStatus();
+      return testRun;
     } finally {
       rmSync(reportDirectory, { recursive: true, force: true });
+    }
+  }
+
+  private async refreshEditorLogStatus(): Promise<void> {
+    const editorStatus = await this.dependencies.editor.status();
+    if (editorStatus.connected) {
+      await this.dependencies.editor.request('ping', {}).catch(() => undefined);
     }
   }
 

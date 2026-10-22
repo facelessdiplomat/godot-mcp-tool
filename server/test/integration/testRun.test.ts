@@ -1,8 +1,7 @@
 import { existsSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { DiscoveryFileReader, isProcessAlive } from '../../src/bridge/DiscoveryFileReader.js';
-import { editorStartupTimeoutMs, godotBinary, McpSession, TemporaryProject, testProjectRoot } from './harness.js';
+import { editorStartupTimeoutMs, godotBinary, McpSession, stopDiscoveredEditor, TemporaryProject, testProjectRoot } from './harness.js';
 
 const testRunTimeoutMs = 120_000;
 const gdUnitInstalled = existsSync(join(testProjectRoot, 'addons', 'gdUnit4'));
@@ -67,10 +66,7 @@ describe.skipIf(godotBinary === '')('running GUT tests', () => {
   afterAll(async () => {
     await session?.close();
     if (project !== undefined) {
-      const discovered = new DiscoveryFileReader(project.root, isProcessAlive).read();
-      if (discovered.kind === 'found') {
-        process.kill(discovered.endpoint.pid, 'SIGKILL');
-      }
+      stopDiscoveredEditor(project.root);
       project.remove();
     }
   });

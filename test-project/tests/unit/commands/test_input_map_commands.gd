@@ -7,6 +7,7 @@ const JsonRpc := preload("res://addons/godot_mcp_tool/bridge/json_rpc.gd")
 
 const MOVE_ACTION := "mcp_test_move_forward"
 const JUMP_ACTION := "mcp_test_jump"
+const ALL_DEVICES := -1
 
 var _save_calls := 0
 
@@ -49,6 +50,17 @@ func test_replaces_the_events_and_reports_the_previous_ones() -> void:
 	assert_eq((((result["previous"] as Dictionary)[MOVE_ACTION] as Array)[0] as Dictionary)["key"], "W")
 	var events: Array = (ProjectSettings.get_setting("input/" + MOVE_ACTION) as Dictionary)["events"]
 	assert_eq((events[0] as InputEventKey).physical_keycode, KEY_UP)
+
+
+func test_binds_the_events_to_every_device_as_the_editor_does() -> void:
+	await _set_actions({JUMP_ACTION: [
+		"Space",
+		{"type": "mouse_button", "button": "left"},
+		{"type": "joypad_button", "button": "b"},
+		{"type": "joypad_motion", "axis": "left_y", "direction": -1},
+	]})
+	var events: Array = (ProjectSettings.get_setting("input/" + JUMP_ACTION) as Dictionary)["events"]
+	assert_eq(events.map(func(event: InputEvent) -> int: return event.device), [ALL_DEVICES, ALL_DEVICES, ALL_DEVICES, ALL_DEVICES])
 
 
 func test_removes_an_action_given_null() -> void:

@@ -1,6 +1,6 @@
 import type { ChildProcess } from 'node:child_process';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { editorStartupTimeoutMs, godotBinary, McpSession, startHeadlessEditor, TemporaryProject } from './harness.js';
+import { editorStartupTimeoutMs, godotBinary, McpSession, positionIn, startHeadlessEditor, TemporaryProject } from './harness.js';
 
 const playerScript = [
   'extends CharacterBody3D',
@@ -46,11 +46,6 @@ const mainScene = [
   '',
 ].join('\n');
 
-function zOf(propertiesText: string): number {
-  const match = /position = Vector3\([^,]+, [^,]+, (?<z>[^)]+)\)/.exec(propertiesText);
-  return Number(match?.groups?.['z']);
-}
-
 describe.skipIf(godotBinary === '')('playing input into the game', () => {
   let project: TemporaryProject | undefined;
   let editorProcess: ChildProcess | undefined;
@@ -91,10 +86,10 @@ describe.skipIf(godotBinary === '')('playing input into the game', () => {
   it('walks the player forward while the action is held', async () => {
     await tools().call('game_run');
     await tools().call('game_wait', { condition: 'is_on_floor()', node: 'Player', timeout_ms: 5000 });
-    const before = zOf((await tools().call('game_get_properties', { path: 'Player', names: ['position'] })).text);
+    const before = positionIn((await tools().call('game_get_properties', { path: 'Player', names: ['position'] })).text).z;
 
     const played = await tools().call('game_input', { steps: [{ action: 'move_forward', ms: 1000 }] });
-    const after = zOf((await tools().call('game_get_properties', { path: 'Player', names: ['position'] })).text);
+    const after = positionIn((await tools().call('game_get_properties', { path: 'Player', names: ['position'] })).text).z;
 
     expect(played.text).toMatch(/^Played 1 input step in \d+ ms\./);
     expect(before - after).toBeGreaterThan(3);
