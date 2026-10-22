@@ -4,11 +4,20 @@ import type { GameOutputCursor } from '../runtime/GameOutputCursor.js';
 import { changingAnnotations, readingAnnotations } from './annotations.js';
 import { BridgeTool } from './bridge/BridgeTool.js';
 import { formatLogEntries, logEntrySchema } from './formatting/logEntries.js';
+import { createGameGetPropertiesTool, createGameGetTreeTool, createGameSetPropertiesTool, createGameWaitTool } from './gameInspectionTools.js';
 import { textResult } from './results.js';
 import type { Tool } from './Tool.js';
 
 export function createGameTools(game: EditorGateway, cursor: GameOutputCursor): Tool[] {
-  return [createGameRunTool(game, cursor), createGameStopTool(game), createGameGetOutputTool(game, cursor)];
+  return [
+    createGameRunTool(game, cursor),
+    createGameStopTool(game),
+    createGameGetOutputTool(game, cursor),
+    createGameGetTreeTool(game),
+    createGameGetPropertiesTool(game),
+    createGameSetPropertiesTool(game),
+    createGameWaitTool(game),
+  ];
 }
 
 const defaultWatchMs = 1000;

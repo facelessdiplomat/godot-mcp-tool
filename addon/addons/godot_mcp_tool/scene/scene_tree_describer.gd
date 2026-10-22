@@ -5,6 +5,12 @@ const NodeFactory := preload("node_factory.gd")
 var node_count := 0
 var truncated := false
 
+var _include_unowned_children: bool
+
+
+func _init(include_unowned_children: bool = false) -> void:
+	_include_unowned_children = include_unowned_children
+
 
 func describe(scene_root: Node, max_depth: int, max_nodes: int) -> Dictionary:
 	node_count = 0
@@ -41,10 +47,10 @@ func _describe_node(node: Node, scene_root: Node, depth: int, max_depth: int, ma
 	return description
 
 
-static func _scene_children(node: Node, scene_root: Node) -> Array[Node]:
+func _scene_children(node: Node, scene_root: Node) -> Array[Node]:
 	var children: Array[Node] = []
 	for child in node.get_children():
-		if child.owner == scene_root:
+		if _include_unowned_children or child.owner == scene_root:
 			children.append(child)
 	return children
 

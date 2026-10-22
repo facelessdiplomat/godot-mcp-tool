@@ -7,5 +7,6 @@ export const serverInstructions = [
   '- Learn node paths with scene_get_tree before changing a scene. rotation is in radians; use rotation_degrees for degrees.',
   '- Changes stay unsaved until scene_save, as in the editor. Save when a logical change is complete; game_run saves first, like the editor does.',
   '- After writing or changing .gd files, check them with script_validate before running. Then check the result with game_run and read errors with game_get_output.',
+  '- To check how the running game behaves, wait for a state with game_wait and read nodes with game_get_properties; getters such as is_on_floor() work there.',
   '- When a result reports new errors (⚠), read them with game_get_output before you continue.',
 ].join('\n');

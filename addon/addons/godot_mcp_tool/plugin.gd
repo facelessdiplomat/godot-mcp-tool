@@ -45,9 +45,9 @@ var _token := ""
 func _enter_tree() -> void:
 	var log_store := LogStore.new()
 	var game := GameState.new()
-	_runtime = RuntimeContext.new(game, log_store, EditorGameLauncher.new())
 	_runtime_debugger = RuntimeDebugger.new(game, log_store)
 	add_debugger_plugin(_runtime_debugger)
+	_runtime = RuntimeContext.new(game, log_store, EditorGameLauncher.new(), _runtime_debugger.channel)
 	_editor_logger = RuntimeLogger.new(false)
 	OS.add_logger(_editor_logger)
 	_ensure_runtime_autoload()

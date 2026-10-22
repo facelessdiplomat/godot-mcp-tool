@@ -1,6 +1,7 @@
 import type { CallToolResult } from '@modelcontextprotocol/server';
 import { describe, expect, it } from 'vitest';
 import { GameOutputCursor } from '../../src/runtime/GameOutputCursor.js';
+import { createGameGetPropertiesTool, createGameGetTreeTool, createGameSetPropertiesTool, createGameWaitTool } from '../../src/tools/gameInspectionTools.js';
 import { createGameGetOutputTool, createGameRunTool, createGameStopTool, createGameTools } from '../../src/tools/gameTools.js';
 import { FakeEditorGateway } from '../support/FakeEditorGateway.js';
 
@@ -132,7 +133,85 @@ describe('game tools', () => {
       ['game_run', true],
       ['game_stop', false],
       ['game_get_output', true],
+      ['game_get_tree', false],
+      ['game_get_properties', false],
+      ['game_set_properties', false],
+      ['game_wait', false],
     ]);
+  });
+
+  it('game_get_tree draws the tree of the running game', async () => {
+    const editor = new FakeEditorGateway().respondTo('game.get_tree', {
+      scene: 'res://levels/arena.tscn',
+      node_count: 3,
+      truncated: false,
+      root: { name: 'Arena', type: 'Node3D', child_count: 2, children: [{ name: 'Player', type: 'CharacterBody3D' }, { name: 'Bullet', type: 'Node3D' }] },
+    });
+
+    const text = textOf(await createGameGetTreeTool(editor).execute({ path: '.' }));
+
+    expect(editor.requests[0]?.params).toEqual({ path: '.', max_depth: 8, max_nodes: 200 });
+    expect(text).toBe(['The running game, current scene res://levels/arena.tscn', 'Arena: Node3D', '├─ Player: CharacterBody3D', '└─ Bullet: Node3D'].join('\n'));
+  });
+
+  it('game_get_properties lists values, getters included', async () => {
+    const editor = new FakeEditorGateway().respondTo('game.get_properties', {
+      scene: 'res://levels/arena.tscn',
+      path: 'Player',
+      type: 'CharacterBody3D',
+      properties: [
+        { name: 'position', type: 'Vector3', value: 'Vector3(0, 1, -4.2)' },
+        { name: 'is_on_floor()', type: 'bool', value: true },
+      ],
+    });
+
+    const text = textOf(await createGameGetPropertiesTool(editor).execute({ path: 'Player', names: ['position', 'is_on_floor()'] }));
+
+    expect(editor.requests[0]?.params).toEqual({ path: 'Player', names: ['position', 'is_on_floor()'], include_defaults: false });
+    expect(text).toBe(['Player (CharacterBody3D) in the running game', 'position = Vector3(0, 1, -4.2)  [Vector3]', 'is_on_floor() = true  [bool]'].join('\n'));
+  });
+
+  it('game_set_properties says the change lasts only while the game runs', async () => {
+    const editor = new FakeEditorGateway().respondTo('game.set_properties', {
+      scene: 'res://levels/arena.tscn',
+      path: 'Player',
+      applied: ['position'],
+      rejected: [],
+      not_applied: [],
+    });
+
+    const text = textOf(await createGameSetPropertiesTool(editor).execute({ path: 'Player', properties: { position: [0, 5, 0] } }));
+
+    expect(text).toBe('Updated Player in the running game. The change lasts until the game stops; scene files stay as they are.\nApplied: position');
+  });
+
+  it('game_wait reports a condition that became true', async () => {
+    const editor = new FakeEditorGateway().respondTo('game.wait', { met: true, value: true, physics_frames: 42, waited_ms: 700 });
+
+    const result = await createGameWaitTool(editor).execute({ condition: 'is_on_floor()', node: 'Player' });
+
+    expect(editor.requests[0]?.params).toEqual({ condition: 'is_on_floor()', node: 'Player', timeout_ms: 10000 });
+    expect(editor.requests[0]?.options?.timeoutMs).toBeGreaterThan(65_000);
+    expect(textOf(result)).toBe('"is_on_floor()" became true on Player after 700 ms (42 physics frames).');
+  });
+
+  it('game_wait reports a condition that stayed false', async () => {
+    const editor = new FakeEditorGateway().respondTo('game.wait', { met: false, value: 'Vector3(0, 3.5, 0)', physics_frames: 600, waited_ms: 10000 });
+
+    const text = textOf(await createGameWaitTool(editor).execute({ condition: 'position' }));
+
+    expect(text).toBe('"position" was still not true on the scene root after 10000 ms; its last value was Vector3(0, 3.5, 0).');
+  });
+
+  it('game_wait waits for frames and time', async () => {
+    const editor = new FakeEditorGateway()
+      .respondTo('game.wait', { physics_frames: 60, waited_ms: 1001 })
+      .respondTo('game.wait', { frames: 2, waited_ms: 33 })
+      .respondTo('game.wait', { waited_ms: 250 });
+
+    expect(textOf(await createGameWaitTool(editor).execute({ physics_frames: 60 }))).toBe('Waited 60 physics frames (1001 ms).');
+    expect(textOf(await createGameWaitTool(editor).execute({ frames: 2 }))).toBe('Waited 2 frames (33 ms).');
+    expect(textOf(await createGameWaitTool(editor).execute({ ms: 250 }))).toBe('Waited 250 ms.');
   });
 });
 

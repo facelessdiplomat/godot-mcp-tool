@@ -1082,8 +1082,11 @@ against a headless editor, Ctrl+Z included, and it passed in a live Claude Code 
 
 ### Milestone 2 — "Eyes and hands"
 
-- [ ] Runtime: `game_screenshot`, `game_input`, `game_wait`, `game_get_tree`, `game_get_properties`,
-      `game_set_properties`.
+- [x] Runtime inspection: `game_get_tree` (with the nodes created at runtime), `game_get_properties` (getters without
+      arguments such as `is_on_floor()` included), `game_set_properties`, `game_wait`. They travel over a request
+      channel from the editor to the game: `mcp:request` / `mcp:response` debugger messages, answered by game-side
+      commands that the runtime agent loads only when a debugger is attached.
+- [ ] Runtime: `game_screenshot`, `game_input`.
 - [ ] 3D views: the `camera` option of the screenshot tools, preset angles, contact sheets; `node_get_bounds`.
 - [ ] `editor_screenshot`, `editor_launch`.
 - [x] `script_validate` (LSP and the fallback).

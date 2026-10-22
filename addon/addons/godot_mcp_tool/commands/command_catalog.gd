@@ -4,6 +4,7 @@ const CommandRouter := preload("command_router.gd")
 const EditingContext := preload("../scene/editing_context.gd")
 const EditorRescanCommand := preload("editor/editor_rescan_command.gd")
 const GameGetOutputCommand := preload("game/game_get_output_command.gd")
+const GameRequestCommand := preload("game/game_request_command.gd")
 const GameRunCommand := preload("game/game_run_command.gd")
 const GameStopCommand := preload("game/game_stop_command.gd")
 const NodeAddCommand := preload("node/node_add_command.gd")
@@ -19,6 +20,10 @@ const SceneCreateCommand := preload("scene/scene_create_command.gd")
 const SceneGetTreeCommand := preload("scene/scene_get_tree_command.gd")
 const SceneOpenCommand := preload("scene/scene_open_command.gd")
 const SceneSaveCommand := preload("scene/scene_save_command.gd")
+
+
+const INSPECTION_TIMEOUT_MSEC := 10_000
+const WAIT_TIMEOUT_MSEC := 65_000
 
 
 static func build_router(context: EditingContext, runtime: RuntimeContext, read_indentation: Callable, save_project_settings: Callable) -> CommandRouter:
@@ -39,4 +44,8 @@ static func build_router(context: EditingContext, runtime: RuntimeContext, read_
 	router.register("game.run", GameRunCommand.new(context, runtime))
 	router.register("game.stop", GameStopCommand.new(runtime))
 	router.register("game.get_output", GameGetOutputCommand.new(runtime))
+	router.register("game.get_tree", GameRequestCommand.new(runtime, "tree", INSPECTION_TIMEOUT_MSEC))
+	router.register("game.get_properties", GameRequestCommand.new(runtime, "properties.get", INSPECTION_TIMEOUT_MSEC))
+	router.register("game.set_properties", GameRequestCommand.new(runtime, "properties.set", INSPECTION_TIMEOUT_MSEC))
+	router.register("game.wait", GameRequestCommand.new(runtime, "wait", WAIT_TIMEOUT_MSEC))
 	return router

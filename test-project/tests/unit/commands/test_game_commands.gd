@@ -5,7 +5,9 @@ const EditingContext := preload("res://addons/godot_mcp_tool/scene/editing_conte
 const FakeGameLauncher := preload("res://tests/support/fake_game_launcher.gd")
 const FakeSceneAccess := preload("res://tests/support/fake_scene_access.gd")
 const FakeScriptEditorAccess := preload("res://tests/support/fake_script_editor_access.gd")
+const GameChannel := preload("res://addons/godot_mcp_tool/runtime/game_channel.gd")
 const GameGetOutputCommand := preload("res://addons/godot_mcp_tool/commands/game/game_get_output_command.gd")
+const GameRequestCommand := preload("res://addons/godot_mcp_tool/commands/game/game_request_command.gd")
 const GameRunCommand := preload("res://addons/godot_mcp_tool/commands/game/game_run_command.gd")
 const GameState := preload("res://addons/godot_mcp_tool/runtime/game_state.gd")
 const GameStopCommand := preload("res://addons/godot_mcp_tool/commands/game/game_stop_command.gd")
@@ -25,6 +27,8 @@ var _game: GameState
 var _log_store: LogStore
 var _launcher: FakeGameLauncher
 var _runtime: RuntimeContext
+var _channel: GameChannel
+var _game_requests: Array = []
 var _main_scene: Variant
 
 
@@ -36,7 +40,12 @@ func before_each() -> void:
 	_game = GameState.new()
 	_log_store = LogStore.new()
 	_launcher = FakeGameLauncher.new(_game, _log_store)
-	_runtime = RuntimeContext.new(_game, _log_store, _launcher)
+	_game_requests = []
+	_channel = GameChannel.new(func(payload: Dictionary) -> bool:
+		_game_requests.append(payload)
+		_answer_soon(payload)
+		return true)
+	_runtime = RuntimeContext.new(_game, _log_store, _launcher, _channel)
 	_main_scene = ProjectSettings.get_setting(MAIN_SCENE_SETTING)
 
 
@@ -197,3 +206,38 @@ func test_reads_the_current_run_when_the_cursor_belongs_to_another_editor() -> v
 	_log_store.append({"level": "info", "message": "fresh"}, "game")
 	var result: Dictionary = await GameGetOutputCommand.new(_runtime).execute({"after": 400})
 	assert_eq((result["entries"] as Array).map(func(entry: Dictionary) -> String: return entry["message"]), ["fresh"])
+
+
+func _answer_soon(payload: Dictionary) -> void:
+	await get_tree().process_frame
+	_channel.receive({"id": payload["id"], "result": {"asked": payload["method"]}})
+
+
+func test_asks_the_running_game_and_returns_its_answer() -> void:
+	_game.mark_started(1)
+	_game.mark_ready("res://main.tscn")
+	var result: Variant = await GameRequestCommand.new(_runtime, "tree", 1000).execute({"path": "."})
+	assert_eq(result, {"asked": "tree"})
+	assert_eq((_game_requests[0] as Dictionary)["params"], {"path": "."})
+
+
+func test_asks_a_game_that_is_paused_on_an_error() -> void:
+	_game.mark_started(1)
+	_game.mark_ready("res://main.tscn")
+	_game.mark_paused()
+	var result: Variant = await GameRequestCommand.new(_runtime, "properties.get", 1000).execute({"path": "Player"})
+	assert_eq(result, {"asked": "properties.get"})
+
+
+func test_refuses_to_ask_a_game_that_is_not_running() -> void:
+	var error: Variant = await GameRequestCommand.new(_runtime, "tree", 1000).execute({})
+	assert_true(error is CommandError)
+	assert_eq((error as CommandError).code, JsonRpc.GAME_NOT_RUNNING)
+	assert_eq(_game_requests, [])
+
+
+func test_refuses_to_ask_a_game_that_is_still_starting() -> void:
+	_game.mark_started(1)
+	var error: Variant = await GameRequestCommand.new(_runtime, "tree", 1000).execute({})
+	assert_string_contains((error as CommandError).message, "starting")
+
