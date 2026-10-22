@@ -2,8 +2,12 @@ import * as z from 'zod/v4';
 import type { EditorGateway } from '../editor/EditorGateway.js';
 import { changingAnnotations, readingAnnotations } from './annotations.js';
 import { BridgeTool } from './bridge/BridgeTool.js';
-import { applyReportSchema, formatApplyReport, formatValue } from './formatting/propertyReports.js';
+import { applyReportSchema, formatApplyReport, formatNodePath, formatValue } from './formatting/propertyReports.js';
 import { errorResult, textResult } from './results.js';
+
+export const autoloadSchema = z.object({ name: z.string(), path: z.string(), singleton: z.boolean() });
+
+type Autoload = z.infer<typeof autoloadSchema>;
 
 const projectInfoSchema = z.object({
   name: z.string(),
@@ -13,7 +17,7 @@ const projectInfoSchema = z.object({
   renderer: z.string(),
   physics_engine_3d: z.string(),
   window: z.object({ width: z.number(), height: z.number(), stretch_mode: z.string(), stretch_aspect: z.string() }),
-  autoloads: z.array(z.object({ name: z.string(), path: z.string(), singleton: z.boolean() })),
+  autoloads: z.array(autoloadSchema),
   enabled_plugins: z.array(z.string()),
   global_classes: z.array(z.object({ name: z.string(), base: z.string(), path: z.string() })),
   global_class_count: z.number().int(),
@@ -68,7 +72,7 @@ function describeProject(info: ProjectInfo): string {
     `Renderer: ${info.renderer}; 3D physics: ${info.physics_engine_3d}`,
     `Window: ${String(info.window.width)}×${String(info.window.height)}, stretch mode ${info.window.stretch_mode}, aspect ${info.window.stretch_aspect}`,
     `Indentation in .gd files: ${info.indentation.style === 'tabs' ? 'tabs' : `${String(info.indentation.size)} spaces`} — never mix tabs and spaces`,
-    `Autoloads: ${listOrNone(info.autoloads.map((autoload) => `${autoload.name} → ${autoload.path}${autoload.singleton ? '' : ' (no global name)'}`))}`,
+    `Autoloads: ${formatAutoloads(info.autoloads)}`,
     `Enabled plugins: ${listOrNone(info.enabled_plugins)}`,
     describeGlobalClasses(info),
     `Top-level folders: ${listOrNone(info.folders)}`,
@@ -85,6 +89,10 @@ function describeGlobalClasses(info: ProjectInfo): string {
       ? `${String(info.global_class_count)}, the first ${String(info.global_classes.length)} shown, the project's own before those of addons`
       : String(info.global_class_count);
   return `Global classes (${count}): ${shown}`;
+}
+
+export function formatAutoloads(autoloads: readonly Autoload[]): string {
+  return listOrNone(autoloads.map((autoload) => `${autoload.name} → ${autoload.path}${autoload.singleton ? '' : ' (no global name)'}`));
 }
 
 function listOrNone(items: readonly string[]): string {
@@ -174,5 +182,37 @@ export function createEditorRescanTool(editor: EditorGateway): BridgeTool<typeof
     timeoutMs: rescanTimeoutMs,
     present: ({ duration_ms }) =>
       textResult(`The editor rescanned the project files in ${String(duration_ms)} ms and reloaded scripts changed on disk.`),
+  });
+}
+
+const selectionSchema = z.union([z.object({ scene: z.string(), nodes: z.array(z.string()) }), z.object({ file: z.string() })]);
+
+type Selection = z.infer<typeof selectionSchema>;
+
+const editorSelectInput = z.object({
+  nodes: z.array(z.string().min(1)).optional().describe('Paths of the nodes to select in the scene tree, such as ["Player", "Player/Camera"].'),
+  scene: z.string().optional().describe('The scene of the nodes, as a res:// path; the editor switches to it. Default: the scene open in the editor.'),
+  file: z.string().min(1).optional().describe('A file or folder to select in the FileSystem dock instead, such as "res://materials/ice.tres".'),
+});
+
+export function createEditorSelectTool(editor: EditorGateway): BridgeTool<typeof editorSelectInput, Selection> {
+  return new BridgeTool(editor, {
+    name: 'editor_select',
+    definition: {
+      title: 'Select in the editor',
+      description:
+        'Select nodes in the scene tree of the editor, or a file in its FileSystem dock, to show the user what you are talking about; the inspector shows what is selected. Changes nothing in the project.',
+      inputSchema: editorSelectInput,
+      annotations: changingAnnotations({ destructive: false, idempotent: true }),
+      alwaysLoad: false,
+    },
+    method: 'editor.select',
+    responseSchema: selectionSchema,
+    present: (selection) =>
+      textResult(
+        'file' in selection
+          ? `Selected ${selection.file} in the FileSystem dock of the editor.`
+          : `Selected ${selection.nodes.map(formatNodePath).join(', ')} in ${selection.scene} in the editor.`,
+      ),
   });
 }

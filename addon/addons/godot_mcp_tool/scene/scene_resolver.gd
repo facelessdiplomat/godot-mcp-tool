@@ -15,7 +15,7 @@ func _init(scene_access: SceneAccess) -> void:
 func resolve_for_editing(scene_path: String) -> Variant:
 	if scene_path.is_empty():
 		var edited_root := access.edited_scene_root()
-		return edited_root if edited_root != null else _no_scene_error()
+		return edited_root if edited_root != null else no_scene_error()
 	var path_error := validate_scene_path(scene_path)
 	if path_error != null:
 		return path_error
@@ -35,7 +35,7 @@ func resolve_for_reading(scene_path: String) -> Variant:
 	if scene_path.is_empty():
 		var edited_root := access.edited_scene_root()
 		if edited_root == null:
-			return _no_scene_error()
+			return no_scene_error()
 		return SceneSnapshot.new(edited_root, edited_root.scene_file_path, false)
 	var path_error := validate_scene_path(scene_path)
 	if path_error != null:
@@ -68,5 +68,5 @@ static func missing_scene_error(scene_path: String) -> CommandError:
 	return CommandError.new(JsonRpc.NOT_FOUND, "Scene %s not found" % scene_path, "Create it with scene_create, or check the path.")
 
 
-static func _no_scene_error() -> CommandError:
+static func no_scene_error() -> CommandError:
 	return CommandError.new(JsonRpc.NO_SCENE, "No scene is open in the editor", "Pass \"scene\" with a res:// path, open one with scene_open, or create one with scene_create.")

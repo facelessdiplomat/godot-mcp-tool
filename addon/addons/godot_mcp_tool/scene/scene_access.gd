@@ -27,3 +27,15 @@ func is_scene_unsaved(_scene_root: Node) -> bool:
 
 func register_new_file(_file_path: String) -> void:
 	pass
+
+
+func close_scene(_scene_root: Node) -> Error:
+	return ERR_UNAVAILABLE
+
+
+func select_nodes(_nodes: Array[Node]) -> void:
+	pass
+
+
+func select_file(_file_path: String) -> void:
+	pass

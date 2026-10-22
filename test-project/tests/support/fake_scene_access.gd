@@ -4,6 +4,9 @@ var edited_root: Node
 var opened_paths := PackedStringArray()
 var saved_paths := PackedStringArray()
 var unsaved_roots: Array[Node] = []
+var closed_paths := PackedStringArray()
+var selected_nodes: Array[Node] = []
+var selected_file := ""
 
 
 func edited_scene_root() -> Node:
@@ -35,6 +38,22 @@ func save_scene(scene_root: Node) -> Error:
 
 func is_scene_unsaved(scene_root: Node) -> bool:
 	return scene_root in unsaved_roots
+
+
+func close_scene(scene_root: Node) -> Error:
+	closed_paths.append(scene_root.scene_file_path)
+	if scene_root == edited_root:
+		edited_root.free()
+		edited_root = null
+	return OK
+
+
+func select_nodes(nodes: Array[Node]) -> void:
+	selected_nodes = nodes
+
+
+func select_file(file_path: String) -> void:
+	selected_file = file_path
 
 
 func release() -> void:

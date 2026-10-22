@@ -26,7 +26,7 @@ static func traits_of(node: Node, scene_root: Node) -> Dictionary:
 	var is_instance := node != scene_root and not node.scene_file_path.is_empty()
 	if is_instance:
 		traits["instance"] = node.scene_file_path
-	var groups := _visible_groups(node)
+	var groups := visible_groups(node)
 	if not groups.is_empty():
 		traits["groups"] = groups
 	return traits
@@ -61,7 +61,7 @@ func _describe_node(node: Node, scene_root: Node, depth: int, max_depth: int, ma
 	return description
 
 
-static func _visible_groups(node: Node) -> Array:
+static func visible_groups(node: Node) -> Array:
 	var groups: Array = []
 	for group in node.get_groups():
 		if not str(group).begins_with("_"):

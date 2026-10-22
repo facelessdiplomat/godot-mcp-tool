@@ -10,6 +10,7 @@ const OPERATIONS := {
 	"node_set_properties": preload("../../scene/edits/property_change.gd"),
 	"node_reparent": preload("../../scene/edits/node_move.gd"),
 	"node_duplicate": preload("../../scene/edits/node_duplication.gd"),
+	"node_set_groups": preload("../../scene/edits/group_change.gd"),
 	"signal_connect": preload("../../scene/edits/signal_connection.gd"),
 	"signal_disconnect": preload("../../scene/edits/signal_disconnection.gd"),
 }

@@ -9,6 +9,7 @@ const CommandCatalog := preload("commands/command_catalog.gd")
 const CommandRouter := preload("commands/command_router.gd")
 const DiscoveryFile := preload("bridge/discovery_file.gd")
 const EditingContext := preload("scene/editing_context.gd")
+const EditorAutoloadRegistry := preload("editor/editor_autoload_registry.gd")
 const EditorSceneAccess := preload("scene/editor_scene_access.gd")
 const EditorScriptEditorAccess := preload("editor/editor_script_editor_access.gd")
 const EditorGameLauncher := preload("runtime/editor_game_launcher.gd")
@@ -29,7 +30,6 @@ const INDENT_TYPE_SETTING := "text_editor/behavior/indent/type"
 const INDENT_SIZE_SETTING := "text_editor/behavior/indent/size"
 const SPACES_INDENT_TYPE := 1
 const AUTOLOAD_PREFIX := "autoload/"
-const RUNTIME_AUTOLOAD_NAME := "GodotMcpRuntime"
 const RUNTIME_AGENT_FILE := "runtime/runtime_agent.gd"
 const EDITOR_SOURCE := "editor"
 
@@ -52,7 +52,7 @@ func _enter_tree() -> void:
 	OS.add_logger(_editor_logger)
 	_ensure_runtime_autoload()
 	var context := EditingContext.new(EditorSceneAccess.new(), EditorUndoHistory.new(get_undo_redo()), VariantCodec.new(), EditorScriptEditorAccess.new())
-	_router = CommandCatalog.build_router(context, _runtime, _read_indentation, ProjectSettings.save)
+	_router = CommandCatalog.build_router(context, _runtime, _read_indentation, ProjectSettings.save, EditorAutoloadRegistry.new(self))
 	_token = TokenGenerator.generate()
 	_bridge_server = BridgeServer.new(_create_session)
 	var listen_error := _bridge_server.listen(AddonInfo.LOOPBACK_ADDRESS, 0)
@@ -92,8 +92,8 @@ func _exit_tree() -> void:
 
 
 func _disable_plugin() -> void:
-	if ProjectSettings.has_setting(AUTOLOAD_PREFIX + RUNTIME_AUTOLOAD_NAME):
-		remove_autoload_singleton(RUNTIME_AUTOLOAD_NAME)
+	if ProjectSettings.has_setting(AUTOLOAD_PREFIX + AddonInfo.RUNTIME_AUTOLOAD_NAME):
+		EditorAutoloadRegistry.new(self).remove(AddonInfo.RUNTIME_AUTOLOAD_NAME)
 
 
 func _run_scene(_scene: String, args: PackedStringArray) -> PackedStringArray:
@@ -121,10 +121,10 @@ func _collect_editor_log() -> void:
 
 func _ensure_runtime_autoload() -> void:
 	var agent_path := (get_script() as Script).resource_path.get_base_dir().path_join(RUNTIME_AGENT_FILE)
-	var setting := AUTOLOAD_PREFIX + RUNTIME_AUTOLOAD_NAME
+	var setting := AUTOLOAD_PREFIX + AddonInfo.RUNTIME_AUTOLOAD_NAME
 	if ProjectSettings.has_setting(setting) and str(ProjectSettings.get_setting(setting)).trim_prefix("*") == agent_path:
 		return
-	add_autoload_singleton(RUNTIME_AUTOLOAD_NAME, agent_path)
+	add_autoload_singleton(AddonInfo.RUNTIME_AUTOLOAD_NAME, agent_path)
 	_place_autoload_first(setting)
 	ProjectSettings.save()
 

@@ -1,4 +1,5 @@
 import type { EditorGateway } from '../editor/EditorGateway.js';
+import { createAutoloadAddTool, createAutoloadRemoveTool } from './autoloadTools.js';
 import { createSceneBatchEditTool } from './batchTools.js';
 import { type CaptureReader, createEditorScreenshotTool } from './captureTools.js';
 import { createInputMapGetTool, createInputMapSetTool } from './inputTools.js';
@@ -9,16 +10,18 @@ import {
   createNodeFindTool,
   createNodeGetBoundsTool,
   createNodeGetPropertiesTool,
+  createNodeSetGroupsTool,
   createNodeSetPropertiesTool,
 } from './nodeTools.js';
 import {
   createEditorRescanTool,
+  createEditorSelectTool,
   createProjectInfoTool,
   createProjectSettingsGetTool,
   createProjectSettingsSetTool,
 } from './projectTools.js';
 import { createResourceCreateTool, createResourceGetTool, createResourceSetPropertiesTool } from './resourceTools.js';
-import { createSceneCreateTool, createSceneGetTreeTool, createSceneOpenTool, createSceneSaveTool } from './sceneTools.js';
+import { createSceneCloseTool, createSceneCreateTool, createSceneGetTreeTool, createSceneOpenTool, createSceneSaveTool } from './sceneTools.js';
 import { createSignalConnectTool, createSignalDisconnectTool, createSignalListTool } from './signalTools.js';
 import type { Tool } from './Tool.js';
 
@@ -50,5 +53,10 @@ export function createEditorTools(editor: EditorGateway, readCapture: CaptureRea
     createResourceCreateTool(editor),
     createResourceGetTool(editor),
     createResourceSetPropertiesTool(editor),
+    createAutoloadAddTool(editor),
+    createAutoloadRemoveTool(editor),
+    createNodeSetGroupsTool(editor),
+    createEditorSelectTool(editor),
+    createSceneCloseTool(editor),
   ];
 }

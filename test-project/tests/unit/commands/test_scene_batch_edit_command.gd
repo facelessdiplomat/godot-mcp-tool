@@ -120,6 +120,17 @@ func test_duplicates_and_deletes_in_one_step() -> void:
 	assert_null(_root.get_node_or_null("CrateB"))
 
 
+func test_sets_groups_of_nodes_added_in_the_same_batch() -> void:
+	var result: Dictionary = await _batch([
+		{"op": "node_add", "type": "Area3D", "name": "Coin"},
+		{"op": "node_set_groups", "path": "Coin", "add": ["pickups"]},
+	])
+	assert_eq(((result["results"] as Array)[1] as Dictionary)["groups"], ["pickups"])
+	assert_true(_root.get_node("Coin").is_in_group("pickups"))
+	assert_true(_history.undo())
+	assert_null(_root.get_node_or_null("Coin"))
+
+
 func test_explains_an_unknown_operation() -> void:
 	var error: Variant = await _batch([{"op": "node_fly"}])
 	assert_true(error is CommandError)

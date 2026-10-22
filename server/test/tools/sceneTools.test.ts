@@ -1,6 +1,6 @@
 import type { CallToolResult } from '@modelcontextprotocol/server';
 import { describe, expect, it } from 'vitest';
-import { createSceneCreateTool, createSceneGetTreeTool, createSceneOpenTool, createSceneSaveTool } from '../../src/tools/sceneTools.js';
+import { createSceneCloseTool, createSceneCreateTool, createSceneGetTreeTool, createSceneOpenTool, createSceneSaveTool } from '../../src/tools/sceneTools.js';
 import { FakeEditorGateway } from '../support/FakeEditorGateway.js';
 
 function textOf(result: CallToolResult): string {
@@ -73,6 +73,23 @@ describe('scene tools', () => {
         'The editor also saved unsaved changes from its script editor to res://player/player.gd; read the files again before editing them.',
       ].join('\n'),
     );
+  });
+
+  it('scene_close says what happened to unsaved changes and what the editor shows now', async () => {
+    const editor = new FakeEditorGateway()
+      .respondTo('scene.close', { closed: 'res://levels/arena.tscn', saved: false, discarded_changes: false, current: 'res://main.tscn' })
+      .respondTo('scene.close', { closed: 'res://levels/arena.tscn', saved: true, discarded_changes: false, current: 'res://main.tscn' })
+      .respondTo('scene.close', { closed: 'res://main.tscn', saved: false, discarded_changes: true, current: '' });
+
+    const plain = await createSceneCloseTool(editor).execute({});
+    const saved = await createSceneCloseTool(editor).execute({ unsaved: 'save' });
+    const discarded = await createSceneCloseTool(editor).execute({ scene: 'res://main.tscn', unsaved: 'discard' });
+
+    expect(editor.requests.map((request) => request.params)).toEqual([{}, { unsaved: 'save' }, { scene: 'res://main.tscn', unsaved: 'discard' }]);
+    expect(textOf(plain)).toBe('Closed res://levels/arena.tscn. The editor shows res://main.tscn now.');
+    expect(textOf(saved)).toBe('Closed res://levels/arena.tscn after saving it. The editor shows res://main.tscn now.');
+    expect(textOf(discarded)).toBe('Closed res://main.tscn without its unsaved changes. No scene is open now.');
+    expect(createSceneCloseTool(editor).definition.annotations.destructiveHint).toBe(true);
   });
 
   it('scene tools are annotated honestly', () => {

@@ -6,6 +6,7 @@ const FakeSceneAccess := preload("res://tests/support/fake_scene_access.gd")
 const FakeScriptEditorAccess := preload("res://tests/support/fake_script_editor_access.gd")
 const JsonRpc := preload("res://addons/godot_mcp_tool/bridge/json_rpc.gd")
 const PlainUndoHistory := preload("res://addons/godot_mcp_tool/scene/plain_undo_history.gd")
+const SceneCloseCommand := preload("res://addons/godot_mcp_tool/commands/scene/scene_close_command.gd")
 const SceneCreateCommand := preload("res://addons/godot_mcp_tool/commands/scene/scene_create_command.gd")
 const SceneGetTreeCommand := preload("res://addons/godot_mcp_tool/commands/scene/scene_get_tree_command.gd")
 const SceneOpenCommand := preload("res://addons/godot_mcp_tool/commands/scene/scene_open_command.gd")
@@ -163,3 +164,45 @@ func test_refuses_to_save_over_a_script_changed_on_disk() -> void:
 	assert_true(error is CommandError)
 	assert_eq((error as CommandError).code, JsonRpc.CONFLICT)
 	assert_eq(_scenes.saved_paths, PackedStringArray())
+
+
+func test_closes_the_scene_open_in_the_editor() -> void:
+	_build_arena()
+	var result: Dictionary = await SceneCloseCommand.new(_context).execute({})
+	assert_eq(_scenes.closed_paths, PackedStringArray(["res://levels/arena.tscn"]))
+	assert_eq_deep(result, {"closed": "res://levels/arena.tscn", "saved": false, "discarded_changes": false, "current": ""})
+
+
+func test_keeps_a_scene_with_unsaved_changes_open_unless_told_what_to_do() -> void:
+	var root := _build_arena()
+	_scenes.unsaved_roots.append(root)
+	var refused: CommandError = await SceneCloseCommand.new(_context).execute({})
+	assert_string_contains(refused.message, "unsaved changes")
+	assert_string_contains(refused.hint, "\"save\"")
+	assert_eq(_scenes.closed_paths.size(), 0)
+
+
+func test_saves_unsaved_changes_before_closing_on_request() -> void:
+	var root := _build_arena()
+	_scenes.unsaved_roots.append(root)
+	var result: Dictionary = await SceneCloseCommand.new(_context).execute({"unsaved": "save"})
+	assert_eq(_scenes.saved_paths, PackedStringArray(["res://levels/arena.tscn"]))
+	assert_eq(result["saved"], true)
+	assert_eq(_scenes.closed_paths, PackedStringArray(["res://levels/arena.tscn"]))
+
+
+func test_discards_unsaved_changes_on_request() -> void:
+	var root := _build_arena()
+	_scenes.unsaved_roots.append(root)
+	var result: Dictionary = await SceneCloseCommand.new(_context).execute({"unsaved": "discard"})
+	assert_eq(_scenes.saved_paths.size(), 0)
+	assert_eq(result["discarded_changes"], true)
+
+
+func test_explains_a_scene_that_is_not_open() -> void:
+	_build_arena()
+	var result: CommandError = await SceneCloseCommand.new(_context).execute({"scene": "res://levels/other.tscn"})
+	var wrong_choice: CommandError = await SceneCloseCommand.new(_context).execute({"unsaved": "keep"})
+	assert_eq(result.code, JsonRpc.NOT_FOUND)
+	assert_string_contains(result.hint, "res://levels/arena.tscn")
+	assert_eq(wrong_choice.code, JsonRpc.INVALID_PARAMS)

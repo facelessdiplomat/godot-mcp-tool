@@ -34,6 +34,11 @@ describe('createEditorTools', () => {
       'resource_create',
       'resource_get',
       'resource_set_properties',
+      'autoload_add',
+      'autoload_remove',
+      'node_set_groups',
+      'editor_select',
+      'scene_close',
     ]);
   });
 

@@ -1,6 +1,12 @@
 import type { CallToolResult } from '@modelcontextprotocol/server';
 import { describe, expect, it } from 'vitest';
-import { createEditorRescanTool, createProjectInfoTool, createProjectSettingsGetTool, createProjectSettingsSetTool } from '../../src/tools/projectTools.js';
+import {
+  createEditorRescanTool,
+  createEditorSelectTool,
+  createProjectInfoTool,
+  createProjectSettingsGetTool,
+  createProjectSettingsSetTool,
+} from '../../src/tools/projectTools.js';
 import { FakeEditorGateway } from '../support/FakeEditorGateway.js';
 
 function textOf(result: CallToolResult): string {
@@ -69,6 +75,16 @@ describe('project tools', () => {
     expect(text).toContain(
       "Global classes (240, the first 2 shown, the project's own before those of addons): PatrolPoint extends Marker3D (res://ai/patrol_point.gd); CmdOption extends RefCounted (res://addons/gdUnit4/src/cmd/CmdOption.gd)",
     );
+  });
+
+  it('editor_select names what it selected', async () => {
+    const editor = new FakeEditorGateway().respondTo('editor.select', { scene: 'res://levels/arena.tscn', nodes: ['Player', 'Player/Camera'] }, { file: 'res://materials/ice.tres' });
+
+    const nodes = await createEditorSelectTool(editor).execute({ nodes: ['Player', 'Player/Camera'] });
+    const file = await createEditorSelectTool(editor).execute({ file: 'res://materials/ice.tres' });
+
+    expect(textOf(nodes)).toBe('Selected Player, Player/Camera in res://levels/arena.tscn in the editor.');
+    expect(textOf(file)).toBe('Selected res://materials/ice.tres in the FileSystem dock of the editor.');
   });
 
   it('project_settings_get lists values and unknown names', async () => {

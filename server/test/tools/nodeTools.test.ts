@@ -6,6 +6,7 @@ import {
   createNodeFindTool,
   createNodeGetBoundsTool,
   createNodeGetPropertiesTool,
+  createNodeSetGroupsTool,
   createNodeSetPropertiesTool,
 } from '../../src/tools/nodeTools.js';
 import { FakeEditorGateway } from '../support/FakeEditorGateway.js';
@@ -41,6 +42,33 @@ describe('node tools', () => {
       properties: { position: [0, 0.5, 0], mesh: { new: 'BoxMesh' } },
     });
     expect(textOf(result)).toBe('Added Crate (MeshInstance3D) to res://levels/arena.tscn. The scene has unsaved changes.\nApplied: position, mesh');
+  });
+
+  it('node_set_groups lists the groups the node is in now', async () => {
+    const editor = new FakeEditorGateway().respondTo('node.set_groups', {
+      scene: 'res://levels/arena.tscn',
+      path: 'Goblin',
+      groups: ['enemies', 'damageable'],
+      added: ['damageable'],
+      removed: ['player'],
+      unchanged: ['enemies'],
+    });
+
+    const result = await createNodeSetGroupsTool(editor).execute({ path: 'Goblin', add: ['enemies', 'damageable'], remove: ['player'] });
+
+    expect(editor.requests[0]?.params).toEqual({ path: 'Goblin', add: ['enemies', 'damageable'], remove: ['player'] });
+    expect(textOf(result)).toBe(
+      'Updated the groups of Goblin in res://levels/arena.tscn, now: enemies, damageable. The scene has unsaved changes.\nAlready as asked: enemies',
+    );
+  });
+
+  it('node_set_groups says when nothing needed to change', async () => {
+    const editor = new FakeEditorGateway().respondTo('node.set_groups', { scene: 'res://levels/arena.tscn', path: '.', groups: [], added: [], removed: [], unchanged: ['ghosts'] });
+
+    const result = await createNodeSetGroupsTool(editor).execute({ path: '.', remove: ['ghosts'] });
+
+    expect(editor.requests[0]?.params).toEqual({ path: '.', add: [], remove: ['ghosts'] });
+    expect(textOf(result)).toBe('The scene root in res://levels/arena.tscn already had the groups as asked, now: none.');
   });
 
   it('node_delete lists the deleted nodes', async () => {

@@ -56,6 +56,17 @@ describe('scene_batch_edit', () => {
     );
   });
 
+  it('summarizes group changes', async () => {
+    const editor = new FakeEditorGateway().respondTo('scene.batch_edit', {
+      scene: 'res://levels/arena.tscn',
+      results: [{ op: 'node_set_groups', path: 'Coin', groups: ['pickups'], added: ['pickups'], removed: [], unchanged: [] }],
+    });
+
+    const result = await createSceneBatchEditTool(editor).execute({ operations: [{ op: 'node_set_groups', path: 'Coin', add: ['pickups'] }] });
+
+    expect(textOf(result)).toBe('Applied 1 operation to res://levels/arena.tscn as one Undo step. The scene has unsaved changes.\n1. Set the groups of Coin, now: pickups');
+  });
+
   it('rejects an operation with a scene of its own before asking the editor', async () => {
     const editor = new FakeEditorGateway();
 

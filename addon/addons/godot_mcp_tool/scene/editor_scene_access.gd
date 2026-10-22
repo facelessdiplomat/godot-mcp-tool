@@ -39,3 +39,24 @@ func is_scene_unsaved(scene_root: Node) -> bool:
 
 func register_new_file(file_path: String) -> void:
 	EditorInterface.get_resource_filesystem().update_file(file_path)
+
+
+func close_scene(scene_root: Node) -> Error:
+	var previous_root := EditorInterface.get_edited_scene_root()
+	if previous_root != scene_root:
+		EditorInterface.open_scene_from_path(scene_root.scene_file_path)
+	var close_error := EditorInterface.close_scene()
+	if previous_root != null and previous_root != scene_root and is_instance_valid(previous_root):
+		EditorInterface.open_scene_from_path(previous_root.scene_file_path)
+	return close_error
+
+
+func select_nodes(nodes: Array[Node]) -> void:
+	var selection := EditorInterface.get_selection()
+	selection.clear()
+	for node in nodes:
+		selection.add_node(node)
+
+
+func select_file(file_path: String) -> void:
+	EditorInterface.select_file(file_path)

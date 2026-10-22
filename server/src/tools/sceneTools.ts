@@ -126,3 +126,36 @@ function describeScenes(saved: readonly string[]): string {
   }
   return `Saved ${String(saved.length)} scenes: ${saved.join(', ')}.`;
 }
+
+const closedSceneSchema = z.object({ closed: z.string(), saved: z.boolean(), discarded_changes: z.boolean(), current: z.string() });
+
+type ClosedScene = z.infer<typeof closedSceneSchema>;
+
+const sceneCloseInput = z.object({
+  scene: z.string().optional().describe('The scene to close, as a res:// path. Default: the scene currently open in the editor.'),
+  unsaved: z
+    .enum(['save', 'discard'])
+    .optional()
+    .describe('What to do with unsaved changes: "save" saves them first, "discard" drops them. Without it, a scene with unsaved changes stays open.'),
+});
+
+export function createSceneCloseTool(editor: EditorGateway): BridgeTool<typeof sceneCloseInput, ClosedScene> {
+  return new BridgeTool(editor, {
+    name: 'scene_close',
+    definition: {
+      title: 'Close scene',
+      description:
+        'Close a scene in the editor: the one named, or the one open now. A scene with unsaved changes stays open unless unsaved says to save them first or to discard them.',
+      inputSchema: sceneCloseInput,
+      annotations: changingAnnotations({ destructive: true, idempotent: false }),
+      alwaysLoad: false,
+    },
+    method: 'scene.close',
+    responseSchema: closedSceneSchema,
+    present: (closed) => {
+      const changes = closed.saved ? ' after saving it' : closed.discarded_changes ? ' without its unsaved changes' : '';
+      const now = closed.current === '' ? 'No scene is open now.' : `The editor shows ${closed.current} now.`;
+      return textResult(`Closed ${closed.closed}${changes}. ${now}`);
+    },
+  });
+}

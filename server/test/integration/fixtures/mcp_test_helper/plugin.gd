@@ -29,6 +29,8 @@ func _handle(request: Dictionary) -> Dictionary:
 			return _reload_from_disk()
 		"undo_in_edited_scene":
 			return _undo_in_edited_scene()
+		"read_selection":
+			return _read_selection()
 	return {"error": "unknown action %s" % request.get("action", "")}
 
 
@@ -64,3 +66,10 @@ func _undo_in_edited_scene() -> Dictionary:
 	var action_name := history.get_current_action_name()
 	return {"undone": history.undo(), "action": action_name}
 
+
+func _read_selection() -> Dictionary:
+	var scene_root := EditorInterface.get_edited_scene_root()
+	var nodes: Array = []
+	for node in EditorInterface.get_selection().get_selected_nodes():
+		nodes.append(str(scene_root.get_path_to(node)) if scene_root != null else str(node.name))
+	return {"nodes": nodes, "files": Array(EditorInterface.get_selected_paths())}

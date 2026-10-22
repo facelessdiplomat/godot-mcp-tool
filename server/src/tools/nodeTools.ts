@@ -236,6 +236,61 @@ function capitalized(text: string): string {
   return text.charAt(0).toUpperCase() + text.slice(1);
 }
 
+export const groupsChangedSchema = z.object({
+  scene: z.string(),
+  path: z.string(),
+  groups: z.array(z.string()),
+  added: z.array(z.string()),
+  removed: z.array(z.string()),
+  unchanged: z.array(z.string()),
+});
+
+type GroupsChanged = z.infer<typeof groupsChangedSchema>;
+
+export const nodeSetGroupsInput = z.object({
+  path: nodePath,
+  add: z.array(z.string().min(1)).default([]).describe('Groups to add the node to, such as ["enemies", "damageable"].'),
+  remove: z.array(z.string().min(1)).default([]).describe('Groups to take the node out of.'),
+  scene: sceneToChange,
+});
+
+export function createNodeSetGroupsTool(editor: EditorGateway): BridgeTool<typeof nodeSetGroupsInput, GroupsChanged> {
+  return new BridgeTool(editor, {
+    name: 'node_set_groups',
+    definition: {
+      title: 'Set node groups',
+      description:
+        'Add a node to groups or take it out of them, as one Undo step; the groups are saved with the scene. Scripts find the nodes of a group with get_tree().get_nodes_in_group("enemies"), and node_find finds them by group.',
+      inputSchema: nodeSetGroupsInput,
+      annotations: changingAnnotations({ destructive: false, idempotent: true }),
+      alwaysLoad: false,
+    },
+    method: 'node.set_groups',
+    responseSchema: groupsChangedSchema,
+    present: (changed) => textResult(describeGroupChange(changed)),
+  });
+}
+
+export function summarizeGroupChange(changed: Omit<GroupsChanged, 'scene'>): string {
+  return `Set the groups of ${formatNodePath(changed.path)}, now: ${listOfGroups(changed.groups)}`;
+}
+
+function describeGroupChange(changed: GroupsChanged): string {
+  const node = formatNodePath(changed.path);
+  if (changed.added.length === 0 && changed.removed.length === 0) {
+    return `${capitalized(node)} in ${changed.scene} already had the groups as asked, now: ${listOfGroups(changed.groups)}.`;
+  }
+  const lines = [`Updated the groups of ${node} in ${changed.scene}, now: ${listOfGroups(changed.groups)}. The scene has unsaved changes.`];
+  if (changed.unchanged.length > 0) {
+    lines.push(`Already as asked: ${changed.unchanged.join(', ')}`);
+  }
+  return lines.join('\n');
+}
+
+function listOfGroups(groups: readonly string[]): string {
+  return groups.length === 0 ? 'none' : groups.join(', ');
+}
+
 export const nodeSetPropertiesInput = z.object({
   path: nodePath,
   properties: propertyValues,
