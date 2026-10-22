@@ -99,7 +99,7 @@ describe('EditorConnection', () => {
   });
 
   it('explains a discovery file left behind by a stopped editor', async () => {
-    const { connection } = connectionWith({ kind: 'stale', path: '/projects/game/.godot/godot_mcp_tool/bridge.json', pid: 41234 }, []);
+    const { connection } = connectionWith({ kind: 'stale', path: '/projects/game/.godot/godot_mcp_tool/bridge.json', pid: 41234, executablePath: '/opt/godot/godot' }, []);
 
     const status = await connection.status();
 

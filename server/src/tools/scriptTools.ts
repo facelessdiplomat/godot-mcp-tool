@@ -1,6 +1,8 @@
 import type { CallToolResult } from '@modelcontextprotocol/server';
 import * as z from 'zod/v4';
+import type { ErrorDismissal } from '../runtime/ErrorSummary.js';
 import { ScriptPathError } from '../scripts/ScriptFiles.js';
+import { isLoadErrorOf } from '../scripts/ScriptLoadErrors.js';
 import { type ValidationResult, ValidationUnavailableError } from '../scripts/ScriptValidator.js';
 import { readingAnnotations } from './annotations.js';
 import { formatValidation } from './formatting/scriptReports.js';
@@ -32,7 +34,10 @@ export class ScriptValidateTool implements Tool<typeof scriptValidateInput> {
     alwaysLoad: true,
   };
 
-  constructor(private readonly checker: ScriptChecker) {}
+  constructor(
+    private readonly checker: ScriptChecker,
+    private readonly editorErrors: ErrorDismissal,
+  ) {}
 
   async execute(input: z.input<typeof scriptValidateInput>): Promise<CallToolResult> {
     const parsedInput = scriptValidateInput.safeParse(input);
@@ -40,7 +45,9 @@ export class ScriptValidateTool implements Tool<typeof scriptValidateInput> {
       return errorResult(`Invalid arguments for ${this.name}:\n${z.prettifyError(parsedInput.error)}`);
     }
     try {
-      return textResult(formatValidation(await this.checker.validate(parsedInput.data.paths)));
+      const validation = await this.checker.validate(parsedInput.data.paths);
+      this.editorErrors.dismiss(isLoadErrorOf(validation.reports.map((report) => report.resourcePath)));
+      return textResult(formatValidation(validation));
     } catch (error) {
       if (error instanceof ScriptPathError || error instanceof ValidationUnavailableError) {
         return errorResult(error.message);

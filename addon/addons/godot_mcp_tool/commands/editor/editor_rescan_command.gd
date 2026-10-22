@@ -17,5 +17,10 @@ func execute(params: Dictionary) -> Variant:
 		if Time.get_ticks_msec() - started_msec > timeout_msec:
 			return CommandError.new(JsonRpc.TIMEOUT, "The file system scan did not finish within %d ms" % timeout_msec, "Large projects may need a longer timeout_ms.")
 		await Engine.get_main_loop().process_frame
+	await _let_editor_apply_scan()
 	EditorInterface.get_script_editor().reload_open_files()
 	return {"duration_ms": Time.get_ticks_msec() - started_msec}
+
+
+func _let_editor_apply_scan() -> void:
+	await Engine.get_main_loop().process_frame

@@ -34,7 +34,7 @@ export interface BridgeEndpoint {
 export type DiscoveryResult =
   | { readonly kind: 'found'; readonly endpoint: BridgeEndpoint }
   | { readonly kind: 'missing'; readonly path: string }
-  | { readonly kind: 'stale'; readonly path: string; readonly pid: number }
+  | { readonly kind: 'stale'; readonly path: string; readonly pid: number; readonly executablePath: string }
   | { readonly kind: 'invalid'; readonly path: string; readonly reason: string };
 
 export interface DiscoverySource {
@@ -76,7 +76,7 @@ export class DiscoveryFileReader implements DiscoverySource {
 
     const discovery = validation.data;
     if (!this.isProcessAlive(discovery.pid)) {
-      return { kind: 'stale', path: this.path, pid: discovery.pid };
+      return { kind: 'stale', path: this.path, pid: discovery.pid, executablePath: discovery.executable_path };
     }
 
     return {
@@ -94,6 +94,14 @@ export class DiscoveryFileReader implements DiscoverySource {
         startedAt: discovery.started_at,
       },
     };
+  }
+
+  lastEditorExecutable(): string | undefined {
+    const discovered = this.read();
+    if (discovered.kind === 'found') {
+      return discovered.endpoint.executablePath;
+    }
+    return discovered.kind === 'stale' ? discovered.executablePath : undefined;
   }
 }
 

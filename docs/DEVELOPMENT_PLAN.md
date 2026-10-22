@@ -247,8 +247,9 @@ against one of them.
 
 - Launched by Claude Code as a stdio process. stdout carries MCP only; the server's own logs go to stderr.
 - Finds the project: `GODOT_PROJECT_PATH` → `project.godot` in `CLAUDE_PROJECT_DIR` (Claude Code passes this
-  variable to servers) → a search upwards from the working directory. Finds the Godot binary: `GODOT_BIN` →
-  `godot`/`godot4` on `PATH` → standard install locations on macOS, Linux and Windows.
+  variable to servers) → a search upwards from the working directory. Finds the Godot binary: `GODOT_BIN` → the
+  connected editor → the editor that last opened the project (recorded in its discovery file) → `godot`/`godot4` on
+  `PATH` → standard install locations on macOS, Linux and Windows.
 - Side-effect-free startup: it connects to the editor lazily, on the first tool call, and never launches Godot at
   startup (§9.13).
 - Connects to the addon through the discovery file and reconnects after editor restarts. The tool list is static:
@@ -568,6 +569,9 @@ Connected to Godot <version>, project "<name>" (3D). Indentation: <tabs | N spac
   both the server and the addon settings, and `_meta["anthropic/requiresUserInteraction"]` makes Claude Code ask for
   confirmation on every call.
 - No tool profiles for other clients (§3).
+- Claude Code runs the tool calls of one message at the same time (seen in the milestone 2 live run): a
+  `game_get_properties` sent together with `game_input` read the state before the input. The server instructions
+  tell the agent to read game state in a later message than the `game_input` or `game_wait` it depends on.
 
 ### 8.13 Compact output example (`scene_get_tree`)
 
@@ -724,6 +728,10 @@ Errors come from three places, and we capture all three:
 
 Every entry has a monotonic `seq`. `game_get_output` returns the entries after a cursor, so a repeated call returns
 only new ones, and the server uses the same cursors to add the new-error summary to every response.
+The addon sends the log status together with the response to each command, so an error printed after a response
+reaches the agent with the next call. A result can cover errors: `script_validate` reports the current state of the
+scripts it checked, so it leaves the editor's parse errors and failed loads of those scripts out of the summary —
+they repeat its report or belong to an older version of the file.
 We don't parse the editor's Debugger tab or Output panel: that is brittle and depends on the editor's UI layout.
 
 Display rules, from spike 3: the message is `rationale` when it is not empty, otherwise `code` (engine errors keep the
@@ -1152,6 +1160,20 @@ scene with one `scene_batch_edit`, runs the game, holds `move_forward` for one s
 angles, reads the player's `position`, confirms that it moved and that `is_on_floor()` is true after landing.
 A deliberately broken script is caught by `script_validate` before running.
 
+Status: done, except the optional hook. The scenario passes as the automated acceptance test
+`server/test/integration/milestone2Scenario.test.ts`, which starts the editor with `editor_launch` (headless, or with
+a window and the two renders when `GODOT_MCP_WINDOW_TESTS=1`), and it passed in a live Claude Code session on
+2026-10-22. The live run found three problems, now fixed:
+
+- Without `GODOT_BIN` and a running editor, no Godot binary was found, so `editor_launch`, the docs tools and the
+  check without the editor could not work. The server now also takes the executable of the editor that last opened
+  the project from the discovery file.
+- The parse errors that the editor printed while loading the broken script reached the agent one call late, after
+  the fixed script had passed `script_validate`. `editor_rescan` now returns once the editor has applied the scan, so
+  such errors come with the call that caused them, and `script_validate` leaves out editor errors about loading the
+  scripts it checked (§9.6).
+- Claude Code runs the tool calls of one message at the same time (§8.12); the server instructions now say so.
+
 ### Milestone 3 — Project, resources, tests
 
 - [ ] `autoload_*`, `node_set_groups`, `editor_select`, `scene_close` (`input_map_*` moved to milestone 2).
@@ -1429,6 +1451,7 @@ Checked against the sources in `~/Software/godot` (`master`, 4.8-beta, commit `6
 | `EditorPlugin._run_scene(scene, args)` can change the launch arguments; it is called for every way of running, including the main scene | `doc/classes/EditorPlugin.xml`, `editor/run/editor_run_bar.cpp` |
 | `EditorInterface`: `play_main_scene/play_current_scene/play_custom_scene/stop_playing_scene`, `open_scene_from_path`, `save_scene(_as)`, `get_editor_viewport_2d/3d`, `get_editor_undo_redo`, `get_open_scene_roots`, `close_scene`; `get_unsaved_scenes` since 4.7 | `doc/classes/EditorInterface.xml`, `CHANGELOG.md` |
 | `EditorFileSystem`: `scan`, `scan_sources`, `update_file`, `reimport_files`; signals `filesystem_changed`, `resources_reimported`, `script_classes_updated` | `doc/classes/EditorFileSystem.xml` |
+| `EditorFileSystem.is_scanning()` turns false when the scan thread ends; the editor applies the scan (new file tree, script classes, loading changed and new scripts) in its next `NOTIFICATION_PROCESS`, which comes after the `process_frame` signal, so waiting for the scan with `process_frame` needs one more frame. Only an editor with a window loads new scripts for their documentation: a headless editor runs in `cmdline_mode` and prints no parse errors for a new broken script | `editor/file_system/editor_file_system.cpp`, `editor/editor_node.cpp` |
 | Before running, the editor saves everything: `run/auto_save/save_before_running` = `true`; saving a scene calls `ScriptEditorPlugin::save_external_data()` → `save_all_scripts()`, which writes unsaved script tabs without comparing with the disk | `editor/settings/editor_settings.cpp`, `editor/script/script_editor_plugin.cpp` |
 | `ScriptEditor.reload_open_files()` compares each tab's last known modification time (one-second resolution) with the disk: tabs without unsaved changes reload silently when auto-reload is on, tabs with unsaved changes raise the "Files have been modified outside Godot" dialog; `ScriptEditor.get_unsaved_files()`; the editor checks script modification times itself when its window gains focus | `doc/classes/ScriptEditor.xml`, `editor/script/script_editor_plugin.cpp` |
 | An autoload added with `EditorPlugin.add_autoload_singleton` reaches `project.godot` only when `ProjectSettingsEditor` saves 1.5 s later, so a game started sooner runs without it; the addon calls `ProjectSettings.save()` itself | `editor/settings/editor_autoload_settings.cpp`, `editor/settings/project_settings_editor.cpp` |

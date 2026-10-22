@@ -1,8 +1,9 @@
 import type { CallToolResult } from '@modelcontextprotocol/server';
 import { describe, expect, it } from 'vitest';
+import { ErrorSummary } from '../../src/runtime/ErrorSummary.js';
 import { ScriptPathError } from '../../src/scripts/ScriptFiles.js';
 import type { ValidationResult } from '../../src/scripts/ScriptValidator.js';
-import { ScriptValidateTool } from '../../src/tools/scriptTools.js';
+import { type ScriptChecker, ScriptValidateTool } from '../../src/tools/scriptTools.js';
 
 function textOf(result: CallToolResult): string {
   const [content] = result.content;
@@ -18,6 +19,10 @@ function checker(outcome: ValidationResult | Error): { validate: (inputs: readon
       return outcome instanceof Error ? Promise.reject(outcome) : Promise.resolve(outcome);
     },
   };
+}
+
+function toolFor(validator: ScriptChecker): ScriptValidateTool {
+  return new ScriptValidateTool(validator, new ErrorSummary());
 }
 
 describe('script_validate', () => {
@@ -36,7 +41,7 @@ describe('script_validate', () => {
       ],
     });
 
-    const result = await new ScriptValidateTool(validator).execute({ paths: ['res://'] });
+    const result = await toolFor(validator).execute({ paths: ['res://'] });
 
     expect(validator.inputs).toEqual([['res://']]);
     expect(result.isError).toBeFalsy();
@@ -54,7 +59,7 @@ describe('script_validate', () => {
   it('names the scripts it found fine', async () => {
     const validator = checker({ method: 'language server', reports: [{ resourcePath: 'res://a.gd', problems: [] }, { resourcePath: 'res://b.gd', problems: [] }] });
 
-    const text = textOf(await new ScriptValidateTool(validator).execute({ paths: ['res://'] }));
+    const text = textOf(await toolFor(validator).execute({ paths: ['res://'] }));
 
     expect(text).toBe("No problems in 2 scripts: res://a.gd, res://b.gd (checked with the editor's language server).");
   });
@@ -66,7 +71,7 @@ describe('script_validate', () => {
       reports: [{ resourcePath: 'res://player.gd', problems: [{ line: 2, severity: 'error', message: 'Identifier "spd" not declared in the current scope.' }] }],
     });
 
-    const text = textOf(await new ScriptValidateTool(validator).execute({ paths: ['res://player.gd'] }));
+    const text = textOf(await toolFor(validator).execute({ paths: ['res://player.gd'] }));
 
     expect(text).toBe(
       [
@@ -78,15 +83,33 @@ describe('script_validate', () => {
     );
   });
 
+  it('leaves out the editor errors about loading the scripts it checked, which its report replaces', async () => {
+    const editorErrors = new ErrorSummary();
+    editorErrors.observe(1, 'log.status', { last_seq: 0, errors: 0, recent_errors: [] });
+    editorErrors.observe(1, 'log.status', {
+      last_seq: 9,
+      errors: 2,
+      recent_errors: [
+        { seq: 8, source: 'editor', message: 'Parse Error: Identifier "spd" not declared in the current scope.', location: 'res://player.gd:12' },
+        { seq: 9, source: 'editor', message: 'Parse Error: Unexpected "Indent".', location: 'res://enemy.gd:3' },
+      ],
+    });
+    const validator = checker({ method: 'language server', reports: [{ resourcePath: 'res://player.gd', problems: [] }] });
+
+    await new ScriptValidateTool(validator, editorErrors).execute({ paths: ['res://player.gd'] });
+
+    expect(editorErrors.takeSummary()).toBe(['⚠ New error since the last call:', '- in the editor: res://enemy.gd:3: Parse Error: Unexpected "Indent".'].join('\n'));
+  });
+
   it('explains paths it cannot check', async () => {
-    const result = await new ScriptValidateTool(checker(new ScriptPathError('res://enemy.gd does not exist.'))).execute({ paths: ['res://enemy.gd'] });
+    const result = await toolFor(checker(new ScriptPathError('res://enemy.gd does not exist.'))).execute({ paths: ['res://enemy.gd'] });
 
     expect(result.isError).toBe(true);
     expect(textOf(result)).toBe('res://enemy.gd does not exist.');
   });
 
   it('is loaded up front and only reads', () => {
-    const tool = new ScriptValidateTool(checker(new Error('unused')));
+    const tool = toolFor(checker(new Error('unused')));
 
     expect(tool.name).toBe('script_validate');
     expect(tool.definition.alwaysLoad).toBe(true);

@@ -75,6 +75,40 @@ describe('ErrorSummary', () => {
     expect(summary.takeSummary()).toBeUndefined();
   });
 
+  it('leaves out errors that the result of a tool already covers', () => {
+    const summary = summaryAfter(
+      status(0, 0),
+      status(7, 3, [
+        { seq: 5, source: 'editor', message: 'Parse Error: Identifier "SPED" not declared in the current scope.', location: 'res://player.gd:15' },
+        { seq: 6, source: 'editor', message: 'Failed to load script "res://player.gd" with error "Parse error".', location: 'modules/gdscript/gdscript_resource_format.cpp:50' },
+        { ...speedError, seq: 7, location: 'res://enemy.gd:4' },
+      ]),
+    );
+
+    summary.dismiss((error) => error.source === 'editor');
+
+    expect(summary.takeSummary()).toBe(
+      ['⚠ New error since the last call:', "- in the game: res://enemy.gd:4: Invalid access to property 'speed'.", 'Read the game output with game_get_output.'].join('\n'),
+    );
+  });
+
+  it('reports nothing when the result of a tool covers every new error', () => {
+    const summary = summaryAfter(status(0, 0), status(2, 1, [{ ...speedError, seq: 2 }]));
+
+    summary.dismiss(() => true);
+
+    expect(summary.takeSummary()).toBeUndefined();
+  });
+
+  it('does not leave out errors that come after the result', () => {
+    const summary = summaryAfter(status(0, 0));
+
+    summary.dismiss(() => true);
+    summary.observe(1, 'log.status', status(3, 1, [{ ...speedError, seq: 3 }]));
+
+    expect(summary.takeSummary()).toContain("Invalid access to property 'speed'.");
+  });
+
   it('starts over when it connects to another editor', () => {
     const summary = new ErrorSummary();
     summary.observe(1, 'log.status', status(20, 9));

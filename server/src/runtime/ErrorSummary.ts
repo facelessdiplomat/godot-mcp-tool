@@ -12,6 +12,12 @@ const recentErrorSchema = z.object({
 
 type RecentError = z.infer<typeof recentErrorSchema>;
 
+export type LoggedError = Omit<RecentError, 'seq'>;
+
+export interface ErrorDismissal {
+  dismiss(isCovered: (error: LoggedError) => boolean): void;
+}
+
 const logStatusSchema = z.object({
   last_seq: z.number().int(),
   errors: z.number().int(),
@@ -25,11 +31,12 @@ interface FoldedError {
   times: number;
 }
 
-export class ErrorSummary {
+export class ErrorSummary implements ErrorDismissal {
   private connection: number | undefined;
   private reportedErrors = 0;
   private reportedSeq = 0;
   private latest: LogStatus | undefined;
+  private readonly dismissedSeqs = new Set<number>();
 
   observe(connection: number, method: string, params: unknown): void {
     if (method !== statusNotification) {
@@ -51,6 +58,15 @@ export class ErrorSummary {
       this.reportedErrors = this.latest.errors;
       this.reportedSeq = this.latest.last_seq;
     }
+    this.dismissedSeqs.clear();
+  }
+
+  dismiss(isCovered: (error: LoggedError) => boolean): void {
+    for (const error of this.unreportedErrors()) {
+      if (isCovered(error)) {
+        this.dismissedSeqs.add(error.seq);
+      }
+    }
   }
 
   takeSummary(): string | undefined {
@@ -58,8 +74,8 @@ export class ErrorSummary {
     if (latest === undefined) {
       return undefined;
     }
-    const newCount = latest.errors - this.reportedErrors;
-    const newErrors = latest.recent_errors.filter((error) => error.seq > this.reportedSeq);
+    const newCount = latest.errors - this.reportedErrors - this.dismissedSeqs.size;
+    const newErrors = this.unreportedErrors();
     this.acknowledge();
     if (newCount <= 0) {
       return undefined;
@@ -69,6 +85,10 @@ export class ErrorSummary {
       lines.push('Read the game output with game_get_output.');
     }
     return lines.join('\n');
+  }
+
+  private unreportedErrors(): RecentError[] {
+    return (this.latest?.recent_errors ?? []).filter((error) => error.seq > this.reportedSeq && !this.dismissedSeqs.has(error.seq));
   }
 }
 

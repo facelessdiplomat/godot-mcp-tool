@@ -1,13 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import { GodotBinaryLocator } from '../../src/godot/GodotBinaryLocator.js';
 
-function createLocator(variables: Record<string, string>, executables: readonly string[], platform: NodeJS.Platform = 'darwin') {
+function createLocator(variables: Record<string, string>, executables: readonly string[], platform: NodeJS.Platform = 'darwin', lastEditorExecutable?: string) {
   const executableFiles = new Set(executables);
   return new GodotBinaryLocator({
     variables,
     platform,
     homeDirectory: '/Users/dev',
     isExecutableFile: (path) => executableFiles.has(path),
+    lastEditorExecutable: () => lastEditorExecutable,
   });
 }
 
@@ -31,6 +32,20 @@ describe('GodotBinaryLocator', () => {
     const locator = createLocator({ PATH: '/usr/bin' }, ['/editor/godot', '/usr/bin/godot']);
 
     expect(locator.locate('/editor/godot')).toEqual({ found: true, path: '/editor/godot', source: 'running editor' });
+  });
+
+  it('uses the executable of the editor that last opened the project before PATH', () => {
+    const lastEditor = '/Users/dev/godot/bin/godot.macos.editor.arm64';
+    const locator = createLocator({ PATH: '/usr/bin' }, [lastEditor, '/usr/bin/godot', '/editor/godot'], 'darwin', lastEditor);
+
+    expect(locator.locate()).toEqual({ found: true, path: lastEditor, source: 'last editor of the project' });
+    expect(locator.locate('/editor/godot').found && locator.locate('/editor/godot')).toMatchObject({ source: 'running editor' });
+  });
+
+  it('skips a last editor that is no longer there', () => {
+    const locator = createLocator({ PATH: '/usr/bin' }, ['/usr/bin/godot'], 'darwin', '/Users/dev/old/godot');
+
+    expect(locator.locate()).toEqual({ found: true, path: '/usr/bin/godot', source: 'PATH' });
   });
 
   it('searches PATH for godot and godot4', () => {

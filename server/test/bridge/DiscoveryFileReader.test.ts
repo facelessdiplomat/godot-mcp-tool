@@ -71,7 +71,16 @@ describe('DiscoveryFileReader', () => {
 
     const result = new DiscoveryFileReader(projectRoot, () => false).read();
 
-    expect(result).toMatchObject({ kind: 'stale', pid: 41234 });
+    expect(result).toMatchObject({ kind: 'stale', pid: 41234, executablePath: '/opt/godot/godot' });
+  });
+
+  it('names the executable of the editor that last opened the project, running or not', () => {
+    expect(new DiscoveryFileReader(projectRoot, () => false).lastEditorExecutable()).toBeUndefined();
+
+    writeDiscovery(JSON.stringify(validDiscovery));
+
+    expect(new DiscoveryFileReader(projectRoot, () => false).lastEditorExecutable()).toBe('/opt/godot/godot');
+    expect(new DiscoveryFileReader(projectRoot, () => true).lastEditorExecutable()).toBe('/opt/godot/godot');
   });
 
   it('reports a file that is not JSON', () => {

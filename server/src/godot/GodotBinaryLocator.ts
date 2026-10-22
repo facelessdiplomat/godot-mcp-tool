@@ -1,6 +1,6 @@
 import { posix, win32 } from 'node:path';
 
-export type BinarySource = 'GODOT_BIN' | 'running editor' | 'PATH' | 'default location';
+export type BinarySource = 'GODOT_BIN' | 'running editor' | 'last editor of the project' | 'PATH' | 'default location';
 
 export type BinaryLookup =
   | { readonly found: true; readonly path: string; readonly source: BinarySource }
@@ -15,6 +15,7 @@ export interface BinaryLocatorEnvironment {
   readonly platform: NodeJS.Platform;
   readonly homeDirectory: string;
   readonly isExecutableFile: (path: string) => boolean;
+  readonly lastEditorExecutable: () => string | undefined;
 }
 
 export class GodotBinaryLocator implements BinaryLocator {
@@ -30,6 +31,11 @@ export class GodotBinaryLocator implements BinaryLocator {
 
     if (runningEditorExecutable !== undefined && this.environment.isExecutableFile(runningEditorExecutable)) {
       return { found: true, path: runningEditorExecutable, source: 'running editor' };
+    }
+
+    const lastEditorExecutable = this.environment.lastEditorExecutable();
+    if (lastEditorExecutable !== undefined && this.environment.isExecutableFile(lastEditorExecutable)) {
+      return { found: true, path: lastEditorExecutable, source: 'last editor of the project' };
     }
 
     const binaryOnPath = this.findOnPath();

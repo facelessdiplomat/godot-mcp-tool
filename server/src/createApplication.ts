@@ -70,6 +70,7 @@ export function createApplication(environment: ApplicationEnvironment): Applicat
     platform: environment.platform,
     homeDirectory: environment.homeDirectory,
     isExecutableFile,
+    lastEditorExecutable: () => discovery?.lastEditorExecutable(),
   });
   const editorLauncher = new EditorLauncher({
     projectRoot: project.found ? project.root : undefined,
@@ -111,6 +112,7 @@ export function createApplication(environment: ApplicationEnvironment): Applicat
         processRunner,
         languageServerPort: parsePort(environment.variables['GODOT_LSP_PORT']),
       }),
+      errorSummary,
     ),
     new DocsClassTool(docsSource),
     new DocsSearchTool(docsSource),
