@@ -446,6 +446,14 @@ About 65 tools across all milestones; 16 in the MVP.
 | `resource_set_properties` | Change resource properties | 3 | W | E |
 | `resource_find_usages` | Who references a file (reverse dependencies) | 4 | R | E |
 
+`resource_create` writes the new `.tres` file at once and never replaces an existing one. `resource_set_properties`
+changes the resource that the editor holds, as one Undo step, and saves the file right away, so the game, tests run
+through the CLI and every scene that uses it see the change. An Undo in the editor marks the resource as changed
+again, and the editor writes it with the next save. Imported files such as textures and models are refused: Godot
+rebuilds them from their source files. Scenes and scripts are refused too and pointed to their own tools. Resources
+and nodes of the project's own classes are created the way the editor creates them: the native base class with the
+script attached, because inside the editor `can_instantiate()` is false for scripts without `@tool`.
+
 ### 8.6 Scripts and documentation
 
 | Tool | What it does | M | Kind | Needs |
@@ -1177,11 +1185,17 @@ a window and the two renders when `GODOT_MCP_WINDOW_TESTS=1`), and it passed in 
 ### Milestone 3 — Project, resources, tests
 
 - [ ] `autoload_*`, `node_set_groups`, `editor_select`, `scene_close` (`input_map_*` moved to milestone 2).
-- [ ] `resource_create`, `resource_get`, `resource_set_properties`.
+- [x] `resource_create`, `resource_get`, `resource_set_properties`: `.tres` files of engine classes and of the
+      project's own classes, saved at once (§8.5).
 - [ ] `test_run` (GUT and gdUnit4, JUnit parsing).
 - [ ] Deterministic mode: `fixed_fps`, `game_pause`, `game_step` (§9.10).
 - [ ] `game_eval`, `game_performance`, `node_call_method`, `editor_run_script` — behind flags.
 - [ ] MCP resources and prompts; the companion skill (§8.10); read-only mode.
+
+Order of work: the resource tools, which the scenario below needs for the `PhysicsMaterial`; `test_run`, which runs
+its GUT test; the small editor tools (`autoload_*`, `node_set_groups`, `editor_select`, `scene_close`); the
+deterministic mode after its spike, together with `game_performance`; the escape hatches behind flags and the
+read-only mode; MCP resources, prompts and the skill; the acceptance test.
 
 **Done when** this passes: "Add a `dash` action (Shift and gamepad B), create a `PhysicsMaterial` for ice, write a GUT
 test for `Player.dash()` and run it" — the tests are green and nothing was done by hand.
@@ -1476,6 +1490,10 @@ Checked against the sources in `~/Software/godot` (`master`, 4.8-beta, commit `6
 | `JSON.from_native/to_native` (since 4.3), `ClassDB.class_get_property_default_value`, `ProjectSettings.get_global_class_list` | `doc/classes/` |
 | A `Node3D` follows only a direct `Node3D` parent: under a plain `Node` its own transform is its global transform | `scene/3d/node_3d.cpp` |
 | `CanvasItem.queue_redraw()` draws through a deferred call. `SceneTree.process` emits `process_frame`, flushes the message queue, runs `_process` and flushes again, so a node added during a frame has drawn itself by the next `process_frame` | `scene/main/canvas_item.cpp`, `scene/main/scene_tree.cpp` |
+| `GDScript.can_instantiate()` is false inside the editor for scripts without `@tool`, because scripting is disabled there; the editor creates an object of a `class_name` by instantiating the native base class and calling `set_script`, which gives it a placeholder instance that keeps the exported values | `modules/gdscript/gdscript.cpp`, `editor/editor_data.cpp` |
+| An `UndoRedo` property change on a `Resource` marks it as edited, and saving a scene also saves the edited external resources; `ResourceSaver.save` in the editor updates the file system dock through the save callback | `core/object/undo_redo.cpp`, `editor/editor_node.cpp` |
+| `var_to_str` writes a float that holds a single-precision value with the fewest digits for single precision (`0.05`), while `JSON.stringify` writes 15 significant digits of the double (`0.0500000007450581`) | observed on 4.8 |
+| `Material`, `Texture2D` and `Mesh` can be instantiated, as classes meant to be extended by scripts, while `Shape3D` and `BaseMaterial3D` are abstract; scripts cannot ask `ClassDB` which classes are virtual | observed on 4.8 |
 | `Viewport.get_visible_rect()` returns the 2D size override (the base size of the `canvas_items` stretch mode), while the root viewport's texture has the window's size in pixels | `scene/main/viewport.cpp` |
 | `Vector3.snapped(Vector3.ONE * 0.001)` leaves float32 noise such as `3.0000002`, and `String.num(10.0, 2)` gives `"10.0"`; the addon rounds with `(v * 1000.0).round() / 1000.0` and writes whole numbers itself | observed on 4.8 |
 | Removing a node from a parent in the tree clears the owner of every moved node whose owner is no longer an ancestor; `set_name` with a sibling's name silently adds a number | `scene/main/node.cpp` (`_propagate_after_exit_tree`, `_validate_child_name`) |

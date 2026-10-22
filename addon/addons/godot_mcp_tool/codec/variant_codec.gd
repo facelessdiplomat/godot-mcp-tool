@@ -54,7 +54,7 @@ func _encode_float(value: float) -> Variant:
 		return "nan"
 	if is_inf(value):
 		return "inf" if value > 0 else "-inf"
-	return value
+	return var_to_str(value).to_float()
 
 
 func _encode_object(object: Object) -> Variant:

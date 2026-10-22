@@ -17,6 +17,7 @@ import {
   createProjectSettingsGetTool,
   createProjectSettingsSetTool,
 } from './projectTools.js';
+import { createResourceCreateTool, createResourceGetTool, createResourceSetPropertiesTool } from './resourceTools.js';
 import { createSceneCreateTool, createSceneGetTreeTool, createSceneOpenTool, createSceneSaveTool } from './sceneTools.js';
 import { createSignalConnectTool, createSignalDisconnectTool, createSignalListTool } from './signalTools.js';
 import type { Tool } from './Tool.js';
@@ -46,5 +47,8 @@ export function createEditorTools(editor: EditorGateway, readCapture: CaptureRea
     createSignalListTool(editor),
     createSignalConnectTool(editor),
     createSignalDisconnectTool(editor),
+    createResourceCreateTool(editor),
+    createResourceGetTool(editor),
+    createResourceSetPropertiesTool(editor),
   ];
 }

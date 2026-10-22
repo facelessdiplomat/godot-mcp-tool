@@ -1,6 +1,7 @@
 extends GutTest
 
 const DiscoveryFile := preload("res://addons/godot_mcp_tool/bridge/discovery_file.gd")
+const ScratchFolder := preload("res://tests/support/scratch_folder.gd")
 
 const GROUP_AND_OTHER_PERMISSIONS := (
 	FileAccess.UNIX_READ_GROUP | FileAccess.UNIX_WRITE_GROUP | FileAccess.UNIX_EXECUTE_GROUP
@@ -15,17 +16,7 @@ func before_each() -> void:
 
 
 func after_each() -> void:
-	_remove_directory_recursively(_sandbox_directory)
-
-
-func _remove_directory_recursively(directory_path: String) -> void:
-	if not DirAccess.dir_exists_absolute(directory_path):
-		return
-	for subdirectory in DirAccess.get_directories_at(directory_path):
-		_remove_directory_recursively(directory_path.path_join(subdirectory))
-	for file_name in DirAccess.get_files_at(directory_path):
-		DirAccess.remove_absolute(directory_path.path_join(file_name))
-	DirAccess.remove_absolute(directory_path)
+	ScratchFolder.remove(_sandbox_directory)
 
 
 func test_writes_the_record_as_json_and_creates_missing_folders() -> void:

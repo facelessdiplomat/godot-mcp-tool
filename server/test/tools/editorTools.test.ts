@@ -31,6 +31,9 @@ describe('createEditorTools', () => {
       'signal_list',
       'signal_connect',
       'signal_disconnect',
+      'resource_create',
+      'resource_get',
+      'resource_set_properties',
     ]);
   });
 

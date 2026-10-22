@@ -10,7 +10,7 @@ const VariantCodec := preload("../codec/variant_codec.gd")
 const LAYOUT_USAGE := PROPERTY_USAGE_CATEGORY | PROPERTY_USAGE_GROUP | PROPERTY_USAGE_SUBGROUP
 const HIDDEN_USAGE := LAYOUT_USAGE | PROPERTY_USAGE_INTERNAL
 const SCRIPT_PROPERTY := "script"
-const SCENE_BINDING_PROPERTIES := ["owner", "scene_file_path"]
+const BINDING_PROPERTIES := ["owner", "scene_file_path", "resource_path"]
 
 var _codec: VariantCodec
 
@@ -23,6 +23,8 @@ func editable_properties(object: Object) -> Dictionary:
 	var properties := {}
 	for property in object.get_property_list():
 		var usage: int = property["usage"]
+		if property["name"] in BINDING_PROPERTIES:
+			continue
 		if property["name"] == SCRIPT_PROPERTY or (usage & PROPERTY_USAGE_EDITOR and not usage & HIDDEN_USAGE):
 			properties[property["name"]] = property
 	return properties
@@ -33,7 +35,7 @@ func settable_properties(object: Object) -> Dictionary:
 	var owner_class := object.get_class()
 	for property in object.get_property_list():
 		var property_name: String = property["name"]
-		if properties.has(property_name) or property_name in SCENE_BINDING_PROPERTIES or int(property["usage"]) & HIDDEN_USAGE:
+		if properties.has(property_name) or property_name in BINDING_PROPERTIES or int(property["usage"]) & HIDDEN_USAGE:
 			continue
 		if not ClassDB.class_get_property_setter(owner_class, property_name).is_empty():
 			properties[property_name] = property

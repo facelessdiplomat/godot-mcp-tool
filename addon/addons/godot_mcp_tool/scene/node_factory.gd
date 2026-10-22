@@ -1,6 +1,7 @@
 extends RefCounted
 
 const CommandError := preload("../commands/command_error.gd")
+const GlobalClasses := preload("../util/global_classes.gd")
 const JsonRpc := preload("../bridge/json_rpc.gd")
 const SimilarNames := preload("../util/similar_names.gd")
 
@@ -12,7 +13,7 @@ func create(type_text: String) -> Variant:
 		return _instantiate_scene(type_text, PackedScene.GEN_EDIT_STATE_INSTANCE)
 	if ClassDB.class_exists(type_text):
 		return _instantiate_engine_class(type_text)
-	var script := _global_script(type_text)
+	var script := GlobalClasses.script_of(type_text)
 	if script != null:
 		return _instantiate_script(type_text, script)
 	return CommandError.new(JsonRpc.NOT_FOUND, "Unknown node type %s" % type_text, unknown_type_hint(type_text))
@@ -30,7 +31,7 @@ static func display_class_of_scene(packed_scene: PackedScene) -> String:
 
 
 static func is_known_class(class_text: String) -> bool:
-	return ClassDB.class_exists(class_text) or _global_script(class_text) != null
+	return ClassDB.class_exists(class_text) or GlobalClasses.script_of(class_text) != null
 
 
 static func display_class(object: Object) -> String:
@@ -41,9 +42,7 @@ static func display_class(object: Object) -> String:
 
 
 static func unknown_type_hint(type_text: String) -> String:
-	var candidates: Array = Array(ClassDB.get_inheriters_from_class("Node"))
-	for global_class in ProjectSettings.get_global_class_list():
-		candidates.append(global_class["class"])
+	var candidates: Array = Array(ClassDB.get_inheriters_from_class("Node")) + GlobalClasses.names()
 	var similar := SimilarNames.hint(type_text, candidates)
 	return similar if not similar.is_empty() else TYPE_EXAMPLES
 
@@ -68,13 +67,7 @@ func _instantiate_engine_class(class_text: String) -> Variant:
 func _instantiate_script(type_text: String, script: Script) -> Variant:
 	if not ClassDB.is_parent_class(script.get_instance_base_type(), "Node"):
 		return CommandError.new(JsonRpc.INVALID_PARAMS, "%s is not a node class" % type_text, TYPE_EXAMPLES)
-	if not script.can_instantiate():
+	var node := GlobalClasses.instantiate(script)
+	if node == null:
 		return CommandError.new(JsonRpc.INVALID_PARAMS, "%s cannot be created; check its script for errors" % type_text)
-	return script.new()
-
-
-static func _global_script(type_text: String) -> Script:
-	for global_class in ProjectSettings.get_global_class_list():
-		if global_class["class"] == type_text:
-			return load(global_class["path"]) as Script
-	return null
+	return node

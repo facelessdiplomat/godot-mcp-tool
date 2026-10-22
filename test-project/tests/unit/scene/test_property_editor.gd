@@ -123,6 +123,19 @@ func test_refuses_properties_that_tie_the_node_to_its_scene() -> void:
 	assert_eq((report["rejected"] as Array).map(func(rejection: Dictionary) -> String: return rejection["name"]), ["owner", "scene_file_path"])
 
 
+func test_neither_lists_nor_sets_the_file_path_of_a_resource() -> void:
+	var material := StandardMaterial3D.new()
+	material.resource_path = "res://materials/orange.tres"
+	material.albedo_color = Color.ORANGE
+	var entries := _editor.describe(material, PackedStringArray(), false)
+	var report := _editor.assign(material, {"resource_path": "res://elsewhere.tres"})
+	assert_true(_entry_named(entries, "resource_path").is_empty())
+	assert_false(_entry_named(entries, "albedo_color").is_empty())
+	assert_eq(report["applied"], [])
+	assert_eq(material.resource_path, "res://materials/orange.tres")
+	material.resource_path = ""
+
+
 func test_reads_a_scripting_property_by_name() -> void:
 	var node: Node3D = autofree(Node3D.new())
 	var entry := _entry_named(_editor.describe(node, PackedStringArray(["rotation_degrees"]), false), "rotation_degrees")

@@ -55,6 +55,13 @@ func test_writes_dictionary_keys_as_text() -> void:
 	assert_eq_deep(_codec.encode({1: Vector2(1, 1), &"speed": 5}), {"1": "Vector2(1, 1)", "speed": 5})
 
 
+func test_writes_single_precision_floats_without_conversion_noise() -> void:
+	var material := PhysicsMaterial.new()
+	material.friction = 0.05
+	assert_eq(_codec.encode(material.friction), 0.05)
+	assert_eq(_codec.encode(0.1 + 0.2), 0.1 + 0.2)
+
+
 func test_writes_special_floats_as_text() -> void:
 	assert_eq(_codec.encode(NAN), "nan")
 	assert_eq(_codec.encode(INF), "inf")

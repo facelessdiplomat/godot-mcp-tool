@@ -10,6 +10,7 @@ const SceneCreateCommand := preload("res://addons/godot_mcp_tool/commands/scene/
 const SceneGetTreeCommand := preload("res://addons/godot_mcp_tool/commands/scene/scene_get_tree_command.gd")
 const SceneOpenCommand := preload("res://addons/godot_mcp_tool/commands/scene/scene_open_command.gd")
 const SceneSaveCommand := preload("res://addons/godot_mcp_tool/commands/scene/scene_save_command.gd")
+const ScratchFolder := preload("res://tests/support/scratch_folder.gd")
 const VariantCodec := preload("res://addons/godot_mcp_tool/codec/variant_codec.gd")
 
 const CRATE_SCENE := "res://tests/fixtures/crate.tscn"
@@ -32,17 +33,7 @@ func before_each() -> void:
 func after_each() -> void:
 	_history.dispose()
 	_scenes.release()
-	_remove_directory_recursively(ProjectSettings.globalize_path(_scratch_directory))
-
-
-func _remove_directory_recursively(directory_path: String) -> void:
-	if not DirAccess.dir_exists_absolute(directory_path):
-		return
-	for subdirectory in DirAccess.get_directories_at(directory_path):
-		_remove_directory_recursively(directory_path.path_join(subdirectory))
-	for file_name in DirAccess.get_files_at(directory_path):
-		DirAccess.remove_absolute(directory_path.path_join(file_name))
-	DirAccess.remove_absolute(directory_path)
+	ScratchFolder.remove(ProjectSettings.globalize_path(_scratch_directory))
 
 
 func _build_arena() -> Node3D:

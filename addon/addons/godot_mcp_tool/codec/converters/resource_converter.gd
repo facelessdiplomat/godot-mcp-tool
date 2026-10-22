@@ -1,5 +1,7 @@
 extends "converter.gd"
 
+const ResourceFactory := preload("../../resources/resource_factory.gd")
+
 
 func handles(property: Dictionary) -> bool:
 	return property.get("type") == TYPE_OBJECT and property.get("hint") == PROPERTY_HINT_RESOURCE_TYPE
@@ -33,7 +35,7 @@ func _create_resource(specification: Dictionary, allowed_types: PackedStringArra
 	var type_name: Variant = specification["new"]
 	if not type_name is String:
 		return _failure("\"new\" must be the name of a resource class")
-	var resource := _instantiate_resource(type_name)
+	var resource := ResourceFactory.instantiate(type_name)
 	if resource == null:
 		return _failure("%s is not a resource class that can be created" % type_name)
 	if not _is_allowed(resource, allowed_types):
@@ -53,19 +55,6 @@ func _create_resource(specification: Dictionary, allowed_types: PackedStringArra
 			return _failure("%s.%s: %s" % [type_name, property_name, nested.error])
 		resource.set(property_name, nested.value)
 	return _success(resource)
-
-
-static func _instantiate_resource(type_name: String) -> Resource:
-	if ClassDB.class_exists(type_name):
-		if ClassDB.can_instantiate(type_name) and ClassDB.is_parent_class(type_name, "Resource"):
-			return ClassDB.instantiate(type_name) as Resource
-		return null
-	for global_class in ProjectSettings.get_global_class_list():
-		if global_class["class"] == type_name:
-			var script := load(global_class["path"]) as Script
-			if script != null and script.can_instantiate() and ClassDB.is_parent_class(script.get_instance_base_type(), "Resource"):
-				return script.new() as Resource
-	return null
 
 
 static func _is_allowed(resource: Object, allowed_types: PackedStringArray) -> bool:

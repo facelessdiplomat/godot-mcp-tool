@@ -149,6 +149,17 @@ describe.skipIf(godotBinary === '')('editing a project through the MCP tools', (
     expect(tree.text).toContain('Barrel: Node3D [instance res://props/barrel.tscn]');
   });
 
+  it('adds a node of a class of the project with its exported properties', async () => {
+    project?.write('patrol_point.gd', ['class_name PatrolPoint', 'extends Marker3D', '', '@export var wait_seconds := 1.0', ''].join('\n'));
+    await tools().call('editor_rescan');
+
+    const added = await tools().call('node_add', { type: 'PatrolPoint', name: 'Patrol', properties: { wait_seconds: 2.5, position: [4, 0, 0] } });
+    const tree = await tools().call('scene_get_tree');
+
+    expect(added.text).toBe('Added Patrol (PatrolPoint) to res://levels/arena.tscn. The scene has unsaved changes.\nApplied: wait_seconds, position');
+    expect(tree.text).toContain('Patrol: PatrolPoint');
+  });
+
   it('deletes nodes', async () => {
     const deleted = await tools().call('node_delete', { paths: ['Sun'] });
     const tree = await tools().call('scene_get_tree');

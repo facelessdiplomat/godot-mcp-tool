@@ -1,5 +1,7 @@
 extends "converter.gd"
 
+const GlobalClasses := preload("../../util/global_classes.gd")
+
 const PACKED_ELEMENT_TYPES := {
 	TYPE_PACKED_BYTE_ARRAY: TYPE_INT,
 	TYPE_PACKED_INT32_ARRAY: TYPE_INT,
@@ -62,8 +64,7 @@ static func _typed_array(elements: Array, element_property: Dictionary) -> Array
 	var class_name_text := str(element_property.get("hint_string", "Object"))
 	if ClassDB.class_exists(class_name_text):
 		return Array(elements, TYPE_OBJECT, StringName(class_name_text), null)
-	for global_class in ProjectSettings.get_global_class_list():
-		if global_class["class"] == class_name_text:
-			var script := load(global_class["path"]) as Script
-			return Array(elements, TYPE_OBJECT, script.get_instance_base_type(), script)
+	var script := GlobalClasses.script_of(class_name_text)
+	if script != null:
+		return Array(elements, TYPE_OBJECT, script.get_instance_base_type(), script)
 	return elements

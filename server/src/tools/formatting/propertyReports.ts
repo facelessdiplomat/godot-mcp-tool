@@ -19,11 +19,15 @@ const describedPropertySchema = z.object({
 
 const unknownPropertySchema = z.object({ name: z.string(), error: z.string() });
 
+export const propertyDescriptionsSchema = z.array(z.union([unknownPropertySchema, describedPropertySchema]));
+
+export type PropertyDescriptions = z.infer<typeof propertyDescriptionsSchema>;
+
 export const propertyListSchema = z.object({
   scene: z.string(),
   path: z.string(),
   type: z.string(),
-  properties: z.array(z.union([unknownPropertySchema, describedPropertySchema])),
+  properties: propertyDescriptionsSchema,
 });
 
 export type PropertyList = z.infer<typeof propertyListSchema>;
@@ -69,13 +73,16 @@ export function formatApplyReport(report: ApplyReport): string {
 
 export function formatPropertyList(list: PropertyList): string {
   const header = `${capitalize(formatNodePath(list.path))} (${list.type}) in ${list.scene}`;
-  if (list.properties.length === 0) {
-    return `${header}\nAll properties have their default values. Pass include_defaults: true, or names, to list them anyway.`;
+  return [header, ...formatPropertyLines(list.properties)].join('\n');
+}
+
+export function formatPropertyLines(properties: PropertyDescriptions): string[] {
+  if (properties.length === 0) {
+    return ['All properties have their default values. Pass include_defaults: true, or names, to list them anyway.'];
   }
-  const lines = list.properties.map((property) =>
+  return properties.map((property) =>
     'error' in property ? `${property.name}: ${property.error}` : `${property.name} = ${describeValue(property)}  [${describeType(property)}]`,
   );
-  return [header, ...lines].join('\n');
 }
 
 function describeValue(property: DescribedProperty): string {
