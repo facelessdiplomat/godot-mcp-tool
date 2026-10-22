@@ -17,7 +17,11 @@ export function createMcpServer(settings: McpServerSettings): McpServer {
 }
 
 function registerTool(server: McpServer, tool: Tool): void {
-  const { title, description, inputSchema, annotations, alwaysLoad } = tool.definition;
+  const { title, description, inputSchema, annotations, alwaysLoad, requiresUserInteraction } = tool.definition;
+  const meta = {
+    ...(alwaysLoad ? { 'anthropic/alwaysLoad': true } : {}),
+    ...(requiresUserInteraction === true ? { 'anthropic/requiresUserInteraction': true } : {}),
+  };
   server.registerTool(
     tool.name,
     {
@@ -25,7 +29,7 @@ function registerTool(server: McpServer, tool: Tool): void {
       description,
       inputSchema,
       annotations,
-      ...(alwaysLoad ? { _meta: { 'anthropic/alwaysLoad': true } } : {}),
+      ...(Object.keys(meta).length > 0 ? { _meta: meta } : {}),
     },
     (input) => tool.execute(input),
   );

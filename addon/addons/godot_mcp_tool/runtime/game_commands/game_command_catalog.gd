@@ -3,6 +3,7 @@ extends RefCounted
 const AddonInfo := preload("../../addon_info.gd")
 const CommandRouter := preload("../../commands/command_router.gd")
 const GameBoundsCommand := preload("game_bounds_command.gd")
+const GameEvalCommand := preload("game_eval_command.gd")
 const GameInputCommand := preload("game_input_command.gd")
 const GamePauseCommand := preload("game_pause_command.gd")
 const GamePerformanceCommand := preload("game_performance_command.gd")
@@ -33,4 +34,5 @@ static func build_router(scene_root_provider: Callable) -> CommandRouter:
 	router.register("pause", GamePauseCommand.new())
 	router.register("step", GameStepCommand.new())
 	router.register("performance", GamePerformanceCommand.new(scene))
+	router.register("eval", GameEvalCommand.new(scene, codec))
 	return router

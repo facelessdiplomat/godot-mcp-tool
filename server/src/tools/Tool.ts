@@ -8,6 +8,7 @@ export interface ToolDefinition<InputSchema extends z.ZodObject> {
   readonly annotations: ToolAnnotations;
   readonly alwaysLoad: boolean;
   readonly showsErrors?: boolean | undefined;
+  readonly requiresUserInteraction?: boolean | undefined;
 }
 
 export interface Tool<InputSchema extends z.ZodObject = z.ZodObject> {

@@ -15,6 +15,7 @@ export interface GodotStatusDependencies {
   readonly editor: EditorStatusProvider;
   readonly binaryLocator: BinaryLocator;
   readonly readVersion: (executablePath: string) => Promise<GodotVersion>;
+  readonly toolNotes?: readonly string[] | undefined;
 }
 
 export class GodotStatusTool implements Tool<typeof inputSchema> {
@@ -33,7 +34,7 @@ export class GodotStatusTool implements Tool<typeof inputSchema> {
 
   async execute(_input: z.input<typeof inputSchema>): Promise<CallToolResult> {
     const editorStatus = await this.dependencies.editor.status();
-    const statusLines = [this.describeProject(), describeEditor(editorStatus), await this.describeBinary(editorStatus)];
+    const statusLines = [this.describeProject(), describeEditor(editorStatus), await this.describeBinary(editorStatus), ...(this.dependencies.toolNotes ?? [])];
     return textResult(statusLines.join('\n'));
   }
 

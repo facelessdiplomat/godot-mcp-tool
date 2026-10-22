@@ -7,6 +7,7 @@ const AutoloadRemoveCommand := preload("project/autoload_remove_command.gd")
 const CommandRouter := preload("command_router.gd")
 const EditingContext := preload("../scene/editing_context.gd")
 const EditorRescanCommand := preload("editor/editor_rescan_command.gd")
+const EditorRunScriptCommand := preload("editor/editor_run_script_command.gd")
 const EditorScreenshotCommand := preload("editor/editor_screenshot_command.gd")
 const EditorSelectCommand := preload("editor/editor_select_command.gd")
 const EditorViewportAccess := preload("../editor/editor_viewport_access.gd")
@@ -17,6 +18,7 @@ const GameStopCommand := preload("game/game_stop_command.gd")
 const InputMapGetCommand := preload("input/input_map_get_command.gd")
 const InputMapSetCommand := preload("input/input_map_set_command.gd")
 const NodeAddCommand := preload("node/node_add_command.gd")
+const NodeCallMethodCommand := preload("node/node_call_method_command.gd")
 const NodeDeleteCommand := preload("node/node_delete_command.gd")
 const NodeDuplicateCommand := preload("node/node_duplicate_command.gd")
 const NodeFindCommand := preload("node/node_find_command.gd")
@@ -42,6 +44,7 @@ const SceneSaveCommand := preload("scene/scene_save_command.gd")
 const SignalConnectCommand := preload("signal/signal_connect_command.gd")
 const SignalDisconnectCommand := preload("signal/signal_disconnect_command.gd")
 const SignalListCommand := preload("signal/signal_list_command.gd")
+const UnsafeCommand := preload("unsafe_command.gd")
 
 const INSPECTION_TIMEOUT_MSEC := 10_000
 const WAIT_TIMEOUT_MSEC := 65_000
@@ -49,7 +52,7 @@ const INPUT_TIMEOUT_MSEC := 300_000
 const SCREENSHOT_TIMEOUT_MSEC := 30_000
 
 
-static func build_router(context: EditingContext, runtime: RuntimeContext, read_indentation: Callable, save_project_settings: Callable, autoloads: AutoloadRegistry) -> CommandRouter:
+static func build_router(context: EditingContext, runtime: RuntimeContext, read_indentation: Callable, save_project_settings: Callable, autoloads: AutoloadRegistry, is_unsafe_allowed: Callable) -> CommandRouter:
 	var captures := ProjectSettings.globalize_path("res://").path_join(AddonInfo.CAPTURES_RELATIVE_PATH)
 	var router := CommandRouter.new()
 	router.register("ping", PingCommand.new())
@@ -96,4 +99,7 @@ static func build_router(context: EditingContext, runtime: RuntimeContext, read_
 	router.register("game.pause", GameRequestCommand.new(runtime, "pause", INSPECTION_TIMEOUT_MSEC))
 	router.register("game.step", GameRequestCommand.new(runtime, "step", WAIT_TIMEOUT_MSEC))
 	router.register("game.performance", GameRequestCommand.new(runtime, "performance", WAIT_TIMEOUT_MSEC))
+	router.register("game.eval", UnsafeCommand.new(GameRequestCommand.new(runtime, "eval", INSPECTION_TIMEOUT_MSEC), is_unsafe_allowed))
+	router.register("editor.run_script", UnsafeCommand.new(EditorRunScriptCommand.new(context), is_unsafe_allowed))
+	router.register("node.call_method", UnsafeCommand.new(NodeCallMethodCommand.new(context), is_unsafe_allowed))
 	return router

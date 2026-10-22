@@ -24,6 +24,7 @@ const RuntimeContext := preload("runtime/runtime_context.gd")
 const RuntimeDebugger := preload("runtime/runtime_debugger.gd")
 const RuntimeLogger := preload("runtime/runtime_logger.gd")
 const TokenGenerator := preload("bridge/token_generator.gd")
+const UnsafeToolsSwitch := preload("editor/unsafe_tools_switch.gd")
 const VariantCodec := preload("codec/variant_codec.gd")
 
 const LANGUAGE_SERVER_PORT_SETTING := "network/language_server/remote_port"
@@ -41,6 +42,7 @@ var _router: CommandRouter
 var _bridge_server: BridgeServer
 var _discovery_file: DiscoveryFile
 var _token := ""
+var _unsafe_tools := UnsafeToolsSwitch.new()
 
 
 func _enter_tree() -> void:
@@ -53,7 +55,8 @@ func _enter_tree() -> void:
 	OS.add_logger(_editor_logger)
 	_ensure_runtime_autoload()
 	var context := EditingContext.new(EditorSceneAccess.new(), EditorUndoHistory.new(get_undo_redo()), VariantCodec.new(), EditorScriptEditorAccess.new())
-	_router = CommandCatalog.build_router(context, _runtime, _read_indentation, ProjectSettings.save, EditorAutoloadRegistry.new(self))
+	_unsafe_tools.install(self)
+	_router = CommandCatalog.build_router(context, _runtime, _read_indentation, ProjectSettings.save, EditorAutoloadRegistry.new(self), _unsafe_tools.is_allowed)
 	_token = TokenGenerator.generate()
 	_bridge_server = BridgeServer.new(_create_session)
 	var listen_error := _bridge_server.listen(AddonInfo.LOOPBACK_ADDRESS, 0)
@@ -78,6 +81,7 @@ func _process(_delta: float) -> void:
 
 
 func _exit_tree() -> void:
+	_unsafe_tools.uninstall(self)
 	if _bridge_server != null:
 		_bridge_server.stop()
 		_bridge_server = null

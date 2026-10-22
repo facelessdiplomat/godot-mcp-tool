@@ -19,7 +19,8 @@ import { GameOutputCursor } from './runtime/GameOutputCursor.js';
 import { LocalGameGateway } from './runtime/LocalGameGateway.js';
 import { ScriptValidator, ValidationUnavailableError } from './scripts/ScriptValidator.js';
 import { createMcpServer } from './server/createMcpServer.js';
-import { serverInstructions } from './server/serverInstructions.js';
+import { readOnlyInstructions, serverInstructions, unsafeInstructions } from './server/serverInstructions.js';
+import { applyToolPolicy, readToolPolicy } from './server/ToolPolicy.js';
 import { BRIDGE_PROTOCOL_VERSION, SERVER_NAME, SERVER_VERSION } from './serverInfo.js';
 import { TestRunner } from './testing/TestRunner.js';
 import { DocsClassTool, DocsSearchTool } from './tools/docsTools.js';
@@ -31,6 +32,7 @@ import { GodotStatusTool } from './tools/GodotStatusTool.js';
 import { ScriptValidateTool } from './tools/scriptTools.js';
 import { TestRunTool } from './tools/TestRunTool.js';
 import type { Tool } from './tools/Tool.js';
+import { createEditorRunScriptTool, createGameEvalTool, createNodeCallMethodTool } from './tools/unsafeTools.js';
 import { userCacheDirectory } from './util/CacheDirectory.js';
 
 export interface ApplicationEnvironment {
@@ -92,18 +94,22 @@ export function createApplication(environment: ApplicationEnvironment): Applicat
     locateBinary: locateGodot,
     processRunner,
   });
+  const policy = readToolPolicy(environment.variables);
+  const toolNotes: string[] = [];
   const localGame = new LocalGameGateway({
     projectRoot: project.found ? project.root : undefined,
     locateBinary: () => binaryLocator.locate(),
     launcher: new NodeProcessLauncher(),
     headless: environment.variables['GODOT_MCP_HEADLESS'] === '1',
   });
+  const gameGateway = new GameGatewayRouter(editor, localGame);
   const plainTools: Tool[] = [
     new GodotStatusTool({
       project,
       editor,
       binaryLocator,
       readVersion: (executablePath) => new GodotCli(processRunner, executablePath).version(),
+      toolNotes,
     }),
     new EditorLaunchTool(editorLauncher),
     ...createEditorTools(editor, readFileSync),
@@ -122,13 +128,21 @@ export function createApplication(environment: ApplicationEnvironment): Applicat
     ),
     new DocsClassTool(docsSource),
     new DocsSearchTool(docsSource),
-    ...createGameTools(new GameGatewayRouter(editor, localGame), new GameOutputCursor(), readFileSync),
+    ...createGameTools(gameGateway, new GameOutputCursor(), readFileSync),
+    ...(policy.unsafe ? [createEditorRunScriptTool(editor), createNodeCallMethodTool(editor), createGameEvalTool(gameGateway)] : []),
   ];
-  const tools = plainTools.map((tool) => new ErrorReportingTool(tool, errorSummary));
+  const selection = applyToolPolicy(plainTools, policy);
+  toolNotes.push(...selection.notes);
+  const tools = selection.tools.map((tool) => new ErrorReportingTool(tool, errorSummary));
+  const instructions = [
+    serverInstructions,
+    ...(policy.readOnly ? [readOnlyInstructions] : []),
+    ...(policy.unsafe && !policy.readOnly ? [unsafeInstructions] : []),
+  ].join('\n');
 
   return {
     createMcpServer: () =>
-      createMcpServer({ name: SERVER_NAME, version: SERVER_VERSION, instructions: serverInstructions, tools }),
+      createMcpServer({ name: SERVER_NAME, version: SERVER_VERSION, instructions, tools }),
     shutdown: () => {
       localGame.shutdown();
       editor.close();

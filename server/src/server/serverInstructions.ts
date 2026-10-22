@@ -12,3 +12,8 @@ export const serverInstructions = [
   '- Check 3D placement and scale with numbers first (node_get_bounds), then look: game_screenshot shows the game window or views of its 3D world, editor_screenshot renders the open scene. One picture of a 3D scene can mislead, so use views from several angles, such as ["front", "top", "iso"].',
   '- When a result reports new errors (⚠), read them with game_get_output before you continue.',
 ].join('\n');
+
+export const readOnlyInstructions = '- This server runs in read-only mode: the tools that change the project or the game are left out.';
+
+export const unsafeInstructions =
+  '- editor_run_script, game_eval and node_call_method are on: they run code in the editor or the game, and the user confirms each call. Use them only when no other tool fits; apart from node_call_method, their changes are not in the Undo history.';

@@ -23,6 +23,22 @@ class EchoTool implements Tool<typeof echoSchema> {
   }
 }
 
+class ConfirmedEchoTool implements Tool<typeof echoSchema> {
+  readonly name = 'echo_confirmed';
+  readonly definition: ToolDefinition<typeof echoSchema> = {
+    title: 'Echo after confirmation',
+    description: 'Returns the given text once the user confirms the call.',
+    inputSchema: echoSchema,
+    annotations: { readOnlyHint: false },
+    alwaysLoad: false,
+    requiresUserInteraction: true,
+  };
+
+  execute(input: z.infer<typeof echoSchema>): Promise<CallToolResult> {
+    return Promise.resolve(textResult(input.text));
+  }
+}
+
 describe('createMcpServer', () => {
   let client: Client | undefined;
 
@@ -58,6 +74,18 @@ describe('createMcpServer', () => {
       annotations: { readOnlyHint: true },
       _meta: { 'anthropic/alwaysLoad': true },
     });
+  });
+
+  it('asks the client to confirm every call of a tool that needs it', async () => {
+    const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+    const server = createMcpServer({ name: 'godot', version: '0.1.0', instructions: 'Use these tools.', tools: [new ConfirmedEchoTool()] });
+    await server.connect(serverTransport);
+    client = new Client({ name: 'test-client', version: '1.0.0' });
+    await client.connect(clientTransport);
+
+    const { tools } = await client.listTools();
+
+    expect(tools[0]?._meta).toEqual({ 'anthropic/requiresUserInteraction': true });
   });
 
   it('calls a tool', async () => {

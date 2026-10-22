@@ -52,6 +52,20 @@ describe('GodotStatusTool', () => {
     expect(text).toContain('Godot binary: /opt/godot/godot (from running editor), version 4.8.beta.custom_build.679066724');
   });
 
+  it('lists the tool modes that are not the defaults', async () => {
+    const tool = new GodotStatusTool({
+      project: foundProject,
+      editor: editorReporting({ connected: true, hello }),
+      binaryLocator: binaryFromRunningEditor,
+      readVersion: readKnownVersion,
+      toolNotes: ['Read-only mode (GODOT_MCP_READ_ONLY): the tools that change the project or the game are left out.'],
+    });
+
+    const text = await statusText(tool);
+
+    expect(text.split('\n').at(-1)).toBe('Read-only mode (GODOT_MCP_READ_ONLY): the tools that change the project or the game are left out.');
+  });
+
   it('explains why the editor is not connected', async () => {
     const tool = new GodotStatusTool({
       project: foundProject,
