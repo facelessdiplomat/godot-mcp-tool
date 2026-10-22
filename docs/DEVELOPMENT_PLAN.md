@@ -537,7 +537,7 @@ window coordinates (§9.9). `mouse_motion` is a relative movement, e.g. for mous
 | Tool | What it does | M | Kind | Needs |
 |---|---|---|---|---|
 | `test_run` | GUT or gdUnit4 tests (detected in `addons/`): folders, scripts, tests by name (GUT); JUnit report → summary, failed tests with `file:line`, test scripts that failed to load | 3 | W (runs project code) | C |
-| `export_project` | Export by preset (`--export-release` / `--export-debug`), checking export templates | 4 | W | C |
+| `export_project` | Export with a preset of the project (`--export-release` / `--export-debug` / `--export-pack`) into a folder of its own inside the project; lists the written files, the warnings, the unsaved changes the build misses, and how to get missing export templates | 4 | W | C |
 | `debug_*` | Breakpoints, stack, variables — via the editor's DAP server (port 6006) | 4 | W | E |
 
 `test_run` brings the project up to date first: the connected editor rescans it, otherwise
@@ -554,6 +554,21 @@ to the outcomes ("all passed; 1 test script failed to load"), or says "No tests 
 missing tests never reads as green. The editor's own errors about those scripts are left out of the new-error summary
 (§9.6). gdUnit4 cannot pick single tests by name. Tests load scenes and resources from
 disk, so unsaved changes in the editor are not seen.
+
+`export_project` runs `godot --headless --quiet --path … --export-<mode> <preset> <output>` in a separate process and
+works without the editor; `--quiet` keeps the progress of every packed file out of the output, while errors and
+warnings still arrive on stderr. The server reads the presets from `export_presets.cfg` itself, so a missing, unknown
+or ambiguous preset and a preset without an export path are explained before Godot starts. The output — the
+`output` parameter, or else the preset's export path, with `.pck` in mode `pack` — must lie inside the project
+folder, also after resolving symbolic links, not in a hidden folder such as `.godot` or `.git`, and not in a folder
+that holds project files; the first new folder on the way gets a `.gdignore` file, or an existing folder of earlier
+builds does, so the editor does not import exported files and the next export does not pack them (ADR-10). Godot
+exits with 0 after a successful export, also one with warnings, and the output must have been written. When the export
+templates are missing, the result names the expected file and, for a custom build of Godot (the version from
+`--version`), how to build templates from the same source; mode `pack` needs no templates. When the editor is
+connected, its unsaved scenes and scripts are listed as not in the build, because the export reads the files on disk.
+Export presets are created by the user in Project → Export: the editor keeps its own list of presets and writes it
+back when they change there, so a preset written to the file while the editor runs would be lost (Appendix B).
 
 ### 8.9 3D tools
 
@@ -1013,8 +1028,10 @@ Dropped and failed connections are the top complaint about almost every existing
 - Path sandbox: every path must resolve inside `res://`. `..`, absolute paths and symlinks pointing outside the
   project are rejected (the addon's own development symlink is resolved explicitly).
 - Processes run without a shell (§9.13).
-- Dangerous capabilities (`editor_run_script`, `game_eval`, `node_call_method`, `filesystem_delete`,
-  `export_project`) are off by default, marked with `destructiveHint` and confirmed on every call (§8.12).
+- Dangerous capabilities (`editor_run_script`, `game_eval`, `node_call_method`, `filesystem_delete`) are off by
+  default, marked with `destructiveHint` and confirmed on every call (§8.12).
+- `export_project` writes only into a folder of its own inside the project (§8.8, ADR-10), so neither a preset's
+  export path nor a parameter can make it overwrite files elsewhere, such as Git hooks or the user's configuration.
 - The runtime agent is active only with a debugger attached, i.e. never in exported release builds.
 - No network access beyond localhost; no telemetry.
 - In Claude Code, read-only tools can be allowed in advance in the permission rules; modifying tools ask for
@@ -1355,7 +1372,10 @@ the next call showed a ⚠.
       a TCP transport for the runtime agent when the game runs as a process (port and token passed as user
       arguments after `--`).
 - [ ] Debugging through DAP: breakpoints, stack, variables.
-- [ ] `export_project`.
+- [x] `export_project`: release, debug and data-only (`.pck`) exports with a preset of the project, in a separate
+      Godot process, only into a folder of its own inside the project that gets a `.gdignore` file; the result lists
+      the written files and warnings, the unsaved changes the build misses, and how to get missing export templates,
+      for custom builds too; scenario `docs/evals/export-the-game.md`.
 - [x] `filesystem_move`, `filesystem_delete`, `resource_find_usages`: files and folders move as in the FileSystem dock,
       with their `.import` and `.uid` files, the scenes, resources and project settings that use them, open scenes
       and UIDs; scripts that name an old path are listed to change; deleting moves files to the system trash and
@@ -1619,6 +1639,15 @@ in the Claude Code CLI — `claude --debug=mcp` (the server's stderr ends up in 
 - Cost: other clients will probably work but aren't tested. They ignore the Claude Code-specific `_meta` keys, so
   nothing breaks for them.
 
+### ADR-10. `export_project` is a regular tool that writes only inside the project
+
+- Exporting is an everyday step of making a game, so it should not need the switches of the dangerous tools (§8.12).
+  What makes an export risky is where it writes: an export path in `export_presets.cfg` or a parameter could point at
+  Git hooks, shell configuration or other files outside the project.
+- So the output must lie inside the project folder, also after resolving symbolic links, outside hidden folders and
+  outside folders with project files; the build folder gets a `.gdignore` file. Exports to other places are made by
+  the user in Project → Export. Claude Code still asks before each call unless the user allows the tool.
+
 ---
 
 ## Appendix B. Verified Godot API facts
@@ -1695,6 +1724,9 @@ Checked against the sources in `~/Software/godot` (`master`, 4.8-beta, commit `6
 | `ResourceLoader.get_resource_uid()` reads the UID from the file (the header, or the `.uid` file of a script) only in the editor; elsewhere, also in GUT runs with `-s`, it asks the UID cache, and `ResourceUID.add_id` registers one there | `core/io/resource_loader.cpp`, `main/main.cpp` |
 | Dropping a resource into the script editor with Ctrl adds `const … = preload("uid://…")` by default (`text_editor/behavior/files/drop_preload_resources_as_uid`), so scripts name files by UID as well as by path; GDScript preloads are not listed by `ResourceLoader.get_dependencies` | `editor/script/script_text_editor.cpp`, `editor/settings/editor_settings.cpp`, observed on 4.8 |
 | `DirAccess.is_case_sensitive(path)` is false on a default macOS volume, where `FileAccess.file_exists` finds `player.gd` when `Player.gd` exists; `DirAccess.rename_absolute` changes only the case of a name there | `platform/macos/dir_access_macos.mm`, observed on 4.8 |
+| Command-line exports (`--export-release`, `--export-debug`, `--export-pack` with a preset name) run an editor that exports after the first scan and exits with 1 on failure and 0 otherwise, also after warnings; the output path may be left out to use the preset's export path, and its folder must exist, or the export fails with "Can't open file for writing". Export messages are printed as `ERROR:` or `WARNING:` with `<category>: <text>` on stderr, and `--quiet` silences stdout, the progress of every packed file included. A pack export (`.pck`, or `.zip` by the extension) needs no export templates and runs with `godot --main-pack` | `main/main.cpp`, `editor/editor_node.cpp` (`_fs_changed`), `editor/export/editor_export_platform.h`, observed on 4.8 |
+| Export templates are looked up in the editor's data folder under `export_templates/<GODOT_VERSION_FULL_CONFIG>/` (`4.8.beta` for this build, without the build name), with a file per platform and kind, such as `macos.zip` or `linux_release.x86_64`; missing ones are reported as configuration errors, "No export template found at the expected path:" with the path, or "Custom release template not found." | `editor/export/editor_export_platform.cpp`, `core/version.h`, observed on 4.8 |
+| An export preset that lacks keys the editor writes (`include_filter`, `exclude_filter`, the `preset.N.options` section) still exports, with an error printed for every missing key. The editor reads `export_presets.cfg` when it starts and again only when an export platform is added or removed, and writes its own list back when presets change in the Export dialog | `editor/export/editor_export.cpp`, observed on 4.8 |
 | `JSON.stringify` sorts the keys of dictionaries by default, so the bridge does not keep their order; ordered data travels as arrays | `core/io/json.h` (`sort_keys = true`) |
 | `InputMap` matches an event of an action against an incoming event only when the action's event has the device `ALL_DEVICES` (-1, not exposed to scripts) or the same device; new `InputEventKey` and mouse events get `DEVICE_ID_KEYBOARD` (16) and `DEVICE_ID_MOUSE` (32), joypad events default to device 0, the first gamepad, and the editor's Input Map dialog stores "All Devices" | `core/input/input_map.cpp`, `core/input/input_event.cpp`, `editor/settings/input_event_configuration_dialog.cpp` |
 | The analyzer reports a member that a class lacks when it is read through the class (`Player.SPEEDD` is a parse error), but a method or property that the type of a variable lacks (`player.dashh()` on a `Player` or a `CharacterBody3D` variable) compiles: only the `unsafe_method_access` and `unsafe_property_access` warnings report it, and both are off by default. `:=` cannot infer the type of a member that the static type lacks, so it works on a variable typed with the `class_name` of its script and fails on one typed with the native base | observed on 4.8 with `--check-only` |

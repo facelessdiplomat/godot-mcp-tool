@@ -20,3 +20,4 @@ When running one, record whether it passed, the number of tool calls and the tok
 | [animate-a-door.md](animate-a-door.md) | `animation_get`, `animation_set`, `animation_delete` | `server/test/integration/animation.test.ts` |
 | [character-states.md](character-states.md) | `animation_tree_get`, `animation_tree_set` | `server/test/integration/animationTree.test.ts` |
 | [tidy-the-project.md](tidy-the-project.md) | `resource_find_usages`, `filesystem_move`, `filesystem_delete` | `server/test/integration/fileTools.test.ts` |
+| [export-the-game.md](export-the-game.md) | `export_project` | `server/test/integration/exportProject.test.ts` |

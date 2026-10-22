@@ -5,6 +5,7 @@ import { DiscoveryFileReader, isProcessAlive } from './bridge/DiscoveryFileReade
 import { DocsSource } from './docs/DocsSource.js';
 import { EditorLauncher, systemClock } from './editor/EditorLauncher.js';
 import { EditorConnection, type EditorSession, UnavailableEditor } from './bridge/EditorConnection.js';
+import { ProjectExporter } from './export/ProjectExporter.js';
 import { type BinaryLookup, GodotBinaryLocator } from './godot/GodotBinaryLocator.js';
 import { GodotCli } from './godot/GodotCli.js';
 import { LanguageServerClient } from './lsp/LanguageServerClient.js';
@@ -31,6 +32,7 @@ import { DocsClassTool, DocsSearchTool } from './tools/docsTools.js';
 import { EditorLaunchTool } from './tools/EditorLaunchTool.js';
 import { createEditorTools } from './tools/editorTools.js';
 import { ErrorReportingTool } from './tools/ErrorReportingTool.js';
+import { ExportProjectTool } from './tools/ExportProjectTool.js';
 import { createGameGetOutputTool, createGameTools } from './tools/gameTools.js';
 import { GodotStatusTool } from './tools/GodotStatusTool.js';
 import { createProjectInfoTool } from './tools/projectTools.js';
@@ -132,6 +134,16 @@ export function createApplication(environment: ApplicationEnvironment): Applicat
     new TestRunTool(
       new TestRunner({ projectRoot: project.found ? project.root : undefined, editor, locateBinary: locateGodot, processRunner, now: () => Date.now() }),
       errorSummary,
+    ),
+    new ExportProjectTool(
+      new ProjectExporter({
+        projectRoot: project.found ? project.root : undefined,
+        editor,
+        locateBinary: locateGodot,
+        processRunner,
+        readVersion: (executablePath) => new GodotCli(processRunner, executablePath).version(),
+        now: () => Date.now(),
+      }),
     ),
     new DocsClassTool(docsSource),
     new DocsSearchTool(docsSource),
