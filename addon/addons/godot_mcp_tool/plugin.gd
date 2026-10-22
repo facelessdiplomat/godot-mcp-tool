@@ -106,6 +106,7 @@ func _create_session() -> BridgeSession:
 
 
 func _read_status() -> Dictionary:
+	_collect_editor_log()
 	var status := _runtime.log_store.status()
 	status["game"] = _runtime.game.state
 	return status

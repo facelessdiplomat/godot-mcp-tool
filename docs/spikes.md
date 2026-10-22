@@ -27,7 +27,7 @@ Update the engine deliberately: pull `master`, rebuild, rerun `npm test`, `npm r
 | 5 | Can agent runs avoid the pause on script errors, and can a paused game be resumed? | `--ignore-error-breaks` via `_run_scene` prevents the pause. Without it, the raw debugger message `continue` resumes the game, and custom captures keep working while it is paused | A `game_continue` capability is possible; the runtime agent can report state while the game is paused |
 | 6 | Does the addon run in `godot --headless --editor`? | Yes: the bridge starts, writes the discovery file, and the full integration test passes against it | Windowless editor mode is viable for CI and milestone 4 |
 | 7 | Can `--check-only --script` replace the editor for validation? | Not reliably: the exit code is always 0, and references to autoloads are reported as errors | Demoted to a last-resort fallback that parses stderr and filters autoload false positives |
-| 8 | How does Claude Code pass text, `structuredContent` and images to the model? | Not checked yet: needs a Claude Code session | Pending |
+| 8 | How does Claude Code pass text, `structuredContent` and images to the model? | Text: yes, but several text blocks may reach the model joined without a separator. `alwaysLoad` and the server instructions work. `structuredContent` and images are not checked yet: the server sends neither before milestone 2 | The new-error summary is appended to the last text block after a blank line; images are checked with `game_screenshot` in milestone 2 |
 | 9 | Does the editor overwrite an agent's edit with a stale unsaved script tab? | Yes, both on `save_all_scenes()` and on running the game (`save_before_running` is on by default). `ScriptEditor.get_unsaved_files()` lists the file beforehand | Conflict detection before saving and running is mandatory in milestone 1 |
 | 10 | Does a symlinked addon work in a separate project? | Yes: `test-project` uses a relative symlink, the editor loads the plugin and imports work | Confirmed |
 | 11 | Can we render from an extra camera in the editor and in the game? | Yes, with a `SubViewport` that shares the scene's `World3D`: 19 ms in the game, 13–44 ms in an unfocused editor with `RenderingServer.force_draw()`. The editor's preview sun and sky belong to that world | Confirmed, with two corrections to the plan (§9.8) |
@@ -114,6 +114,21 @@ Rules for the error model:
 
 Each run takes about 0.15 s.
 
+### 8. Tool results in Claude Code
+
+Checked on 2026-10-22 in the Claude Code desktop app with the `godot` server from `.mcp.json` and a headless editor
+on `test-project`:
+
+- At startup only the six tools marked `anthropic/alwaysLoad` were loaded (`godot_status`, `scene_get_tree`,
+  `node_add`, `node_set_properties`, `game_run`, `game_get_output`). The other ten were listed by name and loaded
+  through tool search on first use. The server instructions arrived as written.
+- A result made of two text blocks reached the model as two separate outputs in one call, and as one string joined
+  without any separator in another call. The server therefore appends the new-error summary to the last text block
+  after a blank line instead of sending it as a block of its own.
+- The milestone 1 scenario passed end to end: the arena with its floor, light, environment and camera, the main
+  scene, the run with its output, and a deliberate script error with its summary in the next response and its stack
+  in `game_get_output`.
+
 ### 9. Stale script overwrite
 
 Sequence: a script is open in the script editor with an unsaved change ("editor B"); the agent writes "agent C" to
@@ -172,6 +187,11 @@ Two traps found on the way:
 ### Other observations
 
 - Godot 4.8 writes `unique_id` to nodes and a `uid` to the scene header when it saves a `.tscn`.
+- A headless editor reports `Parameter "t" is null` from `servers/rendering/dummy/storage/texture_storage.h` on every
+  scene save: without a renderer there is no preview thumbnail. The addon ignores errors from
+  `servers/rendering/dummy/`.
+- Engine source paths in error reports may start with `./` (headers found through the include path); the addon
+  removes the prefix.
 - MCP clients start stdio servers with a minimal environment: variables of the parent shell are not inherited, so
   `GODOT_PROJECT_PATH` and `GODOT_BIN` must be passed in the client configuration (`env` in `.mcp.json`, `-e` in MCP
   Inspector).
@@ -180,4 +200,4 @@ Two traps found on the way:
 
 | # | What is left | Needs |
 |---|---|---|
-| 8 | How Claude Code shows text, `structuredContent` and images to the model | a Claude Code session with this server |
+| 8 | How Claude Code shows images and `structuredContent` to the model | `game_screenshot` in milestone 2 |

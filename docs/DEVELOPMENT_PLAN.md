@@ -1071,8 +1071,8 @@ make it the main scene, run it and show the output." Every change can be undone 
 A deliberate script error shows up in `game_get_output` with file, line and stack, and its summary arrives in the
 very next tool response.
 
-Status: the scenario passes as the automated acceptance test `server/test/integration/mvpScenario.test.ts` against
-a headless editor, Ctrl+Z included. The check in a live Claude Code session with a windowed editor is still to do.
+Status: done. The scenario passes as the automated acceptance test `server/test/integration/mvpScenario.test.ts`
+against a headless editor, Ctrl+Z included, and it passed in a live Claude Code session on 2026-10-22 (spike 8).
 
 ### Milestone 2 — "Eyes and hands"
 

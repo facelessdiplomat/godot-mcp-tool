@@ -1,6 +1,7 @@
 extends RefCounted
 
 const DEFAULT_CAPACITY := 2000
+const RECENT_ERROR_LIMIT := 5
 
 var last_seq := 0
 var error_count := 0
@@ -8,7 +9,7 @@ var warning_count := 0
 
 var _capacity: int
 var _entries: Array = []
-var _latest_error := {}
+var _recent_errors: Array = []
 
 
 func _init(capacity: int = DEFAULT_CAPACITY) -> void:
@@ -26,7 +27,9 @@ func append(entry: Dictionary, source: String) -> void:
 	match stored.get("level"):
 		"error":
 			error_count += 1
-			_latest_error = _summary_of(stored)
+			_recent_errors.append(_summary_of(stored))
+			if _recent_errors.size() > RECENT_ERROR_LIMIT:
+				_recent_errors.pop_front()
 		"warning":
 			warning_count += 1
 
@@ -56,7 +59,7 @@ func entries_after(after_seq: int, levels: PackedStringArray, limit: int) -> Dic
 
 
 func status() -> Dictionary:
-	return {"last_seq": last_seq, "errors": error_count, "warnings": warning_count, "latest_error": _latest_error}
+	return {"last_seq": last_seq, "errors": error_count, "warnings": warning_count, "recent_errors": _recent_errors.duplicate()}
 
 
 static func _summary_of(entry: Dictionary) -> Dictionary:

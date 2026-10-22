@@ -27,12 +27,31 @@ func test_uses_the_rationale_and_the_first_script_frame() -> void:
 	assert_string_starts_with((entry["stack"] as Array)[0], THIS_SCRIPT + ":")
 
 
+func test_leaves_out_frames_of_hidden_scripts() -> void:
+	var entry := LogEntryBuilder.from_error("set_fov", "scene/3d/camera_3d.cpp", 797, "Condition is true.", "", 0, _capture_backtraces(), "res://tests/")
+	assert_string_starts_with(entry["location"], "res://addons/gut/")
+	for frame in entry["stack"]:
+		assert_false((frame as String).begins_with("res://tests/"))
+
+
+func test_uses_the_native_location_when_every_frame_is_hidden() -> void:
+	var entry := LogEntryBuilder.from_error("set_fov", "scene/3d/camera_3d.cpp", 797, "Condition is true.", "", 0, _capture_backtraces(), "res://")
+	assert_eq(entry["location"], "scene/3d/camera_3d.cpp:797")
+	assert_eq(entry["function"], "set_fov")
+	assert_false(entry.has("stack"))
+
+
 func test_falls_back_to_the_code_and_the_native_location() -> void:
 	var entry := LogEntryBuilder.from_error("get_node", "scene/main/node.cpp", 1800, "Condition \"p_path.is_empty()\" is true.", "", 0, [])
 	assert_eq(entry["message"], "Condition \"p_path.is_empty()\" is true.")
 	assert_eq(entry["location"], "scene/main/node.cpp:1800")
 	assert_eq(entry["function"], "get_node")
 	assert_false(entry.has("stack"))
+
+
+func test_writes_engine_source_paths_without_a_leading_dot() -> void:
+	var entry := LogEntryBuilder.from_error("set_fov", "./scene/3d/camera_3d.cpp", 797, "Condition is true.", "", 0, [])
+	assert_eq(entry["location"], "scene/3d/camera_3d.cpp:797")
 
 
 func test_marks_warnings() -> void:

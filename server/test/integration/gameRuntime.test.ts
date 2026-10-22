@@ -69,11 +69,9 @@ describe.skipIf(godotBinary === '')('running the game from the editor', () => {
   it('reports a later script error in the next response of any tool', async () => {
     await pause(2_500);
 
-    const result = await tools().client.callTool({ name: 'project_info', arguments: {} });
-    const texts = result.content.map((content) => (content.type === 'text' ? content.text : ''));
+    const result = await tools().call('project_info');
 
-    expect(texts).toHaveLength(2);
-    expect(texts[1]).toMatch(/^⚠ 1 new error since the last call\. Latest, in the game: res:\/\/main\.gd:8: /);
+    expect(result.text).toMatch(/\n\n⚠ New error since the last call:\n- in the game: res:\/\/main\.gd:8: .*queue_free.*\nRead the game output with game_get_output\.$/);
   });
 
   it('shows the error with its location and stack', async () => {

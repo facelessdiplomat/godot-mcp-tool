@@ -24,6 +24,14 @@ export class ErrorReportingTool<InputSchema extends z.ZodObject = z.ZodObject> i
       return result;
     }
     const summary = this.summary.takeSummary();
-    return summary === undefined ? result : { ...result, content: [...result.content, { type: 'text', text: summary }] };
+    return summary === undefined ? result : { ...result, content: appendText(result.content, summary) };
   }
+}
+
+function appendText(content: CallToolResult['content'], text: string): CallToolResult['content'] {
+  const last = content.at(-1);
+  if (last?.type !== 'text') {
+    return [...content, { type: 'text', text }];
+  }
+  return [...content.slice(0, -1), { ...last, text: `${last.text}\n\n${text}` }];
 }

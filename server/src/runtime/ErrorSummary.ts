@@ -1,26 +1,34 @@
 import * as z from 'zod/v4';
 
 const statusNotification = 'log.status';
+const gameSource = 'game';
 
-const latestErrorSchema = z.object({
+const recentErrorSchema = z.object({
   seq: z.number(),
   source: z.string(),
   message: z.string(),
   location: z.string().optional(),
 });
 
-type LatestError = z.infer<typeof latestErrorSchema>;
+type RecentError = z.infer<typeof recentErrorSchema>;
 
 const logStatusSchema = z.object({
+  last_seq: z.number().int(),
   errors: z.number().int(),
-  latest_error: latestErrorSchema.optional().catch(undefined),
+  recent_errors: z.array(recentErrorSchema).catch([]),
 });
 
 type LogStatus = z.infer<typeof logStatusSchema>;
 
+interface FoldedError {
+  readonly error: RecentError;
+  times: number;
+}
+
 export class ErrorSummary {
   private connection: number | undefined;
   private reportedErrors = 0;
+  private reportedSeq = 0;
   private latest: LogStatus | undefined;
 
   observe(connection: number, method: string, params: unknown): void {
@@ -31,39 +39,68 @@ export class ErrorSummary {
     if (!status.success) {
       return;
     }
+    this.latest = status.data;
     if (connection !== this.connection) {
       this.connection = connection;
-      this.reportedErrors = status.data.errors;
+      this.acknowledge();
     }
-    this.latest = status.data;
   }
 
   acknowledge(): void {
     if (this.latest !== undefined) {
       this.reportedErrors = this.latest.errors;
+      this.reportedSeq = this.latest.last_seq;
     }
   }
 
   takeSummary(): string | undefined {
-    if (this.latest === undefined) {
+    const latest = this.latest;
+    if (latest === undefined) {
       return undefined;
     }
-    const newErrors = this.latest.errors - this.reportedErrors;
-    this.reportedErrors = this.latest.errors;
-    if (newErrors <= 0) {
+    const newCount = latest.errors - this.reportedErrors;
+    const newErrors = latest.recent_errors.filter((error) => error.seq > this.reportedSeq);
+    this.acknowledge();
+    if (newCount <= 0) {
       return undefined;
     }
-    const count = `${String(newErrors)} new ${newErrors === 1 ? 'error' : 'errors'}`;
-    return `⚠ ${count} since the last call. ${describeLatest(this.latest.latest_error)}Read them with game_get_output.`;
+    const lines = [describeCount(newCount, newErrors.length), ...foldRepeats(newErrors).map(describeFolded)];
+    if (newErrors.length < newCount || newErrors.some((error) => error.source === gameSource)) {
+      lines.push('Read the game output with game_get_output.');
+    }
+    return lines.join('\n');
   }
 }
 
-function describeLatest(error: LatestError | undefined): string {
-  if (error === undefined) {
-    return '';
+function describeCount(newCount: number, listedCount: number): string {
+  if (newCount === 1 && listedCount === 1) {
+    return '⚠ New error since the last call:';
   }
+  const count = `⚠ ${String(newCount)} new ${newCount === 1 ? 'error' : 'errors'} since the last call`;
+  if (listedCount === 0) {
+    return `${count}.`;
+  }
+  return listedCount < newCount ? `${count}, the latest:` : `${count}:`;
+}
+
+function foldRepeats(errors: readonly RecentError[]): FoldedError[] {
+  const folded = new Map<string, FoldedError>();
+  for (const error of errors) {
+    const key = `${error.source}\n${error.location ?? ''}\n${error.message}`;
+    const existing = folded.get(key);
+    if (existing === undefined) {
+      folded.set(key, { error, times: 1 });
+    } else {
+      existing.times += 1;
+    }
+  }
+  return [...folded.values()];
+}
+
+function describeFolded({ error, times }: FoldedError): string {
   const place = error.location === undefined ? '' : `${error.location}: `;
-  return `Latest, in the ${error.source}: ${place}${endSentence(error.message)} `;
+  const repetition = times > 1 ? ` (${String(times)} times)` : '';
+  return `- in the ${error.source}: ${place}${endSentence(error.message)}${repetition}`;
 }
 
 function endSentence(text: string): string {

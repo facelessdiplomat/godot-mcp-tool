@@ -1,9 +1,19 @@
 import { describe, expect, it } from 'vitest';
 import { ErrorSummary } from '../../src/runtime/ErrorSummary.js';
 
-function status(errors: number, latestError: Record<string, unknown> = {}): Record<string, unknown> {
-  return { last_seq: errors * 2, errors, warnings: 0, latest_error: latestError, game: 'running' };
+function status(lastSeq: number, errors: number, recentErrors: readonly Record<string, unknown>[] = []): Record<string, unknown> {
+  return { last_seq: lastSeq, errors, warnings: 0, recent_errors: recentErrors, game: 'running' };
 }
+
+function summaryAfter(...statuses: Record<string, unknown>[]): ErrorSummary {
+  const summary = new ErrorSummary();
+  for (const observed of statuses) {
+    summary.observe(1, 'log.status', observed);
+  }
+  return summary;
+}
+
+const speedError = { seq: 12, source: 'game', message: "Invalid access to property 'speed'.", location: 'res://player.gd:12' };
 
 describe('ErrorSummary', () => {
   it('reports nothing before the first status', () => {
@@ -11,38 +21,54 @@ describe('ErrorSummary', () => {
   });
 
   it('starts counting from the status received on connection', () => {
-    const summary = new ErrorSummary();
-
-    summary.observe(1, 'log.status', status(4));
-
-    expect(summary.takeSummary()).toBeUndefined();
+    expect(summaryAfter(status(8, 4, [{ ...speedError, seq: 8 }])).takeSummary()).toBeUndefined();
   });
 
-  it('reports new errors once with the latest one', () => {
-    const summary = new ErrorSummary();
-    summary.observe(1, 'log.status', status(4));
-    summary.observe(1, 'log.status', status(6, { seq: 12, source: 'game', message: "Invalid access to property 'speed'.", location: 'res://player.gd:12' }));
+  it('lists a new error once, with its source and place', () => {
+    const summary = summaryAfter(status(10, 0), status(12, 1, [speedError]));
 
     expect(summary.takeSummary()).toBe(
-      "⚠ 2 new errors since the last call. Latest, in the game: res://player.gd:12: Invalid access to property 'speed'. Read them with game_get_output.",
+      ["⚠ New error since the last call:", "- in the game: res://player.gd:12: Invalid access to property 'speed'.", 'Read the game output with game_get_output.'].join('\n'),
     );
     expect(summary.takeSummary()).toBeUndefined();
   });
 
-  it('names a single error and its source', () => {
-    const summary = new ErrorSummary();
-    summary.observe(1, 'log.status', status(0));
-    summary.observe(1, 'log.status', status(1, { seq: 3, source: 'editor', message: 'Parse Error: Expected end of statement.', location: 'res://enemy.gd:7' }));
+  it('does not send the agent to the game output for editor errors', () => {
+    const summary = summaryAfter(status(2, 0), status(3, 1, [{ seq: 3, source: 'editor', message: 'Parse Error: Expected end of statement', location: 'res://enemy.gd:7' }]));
+
+    expect(summary.takeSummary()).toBe(['⚠ New error since the last call:', '- in the editor: res://enemy.gd:7: Parse Error: Expected end of statement.'].join('\n'));
+  });
+
+  it('folds repeated errors and says when it shows only the latest ones', () => {
+    const repeated = [396, 397, 398, 399, 400].map((seq) => ({ seq, source: 'game', message: 'Boom.', location: 'res://hud.gd:5' }));
+    const summary = summaryAfter(status(0, 0), status(400, 240, repeated));
 
     expect(summary.takeSummary()).toBe(
-      '⚠ 1 new error since the last call. Latest, in the editor: res://enemy.gd:7: Parse Error: Expected end of statement. Read them with game_get_output.',
+      ['⚠ 240 new errors since the last call, the latest:', '- in the game: res://hud.gd:5: Boom. (5 times)', 'Read the game output with game_get_output.'].join('\n'),
+    );
+  });
+
+  it('lists errors from both sources in order', () => {
+    const summary = summaryAfter(
+      status(0, 0),
+      status(5, 2, [
+        { seq: 4, source: 'editor', message: 'Parse Error: Unexpected "Indent".', location: 'res://enemy.gd:3' },
+        { seq: 5, source: 'game', message: 'Boom.' },
+      ]),
+    );
+
+    expect(summary.takeSummary()).toBe(
+      [
+        '⚠ 2 new errors since the last call:',
+        '- in the editor: res://enemy.gd:3: Parse Error: Unexpected "Indent".',
+        '- in the game: Boom.',
+        'Read the game output with game_get_output.',
+      ].join('\n'),
     );
   });
 
   it('does not report errors that a tool already showed', () => {
-    const summary = new ErrorSummary();
-    summary.observe(1, 'log.status', status(0));
-    summary.observe(1, 'log.status', status(3, { seq: 6, source: 'game', message: 'Boom.' }));
+    const summary = summaryAfter(status(0, 0), status(6, 3, [{ ...speedError, seq: 6 }]));
 
     summary.acknowledge();
 
@@ -51,16 +77,15 @@ describe('ErrorSummary', () => {
 
   it('starts over when it connects to another editor', () => {
     const summary = new ErrorSummary();
-    summary.observe(1, 'log.status', status(9));
-    summary.observe(2, 'log.status', status(1));
+    summary.observe(1, 'log.status', status(20, 9));
+    summary.observe(2, 'log.status', status(3, 1, [{ ...speedError, seq: 3 }]));
 
     expect(summary.takeSummary()).toBeUndefined();
   });
 
   it('ignores other notifications and malformed statuses', () => {
-    const summary = new ErrorSummary();
-    summary.observe(1, 'log.status', status(0));
-    summary.observe(1, 'something.else', status(5));
+    const summary = summaryAfter(status(0, 0));
+    summary.observe(1, 'something.else', status(5, 5));
     summary.observe(1, 'log.status', { errors: 'many' });
 
     expect(summary.takeSummary()).toBeUndefined();

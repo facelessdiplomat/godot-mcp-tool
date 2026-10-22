@@ -21,15 +21,25 @@ func test_numbers_entries_and_records_their_source() -> void:
 	assert_eq((page["entries"][1] as Dictionary)["source"], "editor")
 
 
-func test_counts_errors_and_warnings_and_keeps_the_latest_error() -> void:
-	_store.append({"level": "error", "message": "first"}, "game")
+func test_counts_errors_and_warnings_and_keeps_the_recent_errors() -> void:
+	_store.append({"level": "error", "message": "first", "location": "res://player.gd:3"}, "game")
 	_store.append({"level": "warning", "message": "careful"}, "game")
-	_store.append({"level": "error", "message": "second"}, "game")
+	_store.append({"level": "error", "message": "second", "stack": ["res://enemy.gd:9 in _ready"]}, "editor")
 	var status := _store.status()
 	assert_eq(status["last_seq"], 3)
 	assert_eq(status["errors"], 2)
 	assert_eq(status["warnings"], 1)
-	assert_eq((status["latest_error"] as Dictionary)["message"], "second")
+	assert_eq(status["recent_errors"], [
+		{"seq": 1, "source": "game", "message": "first", "location": "res://player.gd:3"},
+		{"seq": 3, "source": "editor", "message": "second"},
+	])
+
+
+func test_keeps_only_the_latest_errors_in_the_status() -> void:
+	for index in 7:
+		_store.append({"level": "error", "message": str(index)}, "game")
+	var recent: Array = _store.status()["recent_errors"]
+	assert_eq(recent.map(func(error: Dictionary) -> int: return error["seq"]), [3, 4, 5, 6, 7])
 
 
 func test_returns_entries_after_a_cursor_filtered_by_level() -> void:

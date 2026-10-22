@@ -93,13 +93,11 @@ describe.skipIf(godotBinary === '')('the milestone 1 scenario', () => {
     const run = await tools().call('game_run');
     await new Promise((resolveDelay) => setTimeout(resolveDelay, 2_000));
 
-    const next = await tools().client.callTool({ name: 'scene_get_tree', arguments: {} });
+    const next = await tools().call('scene_get_tree');
     const output = await tools().call('game_get_output', { levels: ['error'] });
 
     expect(run.text).toContain('Arena ready');
-    expect(next.content.map((content) => (content.type === 'text' ? content.text : '')).at(-1)).toMatch(
-      /^⚠ 1 new error since the last call\. Latest, in the game: res:\/\/levels\/arena\.gd:12: /,
-    );
+    expect(next.text).toMatch(/\n\n⚠ New error since the last call:\n- in the game: res:\/\/levels\/arena\.gd:12: /);
     expect(output.text).toMatch(/ERROR res:\/\/levels\/arena\.gd:12 in _spawn_wave: /);
     expect(output.text).toContain('  at res://levels/arena.gd:12 in _spawn_wave');
     expect(output.text).toContain('  at res://levels/arena.gd:7 in _ready');

@@ -30,3 +30,17 @@ func test_drops_entries_beyond_its_limit_and_says_so() -> void:
 	assert_eq(taken.size(), 3)
 	assert_eq((taken[2] as Dictionary)["level"], "warning")
 	assert_string_contains((taken[2] as Dictionary)["message"], "3")
+
+
+func test_ignores_errors_of_the_rendering_stub_used_without_a_window() -> void:
+	var logger := RuntimeLogger.new(true)
+	logger._log_error("texture_2d_get", "servers/rendering/dummy/storage/texture_storage.h", 110, "Parameter \"t\" is null.", "", false, 0, [])
+	logger._log_error("texture_2d_get", "./servers/rendering/dummy/storage/texture_storage.h", 110, "Parameter \"t\" is null.", "", false, 0, [])
+	assert_eq(logger.take_pending(), [])
+
+
+func test_ignores_errors_the_language_server_reports_while_it_parses_scripts() -> void:
+	var logger := RuntimeLogger.new(true)
+	logger._log_error("parse_script", "modules/gdscript/language_server/gdscript_workspace.cpp", 203, "LSP: Failed to parse script: res://broken.gd", "", false, 0, [])
+	assert_eq(logger.take_pending(), [])
+

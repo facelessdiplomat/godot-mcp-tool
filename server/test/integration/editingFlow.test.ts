@@ -102,6 +102,14 @@ describe.skipIf(godotBinary === '')('editing a project through the MCP tools', (
     expect(missing.text).toContain('Floor');
   });
 
+  it('reports an engine error in the response of the call that caused it', async () => {
+    const updated = await tools().call('node_set_properties', { path: 'Camera', properties: { fov: 200 } });
+
+    expect(updated.isError).toBe(true);
+    expect(updated.text).toContain('- fov: wanted 200, got 75');
+    expect(updated.text).toMatch(/\n\n⚠ New error since the last call:\n- in the editor: scene\/3d\/camera_3d\.cpp:\d+: Condition .*p_fov/);
+  });
+
   it('saves the scene to disk', async () => {
     const saved = await tools().call('scene_save');
 
