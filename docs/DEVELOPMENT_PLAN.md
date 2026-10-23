@@ -1198,7 +1198,7 @@ godot-mcp-tool/
 │   ├── setup.md                  user guide: how to connect (milestone 5)
 │   ├── usage.md                  user guide: how to use (milestone 5)
 │   ├── protocol.md               bridge protocol (milestone 1)
-│   ├── tools.md                  tool reference (generated from the schemas, milestone 5)
+│   ├── tools.md                  tool reference, generated from the schemas by npm run docs:tools (milestone 5)
 │   ├── spikes.md                 spike results and the pinned engine commit (milestone 0)
 │   └── evals/                    evaluation scenarios, one per capability (from milestone 4)
 ├── server/                       MCP server (TypeScript)
@@ -1573,7 +1573,10 @@ The whole integration suite, run next to that editor, found two more problems:
       project, the number of connected MCP clients and the state of the game; the switch for the unsafe tools, kept
       in step with the Tools menu; and the latest 50 agent commands with their time and duration, or their error in
       full, selectable and copyable, without the keepalive `ping`. It is an `EditorDock` in the bottom slot.
-- [ ] User documentation: how to connect and how to use (see [User documentation](#user-documentation)).
+- [x] User documentation: how to connect and how to use (see [User documentation](#user-documentation)):
+      [setup.md](setup.md), [usage.md](usage.md), the README quick start, and [tools.md](tools.md), which a unit test
+      compares with what the server lists, so `npm run docs:tools` must regenerate it after a tool changes. The check
+      of the guides on a fresh project, described below, is still to do.
 - [ ] `CONTRIBUTING.md`, `SECURITY.md`.
 - [x] Evaluation tasks (§13) and tool description tuning based on their results: the 20 scenarios of `docs/evals/`
       run as code with `npm run eval`, each with a reference solution and checks through the MCP tools. The first
