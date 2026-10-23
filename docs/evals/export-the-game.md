@@ -12,11 +12,12 @@ Godot version installed, or not (a custom build of Godot has none).
 
 **Done when**
 
-- The change in the main scene was saved before the build, so it is in it.
+- Whatever was exported, a build or a `.pck`, has the change in the main scene: it was saved before the export.
 - With the templates: `build/macos/game.zip` exists, `export_project` listed it with its size, and `build/` has a
   `.gdignore` file.
-- Without the templates: no build was claimed; the agent told the user which template file is missing and how to get
-  it (for a custom build, how to build it from the same source), and offered a data-only export (`mode: "pack"`).
+- Without the templates: the agent said that it could not make the build, told the user which template file is
+  missing and how to get it (for a custom build, how to build it from the same source), and offered a data-only
+  export (`mode: "pack"`).
 
 **Notes**
 
@@ -24,3 +25,4 @@ Godot version installed, or not (a custom build of Godot has none).
 - It does not edit `export_presets.cfg` or point the export outside the project; it does not report a failed export as
   a build.
 - Automated test: `server/test/integration/exportProject.test.ts`.
+- Evaluation run: `server/test/evals/scenarios/exportTheGame.ts`.

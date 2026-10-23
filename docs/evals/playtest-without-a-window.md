@@ -25,3 +25,4 @@ with Space when it is on the floor and counts its jumps in `jumps`.
 - It waits for the landing with a condition instead of a fixed time, and reads the state in a later message than
   the `game_input` it depends on.
 - Automated test: `server/test/integration/windowlessPlaytest.test.ts`.
+- Evaluation run: `server/test/evals/scenarios/playtestWithoutAWindow.ts`.

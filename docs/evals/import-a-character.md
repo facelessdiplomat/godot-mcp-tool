@@ -14,8 +14,9 @@ in centimeters, with one mesh node `Body` and the material `Skin`.
 
 - `res://models/character.glb.import` has `nodes/root_scale=0.01` (or another setting that makes the model 1.8 m tall).
 - `asset_import_settings_get` reports the imported scene as 0.5 × 1.8 × 0.5 m.
-- The imported scene has one capsule collision shape about 0.25 m in radius and 1.8 m tall whose center is the center
-  of the mesh, Vector3(0, 0.9, 0).
+- One capsule fits the mesh: about 0.25 m in radius and 1.8 m tall, with its center at the center of the mesh, all
+  within 0.1 m. It is either the only collision shape of the imported scene, or the only fitting `CapsuleShape3D` of
+  a scene that instances the model.
 - A scene that instances the model measures 1.8 m tall with `node_get_bounds`.
 
 **Notes**
@@ -26,4 +27,5 @@ in centimeters, with one mesh node `Body` and the material `Skin`.
   model's units (25 and 180) and checks the collision shapes in the result.
 - For a character that moves, collision generated on import gives a `StaticBody3D`; the run may instead, or as well,
   build a `CharacterBody3D` scene around the model with a `CapsuleShape3D` sized with `node_get_bounds`. Either passes
-  if the capsule matches the mesh.
+  if the capsule matches the mesh; the evaluation run has a reference solution for each.
+- Evaluation run: `server/test/evals/scenarios/importACharacter.ts`.

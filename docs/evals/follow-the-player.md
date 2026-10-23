@@ -26,3 +26,4 @@ A Godot project with the addon enabled and the editor running, and `res://arena.
 - The script follows the agent's next path position on the floor plane and keeps gravity for the vertical velocity;
   walking straight at the player would stop at the wall.
 - Automated test: `server/test/integration/navigationBake.test.ts`.
+- Evaluation run: `server/test/evals/scenarios/followThePlayer.ts`.

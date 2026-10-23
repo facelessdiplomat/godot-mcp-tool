@@ -21,6 +21,7 @@
     "lint": "eslint . && node tools/check-gdscript-comments.js ../addon ../test-project/tests test/integration/fixtures",
     "test": "vitest run",
     "test:integration": "vitest run --config vitest.integration.config.ts",
+    "eval": "vitest run --config vitest.evals.config.ts",
     "test:watch": "vitest"
   },
   "dependencies": {

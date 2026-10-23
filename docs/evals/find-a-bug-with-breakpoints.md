@@ -45,3 +45,4 @@ The level hits the enemy once a second.
   when it needs the next line, and removes its breakpoints at the end.
 - It does not leave the game stopped in the debugger while it uses `game_wait` or `game_input`, which refuse then.
 - Automated test: `server/test/integration/debugging.test.ts`.
+- Evaluation run: `server/test/evals/scenarios/findABugWithBreakpoints.ts`.

@@ -27,3 +27,4 @@ There is no `AnimationTree` yet.
   `animation_tree_set` for rejected states or a missing transition from Start.
 - Automated test: `server/test/integration/animationTree.test.ts`, which sets the condition with
   `game_set_properties` instead of moving the character.
+- Evaluation run: `server/test/evals/scenarios/characterStates.ts`.

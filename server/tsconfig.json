@@ -19,5 +19,5 @@
     "outDir": "dist",
     "noEmit": true
   },
-  "include": ["src", "test", "vitest.config.ts", "vitest.integration.config.ts"]
+  "include": ["src", "test", "vitest.config.ts", "vitest.integration.config.ts", "vitest.evals.config.ts"]
 }

@@ -22,3 +22,4 @@ A Godot project with the addon enabled and the editor running, and `res://level.
   result of `animation_set` instead of guessing whether the keys landed.
 - It does not script a tween when the request asks for an animation the level designer can edit.
 - Automated test: `server/test/integration/animation.test.ts`.
+- Evaluation run: `server/test/evals/scenarios/animateADoor.ts`.

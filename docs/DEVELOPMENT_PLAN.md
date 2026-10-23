@@ -1519,7 +1519,13 @@ The whole integration suite, run next to that editor, found two more problems:
       has it (4.6+) and through the bottom panel of 4.5 otherwise.
 - [ ] User documentation: how to connect and how to use (see [User documentation](#user-documentation)).
 - [ ] `CONTRIBUTING.md`, `SECURITY.md`.
-- [ ] Evaluation tasks (§13) and tool description tuning based on their results.
+- [ ] Evaluation tasks (§13) and tool description tuning based on their results: the 20 scenarios of `docs/evals/`
+      run as code with `npm run eval`, each with a reference solution and checks through the MCP tools. The first
+      full run passed 16 of 20 ([results](evals/README.md#results)); its findings are fixed in this order: the
+      harness and two wrong checks; watching the running game (reading the game inside `game_input`, input while
+      `game_pause` holds the game, the frame numbers of `game_pause` and `game_step`, `game_input` at a breakpoint,
+      and what the instructions say about tool calls sent in one message); the smaller tool fixes; the tools that
+      are loaded from the start; joypad input; then a second full run.
 - [ ] CI: lint, unit tests, integration tests with headless Godot (matrix 4.5 / 4.7 / the pinned `master` commit).
 - [ ] Publication to npm and the Godot Asset Store (it replaced the Asset Library in 4.7).
 

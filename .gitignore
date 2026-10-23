@@ -3,6 +3,7 @@ node_modules/
 server/dist/
 server/addon/
 server/coverage/
+server/test/evals/results/
 *.log
 .godot/
 test-project/addons/gut/
