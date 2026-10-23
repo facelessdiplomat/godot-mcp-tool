@@ -1064,6 +1064,12 @@ Dropped and failed connections are the top complaint about almost every existing
   could not reload scripts changed on disk. GUT 9.7.1, the version in `test-project`, does not load on 4.5.
 - The bridge protocol version is part of the handshake; on a mismatch the error explains how to update the addon.
 - Version parsing handles custom builds: `4.8.beta.custom_build.679066724`.
+- CI (`.github/workflows/ci.yml`, GitHub Actions on Ubuntu 24.04) runs the linter, the type check, the unit tests
+  and the package build, and the addon and integration tests against the official 4.7.2 build and against the
+  pinned `master` commit, which it builds from source once and caches by the commit; the window tests stay local.
+  What it downloads is pinned: the actions by commit (`actions/checkout` v7.0.1, `actions/setup-node` v7.1.0,
+  `actions/cache` v6.1.0), the Godot archive by its SHA-512, and GUT and gdUnit4 by the commits of their release
+  tags, which the install scripts check.
 - MCP specification 2026-07-28 is incompatible with earlier revisions, but SDK v2 negotiates the version and serves
   both new and old clients.
 
@@ -1217,13 +1223,14 @@ godot-mcp-tool/
 ├── addon/
 │   └── addons/godot_mcp_tool/    copied (or symlinked) into the game project
 │       ├── plugin.cfg
-│       ├── plugin.gd             EditorPlugin: bridge, autoload, debugger plugin
+│       ├── plugin.gd             EditorPlugin: checks the Godot version, then starts editor/editor_services.gd
 │       ├── bridge/               TCP server, connections, JSON-RPC, discovery
 │       ├── commands/             handlers: project, editor, scene, node, resource, game, view3d, …
 │       ├── codec/                Variant codec
 │       ├── debugger/             EditorDebuggerPlugin
 │       ├── runtime/              autoload GodotMcpRuntime and its commands
 │       └── logging/              Logger subclass
+├── .github/workflows/ci.yml      CI: lint, unit tests, addon and integration tests on Godot 4.7.2 and master
 ├── .claude-plugin/
 │   └── marketplace.json          the repository as the marketplace godot-mcp-tool
 ├── plugin/                       the Claude Code plugin godot
@@ -1584,7 +1591,9 @@ The whole integration suite, run next to that editor, found two more problems:
       Appendix B).
 - [x] Compatibility pass on the official 4.5.2 and 4.7.2 builds (§9.14): every test passes on 4.7.2 after small
       fixes, while 4.5 and 4.6 lack editor APIs that the addon needs, so 4.7 became the minimum (ADR-11).
-- [ ] CI: lint, unit tests, integration tests with headless Godot (matrix 4.7 / the pinned `master` commit).
+- [ ] CI: lint, unit tests, integration tests with headless Godot (matrix 4.7 / the pinned `master` commit). The
+      workflow is written (§9.14); it first runs once the GitHub repository exists, and this is done when it passes
+      there.
 - [ ] Publication to npm and the Godot Asset Store (it replaced the Asset Library in 4.7).
 
 **Done when** the package is published, CI is green and the user documentation passes its check (below).

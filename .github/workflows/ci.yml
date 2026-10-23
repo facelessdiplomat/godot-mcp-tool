@@ -1,0 +1,159 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  NODE_VERSION: 22
+  GODOT_STABLE_VERSION: 4.7.2
+  GODOT_STABLE_SHA512: 9aa00f7a605200940bce3027a567b782f49bd8e940dd06ae9e987bd65aee1b1467edd56ed84fcdcbdd44354bf613bdbb4e5d2913e925850368e150c59ed54c65
+  GODOT_MASTER_COMMIT: 679066724352c12673001d692d41dc2dab9314c0
+  GODOT_MASTER_DIRECTORY: godot-master
+
+jobs:
+  checks:
+    name: Lint, types and unit tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: server
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: server/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Check types
+        run: npm run typecheck
+
+      - name: Run unit tests
+        run: npm test
+
+      - name: Build the package
+        run: npm run build
+
+  godot-master:
+    name: Build Godot master
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    steps:
+      - name: Look for a cached build of the pinned commit
+        id: cached-build
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
+        with:
+          path: ${{ env.GODOT_MASTER_DIRECTORY }}
+          key: godot-editor-linux-${{ env.GODOT_MASTER_COMMIT }}
+          lookup-only: true
+
+      - name: Check out Godot at the pinned commit
+        if: steps.cached-build.outputs.cache-hit != 'true'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          repository: godotengine/godot
+          ref: ${{ env.GODOT_MASTER_COMMIT }}
+          path: godot-source
+          persist-credentials: false
+
+      - name: Build the editor
+        if: steps.cached-build.outputs.cache-hit != 'true'
+        working-directory: godot-source
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes libwayland-bin
+          pipx run --spec scons==4.11.1 scons platform=linuxbsd target=editor accesskit=no
+          mkdir -p "$GITHUB_WORKSPACE/$GODOT_MASTER_DIRECTORY"
+          cp bin/godot.linuxbsd.editor.x86_64 "$GITHUB_WORKSPACE/$GODOT_MASTER_DIRECTORY/godot"
+
+      - name: Cache the build
+        if: steps.cached-build.outputs.cache-hit != 'true'
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
+        with:
+          path: ${{ env.GODOT_MASTER_DIRECTORY }}
+          key: godot-editor-linux-${{ env.GODOT_MASTER_COMMIT }}
+
+  godot-tests:
+    name: Godot ${{ matrix.godot }} tests
+    needs: godot-master
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        godot: [stable, master]
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: server/package-lock.json
+
+      - name: Install dependencies
+        working-directory: server
+        run: npm ci
+
+      - name: Download the official Godot ${{ env.GODOT_STABLE_VERSION }} build
+        if: matrix.godot == 'stable'
+        run: |
+          archive="Godot_v${GODOT_STABLE_VERSION}-stable_linux.x86_64.zip"
+          curl --fail --silent --show-error --location --output "$RUNNER_TEMP/$archive" \
+            "https://github.com/godotengine/godot-builds/releases/download/${GODOT_STABLE_VERSION}-stable/$archive"
+          echo "$GODOT_STABLE_SHA512  $RUNNER_TEMP/$archive" | sha512sum --check --strict
+          unzip -q "$RUNNER_TEMP/$archive" -d "$RUNNER_TEMP/godot"
+          echo "GODOT_BIN=$RUNNER_TEMP/godot/Godot_v${GODOT_STABLE_VERSION}-stable_linux.x86_64" >> "$GITHUB_ENV"
+
+      - name: Restore the Godot master build
+        if: matrix.godot == 'master'
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
+        with:
+          path: ${{ env.GODOT_MASTER_DIRECTORY }}
+          key: godot-editor-linux-${{ env.GODOT_MASTER_COMMIT }}
+          fail-on-cache-miss: true
+
+      - name: Use the Godot master build
+        if: matrix.godot == 'master'
+        run: echo "GODOT_BIN=$GITHUB_WORKSPACE/$GODOT_MASTER_DIRECTORY/godot" >> "$GITHUB_ENV"
+
+      - name: Show the Godot version
+        run: '"$GODOT_BIN" --headless --version'
+
+      - name: Install GUT and gdUnit4 into the test project
+        run: |
+          scripts/install-gut.sh
+          scripts/install-gdunit4.sh
+
+      - name: Run the addon tests
+        run: scripts/test-addon.sh
+
+      - name: Run the integration tests
+        working-directory: server
+        run: npm run test:integration

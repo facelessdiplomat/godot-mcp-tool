@@ -14,7 +14,7 @@ this file records what we learned.
 | Test framework | GUT 9.7.1 |
 
 Update the engine deliberately: pull `master`, rebuild, rerun `npm test`, `npm run test:integration` and
-`scripts/test-addon.sh`, then record the new commit here.
+`scripts/test-addon.sh`, then record the new commit here and in `GODOT_MASTER_COMMIT` of `.github/workflows/ci.yml`.
 
 ## Summary
 
