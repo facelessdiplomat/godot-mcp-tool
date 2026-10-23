@@ -107,3 +107,19 @@ scenario. Cost is the list price that Claude Code reports; time is the agent's o
   `playtest-without-a-window`, took 237 of the 591 calls and $3.52 of the $9.06. Claude Code ran a `game_wait` and a
   `game_input` sent in one message one after another, so the wait was over before the jump began; a read in a later
   message came seconds after a jump of 0.9 s; and input sent while `game_pause` held the game was lost.
+
+### The jump scenarios again, 2026-10-23
+
+The same model and versions, after `game_input` got `read` steps and `game_pause` began to hold the game between the
+holds and waits of `game_input`, `game_wait` and `game_step`:
+
+| Scenario | Checks | Tool calls | Cost, $ | Time, s |
+|---|---|---|---|---|
+| third-person-prototype | 8/8 | 77 → 29 | 1.27 → 0.51 | 212 → 76 |
+| fix-the-jump-error | 3/3 | 48 → 15 | 0.66 → 0.24 | 151 → 41 |
+| gamepad-controls | 6/6 | 66 → 15 | 0.90 → 0.28 | 182 → 49 |
+| playtest-without-a-window | 6/6, was 5/6 | 46 → 15 | 0.69 → 0.26 | 172 → 30 |
+| **Together** | | **237 → 74** | **3.52 → 1.30** | **717 → 196** |
+
+Each agent checked the jump in one or two `game_input` calls with `read` steps; in `playtest-without-a-window` it
+paused the game first and did not start an editor.

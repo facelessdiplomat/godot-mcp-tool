@@ -1,6 +1,7 @@
 extends "../../commands/command.gd"
 
 const Command := preload("../../commands/command.gd")
+const GameTime := preload("../game_time.gd")
 const InputEventCodec := preload("../../input/input_event_codec.gd")
 const Params := preload("../../commands/params.gd")
 const SimilarNames := preload("../../util/similar_names.gd")
@@ -10,14 +11,18 @@ const MAXIMUM_PHYSICS_FRAMES := 3600
 const MAXIMUM_MILLISECONDS := 60_000
 const TAP_PHYSICS_FRAMES := 2
 const STATES := ["tap", "down", "up"]
-const STEP_KINDS := "{\"action\": name}, {\"key\": name}, {\"mouse_motion\": [dx, dy]}, {\"click\": [x, y]}, {\"text\": text}, {\"wait_ms\": n} or {\"wait_physics_frames\": n}"
+const STEP_KINDS := "{\"action\": name}, {\"key\": name}, {\"mouse_motion\": [dx, dy]}, {\"click\": [x, y]}, {\"text\": text}, {\"wait_ms\": n}, {\"wait_physics_frames\": n} or {\"read\": node, \"names\": [...]}"
 
 var _capture: Command
+var _time: GameTime
+var _reader: Command
 var _held := {}
 
 
-func _init(capture: Command) -> void:
+func _init(capture: Command, time: GameTime, reader: Command) -> void:
 	_capture = capture
+	_time = time
+	_reader = reader
 
 
 func execute(params: Dictionary) -> Variant:
@@ -41,15 +46,31 @@ func execute(params: Dictionary) -> Variant:
 		planned.append(step)
 	var tree := Engine.get_main_loop() as SceneTree
 	var started_msec := Time.get_ticks_msec()
-	for step in planned:
-		await _perform(step, tree)
+	var first_frame := _time.frames
+	var reads: Array = []
+	for index in planned.size():
+		var step: Dictionary = planned[index]
+		if step["kind"] == "read":
+			reads.append(_read(step, index + 1, _time.frames - first_frame))
+		else:
+			await _perform(step, tree)
 	var released: Array = []
 	if release_at_end:
 		released = _held.keys()
 		for label in released:
 			_send(_held[label], false)
 		_held.clear()
-	var played := {"steps": planned.size(), "waited_ms": Time.get_ticks_msec() - started_msec, "released": released, "held": _held.keys()}
+	var played := {
+		"steps": planned.size(),
+		"waited_ms": Time.get_ticks_msec() - started_msec,
+		"released": released,
+		"held": _held.keys(),
+		"physics_frames": _time.frames - first_frame,
+		"paused": _time.is_held(),
+		"game_frame": _time.frames,
+	}
+	if not reads.is_empty():
+		played["reads"] = reads
 	if take_screenshot:
 		var capture: Variant = await _capture.execute({})
 		if capture is CommandError:
@@ -80,6 +101,16 @@ func _perform(step: Dictionary, tree: SceneTree) -> void:
 			await _wait(step["hold"], tree)
 
 
+func _read(step: Dictionary, step_number: int, physics_frames: int) -> Dictionary:
+	var outcome: Variant = _reader.execute({"path": step["path"], "names": step["names"]})
+	var read := {"step": step_number, "physics_frames": physics_frames, "path": step["path"]}
+	if outcome is CommandError:
+		read["error"] = (outcome as CommandError).message
+	else:
+		read.merge(outcome, true)
+	return read
+
+
 static func _plan(step: Variant) -> Variant:
 	if not step is Dictionary:
 		return "a step is an object such as {\"action\": \"jump\"}"
@@ -99,7 +130,19 @@ static func _plan(step: Variant) -> Variant:
 	if description.has("wait_ms") or description.has("wait_physics_frames"):
 		var hold: Variant = _plan_duration(description.get("wait_physics_frames"), description.get("wait_ms"), 0)
 		return {"kind": "wait", "hold": hold} if hold is Dictionary else hold
+	if description.has("read"):
+		return _plan_read(description)
 	return "unknown step %s" % JSON.stringify(step)
+
+
+static func _plan_read(description: Dictionary) -> Variant:
+	var path: Variant = description["read"]
+	var names: Variant = description.get("names")
+	if not path is String or (path as String).is_empty():
+		return "read is the path of a node in the running game, such as \"Player\""
+	if not names is Array or (names as Array).is_empty() or not (names as Array).all(func(name: Variant) -> bool: return name is String and not (name as String).is_empty()):
+		return "a read step lists the properties to read in names, such as [\"position\", \"is_on_floor()\"]"
+	return {"kind": "read", "path": path, "names": names}
 
 
 static func _plan_button(description: Dictionary, target: Variant) -> Variant:
@@ -170,38 +213,35 @@ static func _vector_of(value: Variant) -> Variant:
 	return null
 
 
-static func _send(template: InputEvent, pressed: bool) -> void:
+func _send(template: InputEvent, pressed: bool) -> void:
 	var event := template.duplicate() as InputEvent
 	event.set("pressed", pressed)
-	_deliver(event)
+	_time.deliver(event)
 
 
-static func _deliver(event: InputEvent) -> void:
-	Input.parse_input_event(event)
-	Input.flush_buffered_events()
-
-
-static func _move_mouse(relative: Vector2, tree: SceneTree) -> void:
+func _move_mouse(relative: Vector2, tree: SceneTree) -> void:
 	var window := tree.root
 	var to_window := window.get_final_transform()
 	var event := InputEventMouseMotion.new()
 	event.relative = to_window.basis_xform(relative)
 	event.position = to_window * window.get_mouse_position() + event.relative
 	event.global_position = event.position
-	_deliver(event)
+	_time.deliver(event)
 
 
-static func _click(position_in_view: Vector2, button_index: int, double: bool, tree: SceneTree) -> void:
+func _click(position_in_view: Vector2, button_index: int, double: bool, tree: SceneTree) -> void:
+	var was_held := _time.let_run()
 	var position := tree.root.get_final_transform() * position_in_view
 	var hover := InputEventMouseMotion.new()
 	hover.position = position
 	hover.global_position = position
-	_deliver(hover)
+	_time.deliver(hover)
 	for click_number in (2 if double else 1):
-		_deliver(_mouse_button(position, button_index, true, click_number == 1))
+		_time.deliver(_mouse_button(position, button_index, true, click_number == 1))
 		await tree.process_frame
-		_deliver(_mouse_button(position, button_index, false, false))
+		_time.deliver(_mouse_button(position, button_index, false, false))
 		await tree.process_frame
+	_time.hold_again_if(was_held)
 
 
 static func _mouse_button(position: Vector2, button_index: int, pressed: bool, double_click: bool) -> InputEventMouseButton:
@@ -215,20 +255,22 @@ static func _mouse_button(position: Vector2, button_index: int, pressed: bool, d
 	return event
 
 
-static func _type(text: String) -> void:
+func _type(text: String) -> void:
 	for character in text:
 		for pressed in [true, false]:
 			var event := InputEventKey.new()
 			event.unicode = character.unicode_at(0)
 			event.pressed = pressed
-			_deliver(event)
+			_time.deliver(event)
 
 
-static func _wait(hold: Dictionary, tree: SceneTree) -> void:
+func _wait(hold: Dictionary, tree: SceneTree) -> void:
+	var was_held := _time.let_run()
 	if hold.has("ms"):
 		var deadline_msec := Time.get_ticks_msec() + int(hold["ms"])
 		while Time.get_ticks_msec() < deadline_msec:
 			await tree.process_frame
-		return
-	for frame in int(hold["physics_frames"]):
-		await tree.physics_frame
+	else:
+		for frame in int(hold["physics_frames"]):
+			await _time.physics_frame_ended
+	_time.hold_again_if(was_held)

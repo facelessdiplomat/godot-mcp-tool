@@ -7,11 +7,11 @@ import { textResult } from './results.js';
 const gameControlAllowanceMs = 75_000;
 const bytesPerMegabyte = 1024 * 1024;
 
-const pauseResultSchema = z.object({ paused: z.boolean(), was_paused: z.boolean(), physics_frame: z.number() });
+const pauseResultSchema = z.object({ paused: z.boolean(), was_paused: z.boolean(), game_frame: z.number() });
 
 type PauseResult = z.infer<typeof pauseResultSchema>;
 
-const stepResultSchema = z.object({ physics_frames: z.number(), was_paused: z.boolean(), physics_frame: z.number() });
+const stepResultSchema = z.object({ physics_frames: z.number(), was_paused: z.boolean(), game_frame: z.number() });
 
 type StepResult = z.infer<typeof stepResultSchema>;
 
@@ -54,7 +54,7 @@ export function createGamePauseTool(game: EditorGateway): BridgeTool<typeof game
     definition: {
       title: 'Pause or resume the game',
       description:
-        'Pause the running game so that nothing moves, or resume it with paused: false. While it is paused, game_get_properties, game_screenshot and node_get_bounds read a frozen moment and game_step advances it by exact physics frames; game_wait and game_input still wait, but the game does not react. Nodes that the game sets to always process keep running. Needs a game started with game_run, with or without the editor.',
+        'Pause the running game so that nothing moves, or resume it with paused: false. While it is paused, game_get_properties, game_screenshot and node_get_bounds read a frozen moment; game_step advances it by exact physics frames, and game_input and game_wait play it only for their holds and waits, then pause it again. Input sent while it is paused reaches the game in the next frame it plays. Nodes that the game sets to always process keep running. Needs a game started with game_run, with or without the editor.',
       inputSchema: gamePauseInput,
       annotations: changingAnnotations({ destructive: false, idempotent: true }),
       alwaysLoad: false,
@@ -66,14 +66,14 @@ export function createGamePauseTool(game: EditorGateway): BridgeTool<typeof game
 }
 
 function describePause(result: PauseResult): string {
-  const frame = String(result.physics_frame);
+  const frame = `its physics frame ${String(result.game_frame)}`;
   if (result.paused === result.was_paused) {
-    return result.paused ? `The game was paused already, at physics frame ${frame}.` : `The game was running already, at physics frame ${frame}.`;
+    return result.paused ? `The game was paused already, at ${frame}.` : `The game was running already, at ${frame}.`;
   }
   if (result.paused) {
-    return `Paused the game at physics frame ${frame}. Read it with game_get_properties or game_screenshot, advance it with game_step, and resume it with game_pause and paused: false.`;
+    return `Paused the game at ${frame}. Read it with game_get_properties or game_screenshot. game_step, game_input and game_wait play it on by exact physics frames and pause it again; game_pause with paused: false resumes it.`;
   }
-  return `Resumed the game at physics frame ${frame}.`;
+  return `Resumed the game at ${frame}.`;
 }
 
 const gameStepInput = z.object({
@@ -86,7 +86,7 @@ export function createGameStepTool(game: EditorGateway): BridgeTool<typeof gameS
     definition: {
       title: 'Step the game',
       description:
-        'Advance the paused game by exactly the given number of physics frames and keep it paused, to check what happens frame by frame, such as the height of a jump after 10 frames. A running game is paused after the frames. Needs a game started with game_run, with or without the editor.',
+        'Advance the paused game by exactly the given number of physics frames and keep it paused, to check what happens frame by frame, such as the height of a jump after 10 frames. Input sent while the game is paused reaches it in the first of these frames. A running game is paused after the frames. Needs a game started with game_run, with or without the editor.',
       inputSchema: gameStepInput,
       annotations: changingAnnotations({ destructive: false, idempotent: false }),
       alwaysLoad: false,
@@ -101,9 +101,9 @@ export function createGameStepTool(game: EditorGateway): BridgeTool<typeof gameS
 function describeStep(result: StepResult): string {
   const frames = `${String(result.physics_frames)} ${result.physics_frames === 1 ? 'physics frame' : 'physics frames'}`;
   if (result.was_paused) {
-    return `Advanced the game by ${frames} to physics frame ${String(result.physics_frame)}; it stays paused.`;
+    return `Advanced the game by ${frames} to its physics frame ${String(result.game_frame)}; it stays paused.`;
   }
-  return `Let the running game advance ${frames.replace(/^(\d+) /, '$1 more ')} and paused it at physics frame ${String(result.physics_frame)}.`;
+  return `Let the running game advance ${frames.replace(/^(\d+) /, '$1 more ')} and paused it at its physics frame ${String(result.game_frame)}.`;
 }
 
 const gamePerformanceInput = z.object({

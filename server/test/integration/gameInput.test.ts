@@ -1,6 +1,6 @@
 import type { ChildProcess } from 'node:child_process';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { editorStartupTimeoutMs, godotBinary, McpSession, positionIn, startHeadlessEditor, TemporaryProject } from './harness.js';
+import { editorStartupTimeoutMs, godotBinary, McpSession, type Position, positionIn, startHeadlessEditor, TemporaryProject } from './harness.js';
 
 const playerScript = [
   'extends CharacterBody3D',
@@ -45,6 +45,14 @@ const mainScene = [
   'shape = SubResource("CapsuleShape3D_player")',
   '',
 ].join('\n');
+
+function velocityIn(propertiesText: string): Position {
+  const match = /velocity = Vector3\((?<x>[^,]+), (?<y>[^,]+), (?<z>[^)]+)\)/.exec(propertiesText);
+  return { x: Number(match?.groups?.['x']), y: Number(match?.groups?.['y']), z: Number(match?.groups?.['z']) };
+}
+
+const jumpVelocity = 4.5;
+const gravityPerFrame = 9.8 / 60;
 
 describe.skipIf(godotBinary === '')('playing input into the game', () => {
   let project: TemporaryProject | undefined;
@@ -91,7 +99,7 @@ describe.skipIf(godotBinary === '')('playing input into the game', () => {
     const played = await tools().call('game_input', { steps: [{ action: 'move_forward', ms: 1000 }] });
     const after = positionIn((await tools().call('game_get_properties', { path: 'Player', names: ['position'] })).text).z;
 
-    expect(played.text).toMatch(/^Played 1 input step in \d+ ms\./);
+    expect(played.text).toMatch(/^Played 1 input step in \d+ ms \(\d+ physics frames?\)\./);
     expect(before - after).toBeGreaterThan(3);
   });
 
@@ -102,6 +110,46 @@ describe.skipIf(godotBinary === '')('playing input into the game', () => {
 
     expect(airborne.text).toMatch(/became true/);
     expect(landed.text).toMatch(/^"is_on_floor\(\)" became true on Player/);
+  });
+
+  it('reads the game at a moment in the middle of the input', async () => {
+    await tools().call('game_wait', { condition: 'is_on_floor()', node: 'Player', timeout_ms: 5000 });
+    const played = await tools().call('game_input', {
+      steps: [{ key: 'Space', physics_frames: 1 }, { wait_physics_frames: 9 }, { read: 'Player', names: ['velocity', 'is_on_floor()'] }],
+    });
+
+    expect(played.text).toContain('Step 3, after 10 physics frames: Player (CharacterBody3D)');
+    expect(played.text).toContain('is_on_floor() = false  [bool]');
+    expect(velocityIn(played.text).y).toBeCloseTo(jumpVelocity - 9 * gravityPerFrame, 4);
+  });
+
+  it('plays input into the paused game frame by frame', async () => {
+    await tools().call('game_wait', { condition: 'is_on_floor()', node: 'Player', timeout_ms: 5000 });
+    await tools().call('game_pause');
+    const played = await tools().call('game_input', { steps: [{ key: 'Space', physics_frames: 1 }] });
+    const afterTheJumpFrame = await tools().call('game_get_properties', { path: 'Player', names: ['velocity'] });
+    await tools().call('game_step', { physics_frames: 1 });
+    const afterOneMoreFrame = await tools().call('game_get_properties', { path: 'Player', names: ['velocity'] });
+    await tools().call('game_pause', { paused: false });
+
+    expect(played.text).toMatch(/The game advanced 1 physics frame and is paused again at its physics frame \d+\./);
+    expect(velocityIn(afterTheJumpFrame.text).y).toBeCloseTo(jumpVelocity, 4);
+    expect(velocityIn(afterOneMoreFrame.text).y).toBeCloseTo(jumpVelocity - gravityPerFrame, 4);
+  });
+
+  it('keeps input sent to the paused game for the next frame it plays', async () => {
+    await tools().call('game_wait', { condition: 'is_on_floor()', node: 'Player', timeout_ms: 5000 });
+    await tools().call('game_pause');
+    const played = await tools().call('game_input', { steps: [{ key: 'Space', state: 'down' }], release_at_end: false });
+    const beforeTheFrame = await tools().call('game_get_properties', { path: 'Player', names: ['velocity'] });
+    await tools().call('game_step', { physics_frames: 1 });
+    const afterTheFrame = await tools().call('game_get_properties', { path: 'Player', names: ['velocity'] });
+    await tools().call('game_input', { steps: [{ key: 'Space', state: 'up' }] });
+    await tools().call('game_pause', { paused: false });
+
+    expect(played.text).toContain('The game is paused, so this input reaches it in the next frame that game_step, game_wait or game_input plays.');
+    expect(velocityIn(beforeTheFrame.text).y).toBeCloseTo(0, 4);
+    expect(velocityIn(afterTheFrame.text).y).toBeCloseTo(jumpVelocity, 4);
   });
 
   it('suggests the action it did not find', async () => {

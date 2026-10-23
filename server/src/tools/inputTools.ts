@@ -4,6 +4,7 @@ import type { EditorGateway } from '../editor/EditorGateway.js';
 import { changingAnnotations, readingAnnotations } from './annotations.js';
 import { BridgeTool } from './bridge/BridgeTool.js';
 import { type CaptureReader, captureSchema, describeGameCapture, presentCapture, screenshotAllowanceMs } from './captureTools.js';
+import { formatPropertyLines, propertyDescriptionsSchema } from './formatting/propertyReports.js';
 import { errorResult, textResult } from './results.js';
 
 const defaultDeadzone = 0.2;
@@ -34,11 +35,22 @@ const inputMapChangeSchema = z.object({
 
 type InputMapChange = z.infer<typeof inputMapChangeSchema>;
 
+const inputReadSchema = z.union([
+  z.object({ step: z.number(), physics_frames: z.number(), path: z.string(), type: z.string(), properties: propertyDescriptionsSchema }),
+  z.object({ step: z.number(), physics_frames: z.number(), path: z.string(), error: z.string() }),
+]);
+
+type InputRead = z.infer<typeof inputReadSchema>;
+
 const playedInputSchema = z.object({
   steps: z.number(),
   waited_ms: z.number(),
   released: z.array(z.string()),
   held: z.array(z.string()),
+  physics_frames: z.number(),
+  paused: z.boolean(),
+  game_frame: z.number(),
+  reads: z.array(inputReadSchema).optional(),
   screenshot: captureSchema.optional(),
   screenshot_error: z.string().optional(),
 });
@@ -178,7 +190,15 @@ const waitPhysicsFramesStep = z.strictObject({
   wait_physics_frames: z.number().int().min(1).max(3600).describe('Wait this many physics frames.'),
 });
 
-const inputStep = z.union([actionStep, keyStep, mouseMotionStep, clickStep, textStep, waitMillisecondsStep, waitPhysicsFramesStep]);
+const readStep = z.strictObject({
+  read: z.string().min(1).describe('A node of the running game to read at this moment of the input, such as "Player", as in game_get_properties.'),
+  names: z
+    .array(z.string().min(1))
+    .min(1)
+    .describe('Properties and getters to read, such as ["position", "velocity", "is_on_floor()"]. The result lists them with the physics frames played since the input began.'),
+});
+
+const inputStep = z.union([actionStep, keyStep, mouseMotionStep, clickStep, textStep, waitMillisecondsStep, waitPhysicsFramesStep, readStep]);
 
 type InputStep = z.infer<typeof inputStep>;
 
@@ -188,7 +208,7 @@ const gameInputInput = z.object({
     .min(1)
     .max(200)
     .describe(
-      'Input to play in order, such as [{"action": "move_forward", "ms": 1000}, {"action": "jump"}, {"mouse_motion": [120, 0]}, {"click": [640, 360]}, {"wait_ms": 300}].',
+      'Input to play in order, such as [{"action": "move_forward", "ms": 1000}, {"action": "jump"}, {"wait_physics_frames": 10}, {"read": "Player", "names": ["position"]}, {"mouse_motion": [120, 0]}, {"click": [640, 360]}, {"wait_ms": 300}].',
     ),
   release_at_end: z.boolean().default(true).describe('Release every action and key that is still held after the last step. Default: true.'),
   screenshot: z
@@ -203,7 +223,7 @@ export function createGameInputTool(game: EditorGateway, readCapture: CaptureRea
     definition: {
       title: 'Play input into the game',
       description:
-        'Play input into the running game step by step: hold input actions or keys for a time, move and click the mouse, type text, wait. Use it to try gameplay, such as walking forward for a second and then jumping, then check the result with game_get_properties, game_wait, or a screenshot taken right after the last step (screenshot: true). Actions must exist in the project when the game starts. Needs a game started with game_run, with or without the editor.',
+        'Play input into the running game step by step: hold input actions or keys, move and click the mouse, type text, wait, and read nodes at exact moments with read steps, such as the height of a jump 10 physics frames after the press, which a later call would miss. A hold of N physics frames lasts exactly N frames of the game. While game_pause holds the game, the input plays it only for its holds and waits, then pauses it again. Also check the result with game_get_properties or a screenshot right after the last step (screenshot: true). Actions must exist in the project when the game starts. Needs a game started with game_run, with or without the editor.',
       inputSchema: gameInputInput,
       annotations: changingAnnotations({ destructive: false, idempotent: false }),
       alwaysLoad: false,
@@ -231,6 +251,9 @@ function estimatedDurationMs(step: InputStep): number {
   if ('wait_physics_frames' in step) {
     return framesToMs(step.wait_physics_frames);
   }
+  if ('read' in step) {
+    return 0;
+  }
   if ('action' in step || 'key' in step) {
     return step.ms ?? framesToMs(step.physics_frames ?? tapPhysicsFrames);
   }
@@ -242,7 +265,10 @@ function framesToMs(physicsFrames: number): number {
 }
 
 function describePlayedInput(played: PlayedInput): string {
-  const lines = [`Played ${String(played.steps)} input ${played.steps === 1 ? 'step' : 'steps'} in ${String(played.waited_ms)} ms.`];
+  const lines = [
+    `Played ${String(played.steps)} input ${played.steps === 1 ? 'step' : 'steps'} in ${String(played.waited_ms)} ms (${describePhysicsFrames(played.physics_frames)}).`,
+    ...(played.reads ?? []).flatMap(describeRead),
+  ];
   if (played.released.length > 0) {
     lines.push(`Released at the end: ${played.released.join(', ')}.`);
   }
@@ -250,7 +276,26 @@ function describePlayedInput(played: PlayedInput): string {
   if (firstHeld !== undefined) {
     lines.push(`Still held: ${played.held.join(', ')}. Release it with ${releaseStepFor(firstHeld)}.`);
   }
+  if (played.paused) {
+    lines.push(
+      played.physics_frames === 0
+        ? 'The game is paused, so this input reaches it in the next frame that game_step, game_wait or game_input plays.'
+        : `The game advanced ${describePhysicsFrames(played.physics_frames)} and is paused again at its physics frame ${String(played.game_frame)}.`,
+    );
+  }
   return lines.join('\n');
+}
+
+function describeRead(read: InputRead): string[] {
+  const moment = `Step ${String(read.step)}, after ${describePhysicsFrames(read.physics_frames)}`;
+  if ('error' in read) {
+    return [`${moment}: could not read ${read.path}: ${read.error}`];
+  }
+  return [`${moment}: ${read.path} (${read.type})`, ...formatPropertyLines(read.properties)];
+}
+
+function describePhysicsFrames(count: number): string {
+  return `${String(count)} ${count === 1 ? 'physics frame' : 'physics frames'}`;
 }
 
 function releaseStepFor(heldLabel: string): string {

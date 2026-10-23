@@ -24,6 +24,8 @@ const waitResultSchema = z.object({
   frames: z.number().optional(),
   physics_frames: z.number().optional(),
   waited_ms: z.number(),
+  paused: z.boolean(),
+  game_frame: z.number(),
 });
 
 type WaitResult = z.infer<typeof waitResultSchema>;
@@ -116,7 +118,7 @@ const gameWaitInput = z.object({
     .string()
     .min(1)
     .optional()
-    .describe('Wait until this Godot expression is true on the node, such as "is_on_floor()" or "position.y < 0.1". It is checked every physics frame.'),
+    .describe('Wait until this Godot expression is true on the node, such as "is_on_floor()" or "position.y < 0.1". It is checked after every physics frame.'),
   node: z.string().optional().describe('The node the condition is evaluated on, such as "Player". Default: the current scene root.'),
   timeout_ms: z.number().int().min(1).max(60_000).default(10_000).describe('How long to wait for the condition before giving up. Default: 10 seconds.'),
   physics_frames: z.number().int().min(1).max(36_000).optional().describe('Instead of a condition, wait this many physics frames (60 per second by default).'),
@@ -130,7 +132,7 @@ export function createGameWaitTool(game: EditorGateway): BridgeTool<typeof gameW
     definition: {
       title: 'Wait in the game',
       description:
-        'Wait in the running game until a condition holds on a node, such as "is_on_floor()" on Player, or for a number of physics frames, frames or milliseconds. Pass exactly one of condition, physics_frames, frames or ms. Needs a game started with game_run, with or without the editor.',
+        'Wait in the running game until a condition holds on a node, such as "is_on_floor()" on Player, or for a number of physics frames, frames or milliseconds. Pass exactly one of condition, physics_frames, frames or ms. While game_pause holds the game, game_wait plays it until then and pauses it again on that frame, such as at the top of a jump with "velocity.y <= 0". Needs a game started with game_run, with or without the editor.',
       inputSchema: gameWaitInput,
       annotations: readingAnnotations,
       alwaysLoad: false,
@@ -138,7 +140,7 @@ export function createGameWaitTool(game: EditorGateway): BridgeTool<typeof gameW
     method: 'game.wait',
     responseSchema: waitResultSchema,
     timeoutMs: waitAllowanceMs,
-    present: (result, input) => textResult(describeWait(result, input)),
+    present: (result, input) => textResult(result.paused ? `${describeWait(result, input)} The game is paused again at its physics frame ${String(result.game_frame)}.` : describeWait(result, input)),
   });
 }
 

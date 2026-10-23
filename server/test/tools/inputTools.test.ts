@@ -85,8 +85,8 @@ describe('input tools', () => {
 
   it('game_input plays the steps and says what is still held', async () => {
     const editor = new FakeEditorGateway()
-      .respondTo('game.input', { steps: 3, waited_ms: 1240, released: ['move_forward'], held: [] })
-      .respondTo('game.input', { steps: 1, waited_ms: 33, released: [], held: ['jump'] });
+      .respondTo('game.input', { steps: 3, waited_ms: 1240, released: ['move_forward'], held: [], physics_frames: 74, paused: false, game_frame: 300 })
+      .respondTo('game.input', { steps: 1, waited_ms: 33, released: [], held: ['jump'], physics_frames: 0, paused: false, game_frame: 300 });
 
     const first = textOf(
       await createGameInputTool(editor, () => Buffer.alloc(0)).execute({ steps: [{ action: 'move_forward', state: 'down' }, { wait_ms: 1000 }, { action: 'jump' }] }),
@@ -99,12 +99,12 @@ describe('input tools', () => {
       screenshot: false,
     });
     expect(editor.requests[0]?.options?.timeoutMs).toBeGreaterThan(1000 + 15_000);
-    expect(first).toBe('Played 3 input steps in 1240 ms.\nReleased at the end: move_forward.');
-    expect(second).toBe('Played 1 input step in 33 ms.\nStill held: jump. Release it with {"action": "jump", "state": "up"}.');
+    expect(first).toBe('Played 3 input steps in 1240 ms (74 physics frames).\nReleased at the end: move_forward.');
+    expect(second).toBe('Played 1 input step in 33 ms (0 physics frames).\nStill held: jump. Release it with {"action": "jump", "state": "up"}.');
   });
 
   it('game_input tells how to release a held key', async () => {
-    const editor = new FakeEditorGateway().respondTo('game.input', { steps: 1, waited_ms: 16, released: [], held: ['key W'] });
+    const editor = new FakeEditorGateway().respondTo('game.input', { steps: 1, waited_ms: 16, released: [], held: ['key W'], physics_frames: 1, paused: false, game_frame: 5 });
 
     const text = textOf(await createGameInputTool(editor, () => Buffer.alloc(0)).execute({ steps: [{ key: 'W', state: 'down' }], release_at_end: false }));
 
@@ -123,6 +123,9 @@ describe('input tools', () => {
       waited_ms: 40,
       released: [],
       held: [],
+      physics_frames: 2,
+      paused: false,
+      game_frame: 42,
       screenshot: {
         path: '/captures/game-1-001.png',
         width: 1152,
@@ -140,7 +143,7 @@ describe('input tools', () => {
     expect(result.content[0]).toEqual({ type: 'image', data: Buffer.from('png').toString('base64'), mimeType: 'image/png' });
     expect(result.content[1]).toEqual({
       type: 'text',
-      text: 'Played 1 input step in 40 ms.\nScreenshot of the running game (res://levels/arena.tscn), 1152×648.\nSaved to /captures/game-1-001.png',
+      text: 'Played 1 input step in 40 ms (2 physics frames).\nScreenshot of the running game (res://levels/arena.tscn), 1152×648.\nSaved to /captures/game-1-001.png',
     });
   });
 
@@ -150,12 +153,85 @@ describe('input tools', () => {
       waited_ms: 40,
       released: [],
       held: [],
+      physics_frames: 2,
+      paused: false,
+      game_frame: 42,
       screenshot_error: 'The game runs without a window (headless), so it cannot render a screenshot',
     });
 
     const result = await createGameInputTool(editor, () => Buffer.from('png')).execute({ steps: [{ action: 'jump' }], screenshot: true });
 
     expect(result.isError).toBeFalsy();
-    expect(textOf(result)).toBe('Played 1 input step in 40 ms.\nNo screenshot: The game runs without a window (headless), so it cannot render a screenshot');
+    expect(textOf(result)).toBe('Played 1 input step in 40 ms (2 physics frames).\nNo screenshot: The game runs without a window (headless), so it cannot render a screenshot');
+  });
+
+  it('game_input reads nodes at moments of the input', async () => {
+    const editor = new FakeEditorGateway().respondTo('game.input', {
+      steps: 3,
+      waited_ms: 170,
+      released: [],
+      held: [],
+      physics_frames: 10,
+      paused: false,
+      game_frame: 400,
+      reads: [
+        {
+          step: 3,
+          physics_frames: 10,
+          scene: 'res://levels/arena.tscn',
+          path: 'Player',
+          type: 'CharacterBody3D',
+          properties: [
+            { name: 'velocity', type: 'Vector3', value: 'Vector3(0, 3.03, 0)' },
+            { name: 'is_on_floor()', type: 'bool', value: false },
+          ],
+        },
+        { step: 4, physics_frames: 10, path: 'Enemy', error: 'Node "Enemy" not found. Similar: Enemies.' },
+      ],
+    });
+    const steps = [{ key: 'Space', physics_frames: 1 }, { wait_physics_frames: 9 }, { read: 'Player', names: ['velocity', 'is_on_floor()'] }, { read: 'Enemy', names: ['position'] }];
+
+    const text = textOf(await createGameInputTool(editor, () => Buffer.alloc(0)).execute({ steps }));
+
+    expect(editor.requests[0]?.params).toEqual({ steps, release_at_end: true, screenshot: false });
+    expect(text).toBe(
+      [
+        'Played 3 input steps in 170 ms (10 physics frames).',
+        'Step 3, after 10 physics frames: Player (CharacterBody3D)',
+        'velocity = Vector3(0, 3.03, 0)  [Vector3]',
+        'is_on_floor() = false  [bool]',
+        'Step 4, after 10 physics frames: could not read Enemy: Node "Enemy" not found. Similar: Enemies.',
+      ].join('\n'),
+    );
+  });
+
+  it('game_input refuses a read step without names', async () => {
+    const result = await createGameInputTool(new FakeEditorGateway(), () => Buffer.alloc(0)).execute({ steps: [{ read: 'Player' }] } as never);
+
+    expect(result.isError).toBe(true);
+  });
+
+  it('game_input says how far it played a paused game', async () => {
+    const editor = new FakeEditorGateway()
+      .respondTo('game.input', { steps: 1, waited_ms: 20, released: ['key Space'], held: [], physics_frames: 1, paused: true, game_frame: 812 })
+      .respondTo('game.input', { steps: 1, waited_ms: 0, released: [], held: ['key Space'], physics_frames: 0, paused: true, game_frame: 812 });
+
+    const played = textOf(await createGameInputTool(editor, () => Buffer.alloc(0)).execute({ steps: [{ key: 'Space', physics_frames: 1 }] }));
+    const queued = textOf(await createGameInputTool(editor, () => Buffer.alloc(0)).execute({ steps: [{ key: 'Space', state: 'down' }], release_at_end: false }));
+
+    expect(played).toBe(
+      [
+        'Played 1 input step in 20 ms (1 physics frame).',
+        'Released at the end: key Space.',
+        'The game advanced 1 physics frame and is paused again at its physics frame 812.',
+      ].join('\n'),
+    );
+    expect(queued).toBe(
+      [
+        'Played 1 input step in 0 ms (0 physics frames).',
+        'Still held: key Space. Release it with {"key": "Space", "state": "up"}.',
+        'The game is paused, so this input reaches it in the next frame that game_step, game_wait or game_input plays.',
+      ].join('\n'),
+    );
   });
 });

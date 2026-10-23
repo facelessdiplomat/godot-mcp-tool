@@ -33,9 +33,10 @@ are described in the files linked at the end.
    on disk.
 5. **Run** with `game_run` and read errors with `game_get_output`. A ⚠ line in any result means new errors: read them
    before you go on.
-6. **Observe** the running game: `game_input` for actions, keys and the mouse; `game_wait` for a state such as
-   `is_on_floor()`; `game_get_properties` for values, getters included; `node_get_bounds` for placement and scale;
-   `game_screenshot`, with `views` for 3D; `game_pause` and `game_step` for frame-exact checks; `game_performance`.
+6. **Observe** the running game: `game_input` for actions, keys and the mouse, with `read` steps for values at exact
+   moments; `game_wait` for a state such as `is_on_floor()`; `game_get_properties` for values, getters included;
+   `node_get_bounds` for placement and scale; `game_screenshot`, with `views` for 3D; `game_pause` and `game_step` for
+   frame-exact checks; `game_performance`.
 7. **Test** with GUT tests in `res://test` and `test_run`.
    To find why code misbehaves, stop the game on a line with `debug_breakpoints`, read the stack and the variables
    with `debug_state`, step with `debug_continue`, and remove the breakpoints when done.
@@ -51,8 +52,10 @@ are described in the files linked at the end.
 - A physics body needs a `CollisionShape3D` child with a shape, or it falls through the floor and detects nothing.
 - A 3D scene needs its own `DirectionalLight3D` and `WorldEnvironment`: the editor's preview sun and sky do not exist
   in the game.
-- Tool calls sent in one message run at the same time: read the game state in a later message than the
-  `game_input` or `game_wait` it depends on.
+- The game keeps running between tool calls, which come seconds apart: a jump is over before the next call. Read
+  short moments inside `game_input` with a `read` step, or pause with `game_pause`; `game_input`, `game_wait` and
+  `game_step` then play the game by exact physics frames and pause it again. Calls sent in one message may run one
+  after another, so a `game_wait` sent with a `game_input` does not watch it.
 - Check 3D work in numbers first (`node_get_bounds`, properties), then look from several angles, such as
   `views: ["front", "top", "iso"]`; one picture of a 3D scene misleads.
 - Keep game logic in methods that tests and tools can call, such as `dash()` or `take_damage(amount)`, rather than

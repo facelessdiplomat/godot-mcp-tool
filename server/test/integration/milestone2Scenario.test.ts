@@ -144,7 +144,7 @@ describe.skipIf(godotBinary === '')('the milestone 2 scenario: a third-person pr
     const played = await tools().call('game_input', { steps: [{ action: 'move_forward', ms: 1000 }] });
     const after = await tools().call('game_get_properties', { path: 'Player', names: ['position', 'is_on_floor()'] });
 
-    expect(played.text).toMatch(/^Played 1 input step in \d+ ms\./);
+    expect(played.text).toMatch(/^Played 1 input step in \d+ ms \(\d+ physics frames?\)\./);
     expect(positionIn(after.text).z).toBeLessThan(startZ - 3);
     expect(after.text).toContain('is_on_floor() = true  [bool]');
   });

@@ -10,8 +10,9 @@ describe('serverInstructions', () => {
     expect(serverInstructions.length).toBeLessThan(4096);
   });
 
-  it('warns that tool calls sent together run at the same time', () => {
-    expect(serverInstructions).toContain('Tool calls sent in one message run at the same time, so read the state in a later message than the game_input or game_wait it depends on.');
+  it('tells how to catch a short moment of the running game', () => {
+    expect(serverInstructions).toContain('read it inside game_input with a read step, or pause the game with game_pause first');
+    expect(serverInstructions).toContain('Calls sent in one message may run one after another, so a game_wait sent with a game_input does not watch it.');
   });
 
   it('sends file moves and renames through filesystem_move', () => {

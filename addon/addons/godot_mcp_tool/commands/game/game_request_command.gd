@@ -29,4 +29,4 @@ func execute(params: Dictionary) -> Variant:
 					"The game is stopped in the debugger, so its frames do not advance",
 					"debug_state shows where it stopped; resume it with debug_continue.",
 				)
-	return await _runtime.channel.request(_game_method, params, _answer_timeout_msec)
+	return await _runtime.channel.request(_game_method, params, _answer_timeout_msec, _waits_for_frames)

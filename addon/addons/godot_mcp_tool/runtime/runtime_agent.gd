@@ -3,6 +3,7 @@ extends Node
 const CommandRouter := preload("../commands/command_router.gd")
 const DebuggerSink := preload("debugger_sink.gd")
 const GameRequestResponder := preload("game_request_responder.gd")
+const GameTime := preload("game_time.gd")
 const LogFileWriter := preload("log_file_writer.gd")
 const RuntimeActivation := preload("runtime_activation.gd")
 const RuntimeLogger := preload("runtime_logger.gd")
@@ -12,6 +13,7 @@ const ServerConnection := preload("server_connection.gd")
 const GAME_COMMAND_CATALOG_FILE := "game_commands/game_command_catalog.gd"
 
 var _logger: RuntimeLogger
+var _time: GameTime
 var _sink: RefCounted
 var _responder: GameRequestResponder
 var _server_connection: ServerConnection
@@ -19,15 +21,18 @@ var _server_connection: ServerConnection
 
 func _init() -> void:
 	var user_arguments := OS.get_cmdline_user_args()
-	match RuntimeActivation.mode_of(EngineDebugger.is_active(), OS.is_debug_build(), user_arguments):
+	var mode := RuntimeActivation.mode_of(EngineDebugger.is_active(), OS.is_debug_build(), user_arguments)
+	if mode == RuntimeActivation.Mode.OFF:
+		return
+	_time = GameTime.new()
+	add_child(_time)
+	match mode:
 		RuntimeActivation.Mode.EDITOR:
 			_sink = DebuggerSink.new()
 			_listen_to_the_editor()
 		RuntimeActivation.Mode.SERVER:
 			_sink = LogFileWriter.new(LogFileWriter.path_from_arguments(user_arguments))
 			_connect_to_the_server(ServerConnection.port_from_arguments(user_arguments), ServerConnection.token_from_environment())
-		_:
-			return
 	_logger = RuntimeLogger.new(true)
 	OS.add_logger(_logger)
 
@@ -73,7 +78,7 @@ func _connect_to_the_server(port: int, token: String) -> void:
 
 func _game_router() -> CommandRouter:
 	var catalog := load((get_script() as Script).resource_path.get_base_dir().path_join(GAME_COMMAND_CATALOG_FILE)) as GDScript
-	return catalog.call(&"build_router", _current_scene)
+	return catalog.call(&"build_router", _current_scene, _time)
 
 
 func _on_editor_message(message: String, data: Array) -> bool:

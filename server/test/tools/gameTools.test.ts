@@ -228,7 +228,7 @@ describe('game tools', () => {
   });
 
   it('game_wait reports a condition that became true', async () => {
-    const editor = new FakeEditorGateway().respondTo('game.wait', { met: true, value: true, physics_frames: 42, waited_ms: 700 });
+    const editor = new FakeEditorGateway().respondTo('game.wait', { met: true, value: true, physics_frames: 42, waited_ms: 700, paused: false, game_frame: 960 });
 
     const result = await createGameWaitTool(editor).execute({ condition: 'is_on_floor()', node: 'Player' });
 
@@ -238,7 +238,7 @@ describe('game tools', () => {
   });
 
   it('game_wait reports a condition that stayed false', async () => {
-    const editor = new FakeEditorGateway().respondTo('game.wait', { met: false, value: 'Vector3(0, 3.5, 0)', physics_frames: 600, waited_ms: 10000 });
+    const editor = new FakeEditorGateway().respondTo('game.wait', { met: false, value: 'Vector3(0, 3.5, 0)', physics_frames: 600, waited_ms: 10000, paused: false, game_frame: 1560 });
 
     const text = textOf(await createGameWaitTool(editor).execute({ condition: 'position' }));
 
@@ -247,13 +247,25 @@ describe('game tools', () => {
 
   it('game_wait waits for frames and time', async () => {
     const editor = new FakeEditorGateway()
-      .respondTo('game.wait', { physics_frames: 60, waited_ms: 1001 })
-      .respondTo('game.wait', { frames: 2, waited_ms: 33 })
-      .respondTo('game.wait', { waited_ms: 250 });
+      .respondTo('game.wait', { physics_frames: 60, waited_ms: 1001, paused: false, game_frame: 60 })
+      .respondTo('game.wait', { frames: 2, waited_ms: 33, paused: false, game_frame: 62 })
+      .respondTo('game.wait', { waited_ms: 250, paused: false, game_frame: 77 });
 
     expect(textOf(await createGameWaitTool(editor).execute({ physics_frames: 60 }))).toBe('Waited 60 physics frames (1001 ms).');
     expect(textOf(await createGameWaitTool(editor).execute({ frames: 2 }))).toBe('Waited 2 frames (33 ms).');
     expect(textOf(await createGameWaitTool(editor).execute({ ms: 250 }))).toBe('Waited 250 ms.');
+  });
+
+  it('game_wait says that it played the paused game and paused it again', async () => {
+    const editor = new FakeEditorGateway()
+      .respondTo('game.wait', { met: true, value: true, physics_frames: 5, waited_ms: 90, paused: true, game_frame: 37 })
+      .respondTo('game.wait', { physics_frames: 60, waited_ms: 1001, paused: true, game_frame: 97 });
+
+    const condition = textOf(await createGameWaitTool(editor).execute({ condition: 'ticks >= 25', node: 'Faller' }));
+    const frames = textOf(await createGameWaitTool(editor).execute({ physics_frames: 60 }));
+
+    expect(condition).toBe('"ticks >= 25" became true on Faller after 90 ms (5 physics frames). The game is paused again at its physics frame 37.');
+    expect(frames).toBe('Waited 60 physics frames (1001 ms). The game is paused again at its physics frame 97.');
   });
 });
 

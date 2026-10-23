@@ -16,7 +16,14 @@ const mainScript = [
   '\tif counter % 60 == 0:',
   '\t\tprint(label)',
   '',
+  '',
+  'func _physics_process(_delta: float) -> void:',
+  '\tif Input.is_action_pressed("jump"):',
+  '\t\tcounter += 100',
+  '',
 ].join('\n');
+
+const jumpLine = mainScript.split('\n').indexOf('\t\tcounter += 100') + 1;
 
 const mainScene = ['[gd_scene load_steps=2 format=3]', '', '[ext_resource type="Script" path="res://main.gd" id="1_main"]', '', '[node name="Main" type="Node3D"]', 'script = ExtResource("1_main")', ''].join('\n');
 
@@ -39,6 +46,7 @@ describe.skipIf(godotBinary === '')('debugging the running game with breakpoints
     const debugAdapterPort = await findFreePort();
     editorProcess = await startHeadlessEditor(project.root, { debugAdapter: debugAdapterPort });
     session = await McpSession.connect(project.root, { GODOT_DAP_PORT: String(debugAdapterPort) });
+    await session.call('input_map_set', { actions: { jump: ['Space'] } });
   }, editorStartupTimeoutMs);
 
   afterAll(async () => {
@@ -60,7 +68,7 @@ describe.skipIf(godotBinary === '')('debugging the running game with breakpoints
       ].join('\n'),
     );
     expect(refused.isError).toBe(true);
-    expect(refused.text).toBe('res://main.gd has 13 lines, so it has no line 99.');
+    expect(refused.text).toBe(`res://main.gd has ${String(mainScript.split('\n').length)} lines, so it has no line 99.`);
   });
 
   it('stops the game at the breakpoint and shows the stack, the code and the variables', async () => {
@@ -96,5 +104,22 @@ describe.skipIf(godotBinary === '')('debugging the running game with breakpoints
     expect(continued.text).toBe('The game continues. debug_state with wait_ms waits for it to stop at the next breakpoint.');
     expect(waited.isError).toBe(false);
     expect(state.text).toMatch(/^The game is not stopped in the debugger\./);
+  });
+
+  it('answers at once when the game stops at a breakpoint in the middle of the input', async () => {
+    await tools().call('debug_breakpoints', { add: [`res://main.gd:${String(jumpLine)}`] });
+    const started = Date.now();
+    const played = await tools().call('game_input', { steps: [{ action: 'jump', physics_frames: 30 }] });
+    const answeredAfterMs = Date.now() - started;
+    const state = await tools().call('debug_state');
+    await tools().call('debug_breakpoints', { clear: true });
+    await tools().call('debug_continue');
+
+    expect(played.isError).toBe(true);
+    expect(played.text).toBe(
+      'The game stopped in the debugger before this call finished; its frames do not advance while it is stopped\nHint: debug_state shows where it stopped; debug_continue resumes the game, and the rest of this call plays out then.',
+    );
+    expect(answeredAfterMs).toBeLessThan(5000);
+    expect(state.text).toMatch(new RegExp(`^The game stopped at a breakpoint at res://main\\.gd:${String(jumpLine)} in _physics_process\\.`));
   });
 });

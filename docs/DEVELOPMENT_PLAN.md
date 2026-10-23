@@ -517,7 +517,7 @@ doesn't carry.
 | `game_stop` | Stop the game | 1 | W | E/C |
 | `game_get_output` | Logs and errors with stack traces after a cursor (only new entries), level filter, line limit | 1 | R | E/C |
 | `game_screenshot` | Screenshot of the game viewport: scale, format; in 3D, optionally renders from extra cameras without touching the active one (§8.9) | 2 | R | G |
-| `game_input` | A sequence of steps: actions, keys, mouse motion and clicks, text, pauses; optionally a screenshot at the end | 2 | W | G |
+| `game_input` | A sequence of steps: actions, keys, mouse motion and clicks, text, pauses, reads of nodes at exact moments; optionally a screenshot at the end | 2 | W | G |
 | `game_wait` | Wait for render frames, physics frames, milliseconds or a condition (`Expression`), with a timeout | 2 | R | G |
 | `game_get_tree` | The runtime node tree | 2 | R | G |
 | `game_get_properties` / `game_set_properties` | Like the remote inspector | 2 | R/W | G |
@@ -593,7 +593,9 @@ unless `network/debug_adapter/sync_breakpoints` is on; the price is that variabl
 Lines are counted from 1 in the tools and converted for the adapter (Appendix B). While the game is stopped,
 `game_get_properties` and `game_get_tree` still answer, and `game_wait`, `game_input`, `game_step`, `game_screenshot`
 and `game_performance` refuse at once instead of waiting for frames that do not come; `game_run` and `game_get_output`
-say that the game is stopped in the debugger.
+say that the game is stopped in the debugger. A call that is already waiting for frames when the game stops, such as
+a `game_input` whose jump reaches a breakpoint, is answered at once too; the rest of it plays out when the game
+continues, and its late answer is dropped.
 
 ### 8.9 3D tools
 
@@ -688,9 +690,12 @@ Connected to Godot <version>, project "<name>" (3D). Indentation: <tabs | N spac
 - No tool profiles for other clients (§3).
 - Installed as the Claude Code plugin `godot`, the server's tools are named `mcp__plugin_godot_godot__<tool>`, so
   permission rules and hook matchers use these names; its skill is `/godot:godot`.
-- Claude Code runs the tool calls of one message at the same time (seen in the milestone 2 live run): a
-  `game_get_properties` sent together with `game_input` read the state before the input. The server instructions
-  tell the agent to read game state in a later message than the `game_input` or `game_wait` it depends on.
+- Claude Code runs the tool calls of one message at the same time only when all of them only read; otherwise it runs
+  them one after another, in the order sent. The debug logs of the first evaluation run show it: a `game_wait` sent
+  with a `game_input` ended before the input began, so it never saw the jump. And a later call comes seconds after a
+  short moment, such as a jump of 0.9 s, is over. So `game_input` reads nodes at exact moments with `read` steps, and
+  while `game_pause` holds the game, `game_input`, `game_wait` and `game_step` play it by exact physics frames and
+  pause it again (§9.10). The server instructions and the skill say so.
 
 ### 8.13 Compact output example (`scene_get_tree`)
 
@@ -938,10 +943,17 @@ On a script error the editor's debugger pauses the game by default — to the ag
 - Pause and step (`game_pause`, `game_step`) pause the scene tree from the runtime agent. The spike of milestone 3
   compared this with the Game view's own "suspend / next frame": `SceneTree.set_suspend` is not available to scripts,
   only through the debugger messages `scene:suspend_changed` and `scene:next_frame`, and its next frame runs until the
-  next rendered frame, which holds no fixed number of physics frames. The agent instead waits for the start of a
-  physics tick, unpauses the tree, lets `physics_frame` fire N times and pauses it again: exactly N ticks of
-  `_physics_process` and of the physics server. Nodes that the game sets to `PROCESS_MODE_ALWAYS` keep running, and
-  resuming also ends a pause that the game set itself.
+  next rendered frame, which holds no fixed number of physics frames. The agent instead unpauses the tree, lets N
+  physics frames end and pauses it again: exactly N ticks of `_physics_process`. Nodes that the game sets to
+  `PROCESS_MODE_ALWAYS` keep running, and resuming also ends a pause that the game set itself.
+- The game clock is a node of the runtime agent that always processes and runs last in each physics frame: it counts
+  the frames that the game itself plays, which `game_pause` and `game_step` report, and says when a frame has ended.
+  Holds and waits end there, so a hold of N physics frames lasts exactly N frames of the game (before, the release came
+  at the start of the Nth frame, one frame early), and a `read` step of `game_input` sees the frame complete.
+- While `game_pause` holds the game, `game_input` and `game_wait` play it only for their holds and waits and pause it
+  again, and `game_step` plays its frames. Input sent while the game is held waits for the next frame it plays:
+  Godot marks a press as just pressed in the next physics frame of the engine, which keeps counting while the tree is
+  paused, so a press sent to a paused tree was lost for `is_action_just_pressed`.
 - With `fixed_fps` and no window the game runs as fast as it can (60 frames in 0.2 ms in the spike), so waits and
   holds in milliseconds mean little there; the tool descriptions point to physics frames.
 - `game_performance` samples the `Performance` monitors and the frame times over N frames: average, 95th percentile
@@ -1346,7 +1358,8 @@ a window and the two renders when `GODOT_MCP_WINDOW_TESTS=1`), and it passed in 
   the fixed script had passed `script_validate`. `editor_rescan` now returns once the editor has applied the scan, so
   such errors come with the call that caused them, and `script_validate` leaves out editor errors about loading the
   scripts it checked (§9.6).
-- Claude Code runs the tool calls of one message at the same time (§8.12); the server instructions now say so.
+- A `game_get_properties` sent in one message with a `game_input` read the game before the input; the server
+  instructions then said to read in a later message, which §8.12 replaced after the first evaluation run.
 
 ### Milestone 3 — Project, resources, tests
 
@@ -1522,10 +1535,11 @@ The whole integration suite, run next to that editor, found two more problems:
 - [ ] Evaluation tasks (§13) and tool description tuning based on their results: the 20 scenarios of `docs/evals/`
       run as code with `npm run eval`, each with a reference solution and checks through the MCP tools. The first
       full run passed 16 of 20 ([results](evals/README.md#results)); its findings are fixed in this order: the
-      harness and two wrong checks; watching the running game (reading the game inside `game_input`, input while
-      `game_pause` holds the game, the frame numbers of `game_pause` and `game_step`, `game_input` at a breakpoint,
-      and what the instructions say about tool calls sent in one message); the smaller tool fixes; the tools that
-      are loaded from the start; joypad input; then a second full run.
+      harness and three wrong checks (done); watching the running game (done: reading the game inside `game_input`,
+      input while `game_pause` holds the game, the frame numbers of `game_pause` and `game_step`, `game_input` at a
+      breakpoint, and what the instructions say about tool calls sent in one message; the four jump scenarios went
+      from 237 tool calls to 74); the smaller tool fixes; the tools that are loaded from the start; joypad input;
+      then a second full run.
 - [ ] CI: lint, unit tests, integration tests with headless Godot (matrix 4.5 / 4.7 / the pinned `master` commit).
 - [ ] Publication to npm and the Godot Asset Store (it replaced the Asset Library in 4.7).
 

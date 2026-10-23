@@ -223,7 +223,7 @@ describe.skipIf(godotBinary === '')('the milestone 3 scenario: a dash with its G
 
     expect(run.text).toMatch(/^The game is running res:\/\/levels\/arena\.tscn/);
     expect(landed.text).toMatch(/^"is_on_floor\(\)" became true on Player/);
-    expect(dashed.text).toMatch(/^Played 2 input steps in \d+ ms\./);
+    expect(dashed.text).toMatch(/^Played 2 input steps in \d+ ms \(\d+ physics frames?\)\./);
     expect(positionIn(after.text).z).toBeLessThan(positionIn(before.text).z - 2.5);
     expect(after.text).toContain('is_on_floor() = true  [bool]');
   });

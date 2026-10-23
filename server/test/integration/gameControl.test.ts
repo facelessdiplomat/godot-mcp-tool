@@ -38,6 +38,14 @@ const fallScene = [
   '',
 ].join('\n');
 
+function pauseForRealTime(milliseconds: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, milliseconds));
+}
+
+function gameFrameIn(text: string): number {
+  return Number(/its physics frame (\d+)/.exec(text)?.[1]);
+}
+
 function numberAfter(text: string, name: string): number {
   const match = new RegExp(`${name} = (-?[\\d.e+-]+)`).exec(text);
   return Number(match?.[1]);
@@ -86,9 +94,9 @@ describe.skipIf(godotBinary === '')('controlling the time of the running game', 
   it('pauses the game so that nothing moves', async () => {
     const paused = await tools().call('game_pause');
     const ticksWhenPaused = await ticks();
-    await tools().call('game_wait', { physics_frames: 20 });
+    await pauseForRealTime(300);
 
-    expect(paused.text).toMatch(/^Paused the game at physics frame \d+\./);
+    expect(paused.text).toMatch(/^Paused the game at its physics frame \d+\./);
     expect(await ticks()).toBe(ticksWhenPaused);
   });
 
@@ -96,8 +104,25 @@ describe.skipIf(godotBinary === '')('controlling the time of the running game', 
     const before = await ticks();
     const stepped = await tools().call('game_step', { physics_frames: 10 });
 
-    expect(stepped.text).toMatch(/^Advanced the game by 10 physics frames to physics frame \d+; it stays paused\.$/);
+    expect(stepped.text).toMatch(/^Advanced the game by 10 physics frames to its physics frame \d+; it stays paused\.$/);
     expect(await ticks()).toBe(before + 10);
+  });
+
+  it('counts only the frames that the game plays', async () => {
+    const paused = await tools().call('game_pause');
+    await pauseForRealTime(300);
+    const stepped = await tools().call('game_step', { physics_frames: 1 });
+
+    expect(gameFrameIn(stepped.text)).toBe(gameFrameIn(paused.text) + 1);
+  });
+
+  it('waits in the paused game by playing it until the condition holds, then pauses it again', async () => {
+    const target = (await ticks()) + 5;
+    const waited = await tools().call('game_wait', { condition: `ticks >= ${String(target)}`, node: 'Faller' });
+    await pauseForRealTime(300);
+
+    expect(waited.text).toMatch(new RegExp(`^"ticks >= ${String(target)}" became true on Faller after \\d+ ms \\(5 physics frames\\)\\. The game is paused again at its physics frame \\d+\\.$`));
+    expect(await ticks()).toBe(target);
   });
 
   it('measures the performance of the paused game', async () => {
@@ -114,7 +139,7 @@ describe.skipIf(godotBinary === '')('controlling the time of the running game', 
     const before = await ticks();
     await tools().call('game_wait', { physics_frames: 5 });
 
-    expect(resumed.text).toMatch(/^Resumed the game at physics frame \d+\.$/);
+    expect(resumed.text).toMatch(/^Resumed the game at its physics frame \d+\.$/);
     expect(await ticks()).toBeGreaterThan(before);
   });
 });

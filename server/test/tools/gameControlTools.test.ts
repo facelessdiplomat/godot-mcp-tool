@@ -34,9 +34,9 @@ const measurement = {
 describe('game control tools', () => {
   it('game_pause pauses the game and resumes it', async () => {
     const editor = new FakeEditorGateway()
-      .respondTo('game.pause', { paused: true, was_paused: false, physics_frame: 812 })
-      .respondTo('game.pause', { paused: false, was_paused: true, physics_frame: 812 })
-      .respondTo('game.pause', { paused: true, was_paused: true, physics_frame: 812 });
+      .respondTo('game.pause', { paused: true, was_paused: false, game_frame: 812 })
+      .respondTo('game.pause', { paused: false, was_paused: true, game_frame: 812 })
+      .respondTo('game.pause', { paused: true, was_paused: true, game_frame: 812 });
 
     const paused = await createGamePauseTool(editor).execute({});
     const resumed = await createGamePauseTool(editor).execute({ paused: false });
@@ -44,23 +44,23 @@ describe('game control tools', () => {
 
     expect(editor.requests.map((request) => request.params)).toEqual([{ paused: true }, { paused: false }, { paused: true }]);
     expect(textOf(paused)).toBe(
-      'Paused the game at physics frame 812. Read it with game_get_properties or game_screenshot, advance it with game_step, and resume it with game_pause and paused: false.',
+      'Paused the game at its physics frame 812. Read it with game_get_properties or game_screenshot. game_step, game_input and game_wait play it on by exact physics frames and pause it again; game_pause with paused: false resumes it.',
     );
-    expect(textOf(resumed)).toBe('Resumed the game at physics frame 812.');
-    expect(textOf(again)).toBe('The game was paused already, at physics frame 812.');
+    expect(textOf(resumed)).toBe('Resumed the game at its physics frame 812.');
+    expect(textOf(again)).toBe('The game was paused already, at its physics frame 812.');
   });
 
   it('game_step advances the game by exact physics frames and keeps it paused', async () => {
     const editor = new FakeEditorGateway()
-      .respondTo('game.step', { physics_frames: 5, was_paused: true, physics_frame: 817 })
-      .respondTo('game.step', { physics_frames: 1, was_paused: false, physics_frame: 900 });
+      .respondTo('game.step', { physics_frames: 5, was_paused: true, game_frame: 817 })
+      .respondTo('game.step', { physics_frames: 1, was_paused: false, game_frame: 900 });
 
     const stepped = await createGameStepTool(editor).execute({ physics_frames: 5 });
     const fromRunning = await createGameStepTool(editor).execute({});
 
     expect(editor.requests.map((request) => request.params)).toEqual([{ physics_frames: 5 }, { physics_frames: 1 }]);
-    expect(textOf(stepped)).toBe('Advanced the game by 5 physics frames to physics frame 817; it stays paused.');
-    expect(textOf(fromRunning)).toBe('Let the running game advance 1 more physics frame and paused it at physics frame 900.');
+    expect(textOf(stepped)).toBe('Advanced the game by 5 physics frames to its physics frame 817; it stays paused.');
+    expect(textOf(fromRunning)).toBe('Let the running game advance 1 more physics frame and paused it at its physics frame 900.');
   });
 
   it('game_performance summarizes the measured frames', async () => {

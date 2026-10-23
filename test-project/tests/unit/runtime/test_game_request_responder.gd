@@ -4,6 +4,7 @@ const Command := preload("res://addons/godot_mcp_tool/commands/command.gd")
 const CommandError := preload("res://addons/godot_mcp_tool/commands/command_error.gd")
 const CommandRouter := preload("res://addons/godot_mcp_tool/commands/command_router.gd")
 const GameCommandCatalog := preload("res://addons/godot_mcp_tool/runtime/game_commands/game_command_catalog.gd")
+const GameTime := preload("res://addons/godot_mcp_tool/runtime/game_time.gd")
 const GameRequestResponder := preload("res://addons/godot_mcp_tool/runtime/game_request_responder.gd")
 const JsonRpc := preload("res://addons/godot_mcp_tool/bridge/json_rpc.gd")
 
@@ -50,5 +51,7 @@ func test_answers_an_unknown_method_with_the_known_ones() -> void:
 
 
 func test_the_game_offers_its_inspection_commands() -> void:
-	var router := GameCommandCatalog.build_router(func() -> Node: return null)
+	var time := GameTime.new()
+	add_child_autoqfree(time)
+	var router := GameCommandCatalog.build_router(func() -> Node: return null, time)
 	assert_eq(router.methods(), PackedStringArray(["bounds", "eval", "input", "pause", "performance", "properties.get", "properties.set", "screenshot", "step", "tree", "wait"]))

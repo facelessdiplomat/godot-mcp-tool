@@ -1,6 +1,13 @@
 extends "../../commands/command.gd"
 
+const GameTime := preload("../game_time.gd")
 const Params := preload("../../commands/params.gd")
+
+var _time: GameTime
+
+
+func _init(time: GameTime) -> void:
+	_time = time
 
 
 func execute(params: Dictionary) -> Variant:
@@ -9,5 +16,8 @@ func execute(params: Dictionary) -> Variant:
 		return paused
 	var tree := Engine.get_main_loop() as SceneTree
 	var was_paused := tree.paused
-	tree.paused = paused
-	return {"paused": tree.paused, "was_paused": was_paused, "physics_frame": Engine.get_physics_frames()}
+	if paused:
+		_time.hold()
+	else:
+		_time.resume()
+	return {"paused": tree.paused, "was_paused": was_paused, "game_frame": _time.frames}

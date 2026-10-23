@@ -49,7 +49,9 @@ func _setup_session(session_id: int) -> void:
 	session.stopped.connect(func() -> void:
 		_game.mark_stopped()
 		channel.cancel_all("The game stopped before it answered."))
-	session.breaked.connect(func(_can_debug: bool) -> void: _game.mark_paused())
+	session.breaked.connect(func(_can_debug: bool) -> void:
+		_game.mark_paused()
+		channel.end_frame_waits())
 	session.continued.connect(_game.mark_resumed)
 
 
