@@ -1152,7 +1152,10 @@ godot-mcp-tool/
 │   │   ├── tools/                one file per area: project, editor, scene, node, game, docs, view3d, …
 │   │   ├── resources/            MCP resources
 │   │   ├── prompts/              MCP prompts
+│   │   ├── addon/                the addon in a game project: inspection, installation, plugin activation
+│   │   ├── cli/                  the commands install-addon, update-addon and doctor
 │   │   └── util/                 errors, truncation, pagination, images
+│   ├── addon/                    the addon copied in by the build and shipped in the npm package (not in Git)
 │   └── test/
 ├── addon/
 │   └── addons/godot_mcp_tool/    copied (or symlinked) into the game project
@@ -1478,8 +1481,14 @@ The whole integration suite, run next to that editor, found two more problems:
 
 ### Milestone 5 — Polish and distribution
 
-- [ ] An npm package with the addon bundled; `install-addon`, `update-addon` and `doctor` (environment diagnostics)
-      commands.
+- [x] An npm package with the addon bundled; `install-addon`, `update-addon` and `doctor` (environment diagnostics)
+      commands: `npm run build` copies the addon into `server/addon/`, which the package ships next to `dist/`, and
+      without a command the package runs the MCP server, as Claude Code starts it. `install-addon` copies the addon
+      into `addons/godot_mcp_tool` and enables its plugin in `project.godot`; `update-addon` replaces it only while
+      the editor of the project is closed, through a hidden folder and with a rollback; both leave a linked addon
+      alone. `doctor` checks Node.js, the project, Godot and its version, the addon and its version, the plugin and
+      the connection to the editor, and says how to fix each problem; `godot_status` says when the editor runs an
+      addon of another version than the server.
 - [ ] A Claude Code plugin that bundles the MCP server configuration, the `.gd` validation hook and the skill:
       `plugin/` gains `.claude-plugin/plugin.json` and a `.mcp.json` that points at the server through
       `${CLAUDE_PLUGIN_ROOT}`; the skill is already in `plugin/skills/godot/`.
@@ -1491,6 +1500,14 @@ The whole integration suite, run next to that editor, found two more problems:
 - [ ] Publication to npm and the Godot Asset Store (it replaced the Asset Library in 4.7).
 
 **Done when** the package is published, CI is green and the user documentation passes its check (below).
+
+Order of work: the npm package with the bundled addon and its `install-addon`, `update-addon` and `doctor` commands
+first, since the plugin, the documentation and the publication build on it; then the Claude Code plugin with the `.gd`
+validation hook; the editor dock; the evaluation tasks and the tuning of tool descriptions, which change the texts
+that the tool reference is generated from; CI with the version matrix, after a compatibility pass on Godot 4.5 and
+4.7; the user documentation, `CONTRIBUTING.md` and `SECURITY.md`, and the check of the documentation on a fresh
+project; the publication last. The public GitHub repository, the downloads of Godot 4.5 and 4.7 for the
+compatibility pass and the publication itself wait for your go-ahead.
 
 ### User documentation
 
@@ -1605,8 +1622,9 @@ ln -s ~/Projects/godot-mcp-tool/addon/addons/godot_mcp_tool <game>/addons/godot_
 ```
 
 While it is a symlink, add `addons/godot_mcp_tool` to the game's `.gitignore`: a symlink to an absolute local path
-is useless to anyone else. After publication, `install-addon` copies a release version of the addon that can be
-committed.
+is useless to anyone else. `npx godot-mcp-tool install-addon` in the game folder copies the addon of the package
+instead, which can be committed, and enables its plugin; `npx godot-mcp-tool update-addon` replaces it with a newer
+version while the editor is closed, and `npx godot-mcp-tool doctor` checks the whole setup.
 
 Until the plugin of milestone 5 bundles it, the companion skill is linked the same way, and `.claude/skills/godot`
 goes into the game's `.gitignore` too:
@@ -1766,6 +1784,8 @@ Checked against the sources in `~/Software/godot` (`master`, 4.8-beta, commit `6
 | A static function on a preloaded script is shadowed by a `Resource` or `Object` method of the same name (`is_built_in`, `get_name`, …), because the call goes to the script resource itself | observed on 4.8 |
 | `TCPServer.listen(port, bind_address = "*")` listens on all interfaces by default; `get_local_port()` | `doc/classes/TCPServer.xml` |
 | The editor starts its plugins inside its first scan (`_first_scan_filesystem` calls `EditorNode::init_plugins`), before it imports new and changed files; `EditorFileSystem.is_scanning()` includes the `first_scan` flag, which turns false only after that import | `editor/file_system/editor_file_system.cpp` |
+| `project.godot` is written with its sections in alphabetical order (`_save_settings_text` walks an `RBMap` of sections) and a blank line after each header and each section | `core/config/project_settings.cpp` |
+| When an editor plugin's scripts change on disk, the running editor reloads them in place: a member variable that the new code adds starts empty, because `_enter_tree` has already run, so the plugin may fail until the editor restarts | observed on 4.8 |
 | `OS.is_process_running(pid)` knows only child processes of the caller: for any other `pid` its `waitpid` fails, and it prints "The process … does not exist or is not a child of the calling process" and returns false | `drivers/unix/os_unix.cpp`, `doc/classes/OS.xml` |
 | On macOS a `StreamPeerTCP` that connects to a closed loopback port reports `STATUS_CONNECTED` after its first `poll()` and `STATUS_NONE` after the next one, while a connection to a listening port stays connected | observed on 4.8 |
 | `godot --import` and the command-line exports start a whole editor: the project's enabled editor plugins enter the tree, and leave it when that editor quits | observed on 4.8 |

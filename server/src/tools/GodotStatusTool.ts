@@ -4,6 +4,7 @@ import type { EditorStatus, EditorStatusProvider } from '../bridge/EditorConnect
 import type { BinaryLocator } from '../godot/GodotBinaryLocator.js';
 import type { GodotVersion } from '../godot/GodotVersion.js';
 import type { ProjectLookup } from '../project/ProjectLocator.js';
+import { SERVER_VERSION } from '../serverInfo.js';
 import { describeError } from '../util/errors.js';
 import { textResult } from './results.js';
 import type { Tool, ToolDefinition } from './Tool.js';
@@ -64,5 +65,8 @@ function describeEditor(editorStatus: EditorStatus): string {
     return `Editor: not connected. ${editorStatus.reason} Start it with editor_launch.`;
   }
   const { hello } = editorStatus;
-  return `Editor: connected. Godot ${hello.godotVersion}, addon ${hello.addonVersion}, bridge protocol ${String(hello.protocol)}`;
+  const connection = `Editor: connected. Godot ${hello.godotVersion}, addon ${hello.addonVersion}, bridge protocol ${String(hello.protocol)}`;
+  return hello.addonVersion === SERVER_VERSION
+    ? connection
+    : `${connection}. The addon is not the version of this server (${SERVER_VERSION}): close the editor, run npx godot-mcp-tool update-addon in the project folder and open the editor again.`;
 }

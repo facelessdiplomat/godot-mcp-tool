@@ -1,14 +1,12 @@
-import { accessSync, constants, readFileSync, statSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 import type { McpServer } from '@modelcontextprotocol/server';
-import { BridgeClient } from './bridge/BridgeClient.js';
-import { DiscoveryFileReader, isProcessAlive } from './bridge/DiscoveryFileReader.js';
 import { DocsSource } from './docs/DocsSource.js';
 import { EditorLauncher, systemClock } from './editor/EditorLauncher.js';
-import { EditorConnection, type EditorSession, UnavailableEditor } from './bridge/EditorConnection.js';
+import type { EditorSession } from './bridge/EditorConnection.js';
 import { DebugAdapterClient } from './debug/DebugAdapterClient.js';
 import { GameDebugger } from './debug/GameDebugger.js';
 import { ProjectExporter } from './export/ProjectExporter.js';
-import { type BinaryLookup, GodotBinaryLocator } from './godot/GodotBinaryLocator.js';
+import type { BinaryLookup } from './godot/GodotBinaryLocator.js';
 import { GodotCli } from './godot/GodotCli.js';
 import { LanguageServerClient } from './lsp/LanguageServerClient.js';
 import { NodeDetachedLauncher } from './process/DetachedLauncher.js';
@@ -18,7 +16,6 @@ import { FixLastRunPrompt } from './prompts/FixLastRunPrompt.js';
 import { PlaytestPrompt } from './prompts/PlaytestPrompt.js';
 import { readAutoloadNames } from './project/ProjectFile.js';
 import { listScenes } from './project/ProjectFiles.js';
-import { ProjectLocator } from './project/ProjectLocator.js';
 import { readScriptLines } from './project/ScriptLines.js';
 import { createGodotResources } from './resources/godotResources.js';
 import { ErrorSummary } from './runtime/ErrorSummary.js';
@@ -26,10 +23,11 @@ import { GameGatewayRouter } from './runtime/GameGatewayRouter.js';
 import { GameOutputCursor } from './runtime/GameOutputCursor.js';
 import { LocalGameGateway } from './runtime/LocalGameGateway.js';
 import { ScriptValidator, ValidationUnavailableError } from './scripts/ScriptValidator.js';
+import { type ApplicationEnvironment, createGodotContext } from './createGodotContext.js';
 import { createMcpServer } from './server/createMcpServer.js';
 import { readOnlyInstructions, serverInstructions, unsafeInstructions } from './server/serverInstructions.js';
 import { applyToolPolicy, readToolPolicy } from './server/ToolPolicy.js';
-import { BRIDGE_PROTOCOL_VERSION, SERVER_NAME, SERVER_VERSION } from './serverInfo.js';
+import { SERVER_NAME, SERVER_VERSION } from './serverInfo.js';
 import { TestRunner } from './testing/TestRunner.js';
 import { DocsClassTool, DocsSearchTool } from './tools/docsTools.js';
 import { EditorLaunchTool } from './tools/EditorLaunchTool.js';
@@ -47,47 +45,20 @@ import type { Tool } from './tools/Tool.js';
 import { createEditorRunScriptTool, createFilesystemDeleteTool, createGameEvalTool, createNodeCallMethodTool } from './tools/unsafeTools.js';
 import { userCacheDirectory } from './util/CacheDirectory.js';
 
-export interface ApplicationEnvironment {
-  readonly variables: Readonly<Record<string, string | undefined>>;
-  readonly workingDirectory: string;
-  readonly platform: NodeJS.Platform;
-  readonly homeDirectory: string;
-}
-
 export interface Application {
   createMcpServer(): McpServer;
   shutdown(): void;
 }
 
-const bridgeRequestTimeoutMs = 30_000;
 const checkOnlyTimeoutMs = 60_000;
 
 export function createApplication(environment: ApplicationEnvironment): Application {
-  const project = new ProjectLocator(environment.variables, environment.workingDirectory).locate();
-  const discovery = project.found ? new DiscoveryFileReader(project.root, isProcessAlive) : undefined;
-  const editor: EditorSession = discovery
-    ? new EditorConnection(
-        discovery,
-        (endpoint) =>
-          new BridgeClient(endpoint, {
-            clientName: `${SERVER_NAME}/${SERVER_VERSION}`,
-            protocol: BRIDGE_PROTOCOL_VERSION,
-            requestTimeoutMs: bridgeRequestTimeoutMs,
-          }),
-      )
-    : new UnavailableEditor('No Godot project was found, so there is no editor to connect to.');
+  const { project, discovery, editor, binaryLocator } = createGodotContext(environment);
   const errorSummary = new ErrorSummary();
   editor.onNotification((connectionNumber, method, params) => {
     errorSummary.observe(connectionNumber, method, params);
   });
   const processRunner = new NodeProcessRunner();
-  const binaryLocator = new GodotBinaryLocator({
-    variables: environment.variables,
-    platform: environment.platform,
-    homeDirectory: environment.homeDirectory,
-    isExecutableFile,
-    lastEditorExecutable: () => discovery?.lastEditorExecutable(),
-  });
   const locateGodot = async (): Promise<BinaryLookup> => {
     const editorStatus = await editor.status();
     return binaryLocator.locate(editorStatus.connected ? editorStatus.hello.executablePath : undefined);
@@ -235,13 +206,4 @@ function createScriptValidator({ projectRoot, editor, locateGodot, processRunner
 function parsePort(text: string | undefined): number | undefined {
   const port = Number(text);
   return text !== undefined && Number.isInteger(port) && port > 0 && port < 65_536 ? port : undefined;
-}
-
-function isExecutableFile(path: string): boolean {
-  try {
-    accessSync(path, constants.X_OK);
-    return statSync(path).isFile();
-  } catch {
-    return false;
-  }
 }

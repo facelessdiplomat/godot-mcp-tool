@@ -4,6 +4,7 @@ import type { EditorStatus, EditorStatusProvider } from '../../src/bridge/Editor
 import type { BinaryLookup } from '../../src/godot/GodotBinaryLocator.js';
 import { GodotVersion } from '../../src/godot/GodotVersion.js';
 import type { ProjectLookup } from '../../src/project/ProjectLocator.js';
+import { SERVER_VERSION } from '../../src/serverInfo.js';
 import { GodotStatusTool } from '../../src/tools/GodotStatusTool.js';
 
 const hello: HelloResult = {
@@ -50,6 +51,21 @@ describe('GodotStatusTool', () => {
     expect(text).toContain('Project: /projects/game (from GODOT_PROJECT_PATH)');
     expect(text).toContain('Editor: connected. Godot 4.8.beta.custom_build.679066724, addon 0.1.0, bridge protocol 1');
     expect(text).toContain('Godot binary: /opt/godot/godot (from running editor), version 4.8.beta.custom_build.679066724');
+  });
+
+  it('says how to update an addon whose version differs from the server', async () => {
+    const tool = new GodotStatusTool({
+      project: foundProject,
+      editor: editorReporting({ connected: true, hello: { ...hello, addonVersion: '0.0.1' } }),
+      binaryLocator: binaryFromRunningEditor,
+      readVersion: readKnownVersion,
+    });
+
+    const text = await statusText(tool);
+
+    expect(text).toContain(
+      `Editor: connected. Godot 4.8.beta.custom_build.679066724, addon 0.0.1, bridge protocol 1. The addon is not the version of this server (${SERVER_VERSION}): close the editor, run npx godot-mcp-tool update-addon in the project folder and open the editor again.`,
+    );
   });
 
   it('lists the tool modes that are not the defaults', async () => {

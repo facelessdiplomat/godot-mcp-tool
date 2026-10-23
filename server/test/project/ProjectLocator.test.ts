@@ -46,6 +46,21 @@ describe('ProjectLocator', () => {
     expect(!lookup.found && lookup.reason).toContain(emptyDirectory);
   });
 
+  it('prefers a project folder given on the command line', () => {
+    const projectRoot = createProject(join(sandbox, 'game'));
+    createProject(join(sandbox, 'other'));
+    const locator = new ProjectLocator({ GODOT_PROJECT_PATH: join(sandbox, 'other') }, sandbox, 'game');
+
+    expect(locator.locate()).toEqual({ found: true, root: projectRoot, source: 'command line' });
+  });
+
+  it('reports a command line folder without project.godot', () => {
+    mkdirSync(join(sandbox, 'empty'));
+    const locator = new ProjectLocator({}, sandbox, 'empty');
+
+    expect(locator.locate()).toEqual({ found: false, reason: `${join(sandbox, 'empty')} has no project.godot.` });
+  });
+
   it('finds the project in CLAUDE_PROJECT_DIR', () => {
     const projectRoot = createProject(join(sandbox, 'game'));
     const locator = new ProjectLocator({ CLAUDE_PROJECT_DIR: projectRoot }, sandbox);

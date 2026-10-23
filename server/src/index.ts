@@ -1,32 +1,32 @@
 #!/usr/bin/env node
 import { homedir } from 'node:os';
-import { serveStdio } from '@modelcontextprotocol/server/stdio';
-import { createApplication } from './createApplication.js';
+import { parseCommandLine } from './cli/CommandLine.js';
+import { runCommand } from './cli/runCommand.js';
+import { bundledAddonDirectory } from './packageFiles.js';
+import { serveOverStdio } from './serveOverStdio.js';
 
-const application = createApplication({
+const environment = {
   variables: process.env,
   workingDirectory: process.cwd(),
   platform: process.platform,
   homeDirectory: homedir(),
-});
+};
 
-const stdioServer = serveStdio(() => application.createMcpServer(), {
-  onerror: (error) => {
-    console.error(error);
-  },
-});
+const request = parseCommandLine(process.argv.slice(2));
 
-let shuttingDown = false;
-
-function shutDown(): void {
-  if (shuttingDown) {
-    return;
-  }
-  shuttingDown = true;
-  application.shutdown();
-  void stdioServer.close().finally(() => process.exit(0));
+if (request.kind === 'serve') {
+  serveOverStdio(environment);
+} else {
+  process.exitCode = await runCommand(
+    request,
+    { ...environment, nodeVersion: process.versions.node, bundledAddonDirectory },
+    {
+      write: (line) => {
+        process.stdout.write(`${line}\n`);
+      },
+      writeError: (line) => {
+        process.stderr.write(`${line}\n`);
+      },
+    },
+  );
 }
-
-process.stdin.once('end', shutDown);
-process.once('SIGINT', shutDown);
-process.once('SIGTERM', shutDown);
