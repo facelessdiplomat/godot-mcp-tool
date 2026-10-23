@@ -19,7 +19,7 @@ func _init(runtime: RuntimeContext, game_method: String, answer_timeout_msec: in
 func execute(params: Dictionary) -> Variant:
 	match _runtime.game.state:
 		GameState.STOPPED:
-			return CommandError.new(JsonRpc.GAME_NOT_RUNNING, "The game is not running", "Start it with game_run; inspecting the game needs a run from the editor.")
+			return CommandError.new(JsonRpc.GAME_NOT_RUNNING, "The game is not running", "Start it with game_run.")
 		GameState.STARTING:
 			return CommandError.new(JsonRpc.GAME_NOT_RUNNING, "The game is still starting", "Try again once game_run has returned.")
 		GameState.PAUSED:

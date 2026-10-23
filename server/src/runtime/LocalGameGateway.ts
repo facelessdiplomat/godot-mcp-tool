@@ -1,11 +1,14 @@
-import { existsSync, mkdirSync, rmSync } from 'node:fs';
+import { randomBytes } from 'node:crypto';
+import { existsSync, mkdirSync, readFileSync, rmSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
 import * as z from 'zod/v4';
 import { BridgeRequestError } from '../bridge/BridgeErrors.js';
-import type { EditorGateway } from '../editor/EditorGateway.js';
+import type { EditorGateway, EditorRequestOptions } from '../editor/EditorGateway.js';
 import type { BinaryLookup } from '../godot/GodotBinaryLocator.js';
 import type { LaunchedProcess, ProcessLauncher } from '../process/ProcessLauncher.js';
+import { readConfigSections } from '../project/ConfigText.js';
+import { LocalGameChannel } from './LocalGameChannel.js';
 import { LogBook } from './LogBook.js';
 import { RecordFile } from './RecordFile.js';
 
@@ -24,7 +27,29 @@ const methodNotFoundCode = -32601;
 const invalidParamsCode = -32602;
 const notFoundCode = -32004;
 const noSceneCode = -32005;
+const gameNotRunningCode = -32006;
+const unsafeDisabledCode = -32009;
 const operationFailedCode = -32010;
+
+const gameRequests: Readonly<Record<string, string>> = {
+  'game.get_tree': 'tree',
+  'game.get_properties': 'properties.get',
+  'game.set_properties': 'properties.set',
+  'game.wait': 'wait',
+  'game.input': 'input',
+  'game.screenshot': 'screenshot',
+  'game.pause': 'pause',
+  'game.step': 'step',
+  'game.performance': 'performance',
+  'game.eval': 'eval',
+};
+const evaluationMethod = 'game.eval';
+const defaultGameRequestTimeoutMs = 30_000;
+const tokenBytes = 24;
+const tokenVariable = 'GODOT_MCP_GAME_TOKEN';
+const projectMetadataPath = join('.godot', 'editor', 'project_metadata.cfg');
+const addonSettingsSection = 'godot_mcp_tool';
+const unsafeToolsKey = 'allow_unsafe_tools';
 
 const defaultStartupTimeoutMs = 30_000;
 const defaultPollIntervalMs = 50;
@@ -58,6 +83,7 @@ export class LocalGameGateway implements EditorGateway {
   private readonly book = new LogBook();
   private readonly records: RecordFile | undefined;
   private process: LaunchedProcess | undefined;
+  private channel: LocalGameChannel | undefined;
   private readyScene: string | undefined;
   private runFirstSeq = 1;
   private stopRequested = false;
@@ -71,7 +97,11 @@ export class LocalGameGateway implements EditorGateway {
     return this.process !== undefined && !this.process.hasExited;
   }
 
-  async request(method: string, params: Record<string, unknown>): Promise<unknown> {
+  async request(method: string, params: Record<string, unknown>, options: EditorRequestOptions = {}): Promise<unknown> {
+    const gameMethod = gameRequests[method];
+    if (gameMethod !== undefined) {
+      return this.askGame(method, gameMethod, params, options.timeoutMs ?? defaultGameRequestTimeoutMs);
+    }
     switch (method) {
       case 'game.run':
         return this.run(parseParams(runParamsSchema, params));
@@ -91,14 +121,46 @@ export class LocalGameGateway implements EditorGateway {
 
   shutdown(): void {
     this.process?.stop();
+    this.channel?.close();
+  }
+
+  private askGame(method: string, gameMethod: string, params: Record<string, unknown>, timeoutMs: number): Promise<unknown> {
+    if (this.channel === undefined || !this.isRunning) {
+      throw new BridgeRequestError('The game is not running', gameNotRunningCode, 'Start it with game_run.', undefined);
+    }
+    if (method === evaluationMethod && !this.allowsUnsafeTools()) {
+      throw new BridgeRequestError(
+        'Unsafe tools are turned off in the editor for this project',
+        unsafeDisabledCode,
+        'The user can turn them on in the editor with Project → Tools → Godot MCP Tool → Allow Unsafe Tools.',
+        undefined,
+      );
+    }
+    return this.channel.request(gameMethod, params, timeoutMs);
+  }
+
+  private allowsUnsafeTools(): boolean {
+    const { projectRoot } = this.options;
+    if (projectRoot === undefined) {
+      return false;
+    }
+    try {
+      const metadata = readConfigSections(readFileSync(join(projectRoot, projectMetadataPath), 'utf8'));
+      return metadata.find((section) => section.name === addonSettingsSection)?.values.get(unsafeToolsKey) === 'true';
+    } catch {
+      return false;
+    }
   }
 
   private async run(params: RunParams): Promise<unknown> {
     const { projectRoot, records, binaryPath } = this.prepareRun(params.scene);
     await this.stop();
     this.beginRun(records);
+    const token = randomBytes(tokenBytes).toString('base64url');
+    const channel = await LocalGameChannel.open(token);
+    this.channel = channel;
     const startedAt = Date.now();
-    const launched = this.options.launcher.launch(binaryPath, this.launchArguments(projectRoot, params, records.path), projectRoot);
+    const launched = this.options.launcher.launch(binaryPath, this.launchArguments(projectRoot, params, records.path, channel.port), projectRoot, { [tokenVariable]: token });
     this.process = launched;
     launched.onOutput((text) => {
       this.rememberOutput(text);
@@ -162,7 +224,7 @@ export class LocalGameGateway implements EditorGateway {
     this.recentOutput = [];
   }
 
-  private launchArguments(projectRoot: string, params: RunParams, logFile: string): string[] {
+  private launchArguments(projectRoot: string, params: RunParams, logFile: string, port: number): string[] {
     return [
       '--path',
       projectRoot,
@@ -171,6 +233,7 @@ export class LocalGameGateway implements EditorGateway {
       ...(params.scene === 'main' ? [] : [params.scene]),
       '--',
       `--mcp-log-file=${logFile}`,
+      `--mcp-port=${String(port)}`,
     ];
   }
 
@@ -182,6 +245,8 @@ export class LocalGameGateway implements EditorGateway {
     this.stopRequested = true;
     running.stop();
     await this.waitUntil(() => running.hasExited, stopTimeoutMs);
+    this.channel?.close();
+    this.channel = undefined;
     return { was_running: true };
   }
 
@@ -203,6 +268,8 @@ export class LocalGameGateway implements EditorGateway {
     if (launched !== this.process || this.stopRequested) {
       return;
     }
+    this.channel?.close();
+    this.channel = undefined;
     this.drain();
     if (exitCode === 0) {
       this.book.append({ level: 'info', message: 'The game quit with exit code 0.' }, processSource);

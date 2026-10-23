@@ -9,8 +9,15 @@ export interface EditorStarter {
   launch(options: EditorLaunchOptions): Promise<EditorLaunchResult>;
 }
 
+export interface EditorLaunchSettings {
+  readonly headlessByDefault: boolean;
+}
+
 const editorLaunchInput = z.object({
-  headless: z.boolean().default(false).describe('Start the editor without a window, as on a server. Screenshots need a window.'),
+  headless: z
+    .boolean()
+    .optional()
+    .describe('Start the editor without a window, as on a server; screenshots need a window. Default: with a window, or without one when the server runs with GODOT_MCP_HEADLESS=1.'),
 });
 
 export class EditorLaunchTool implements Tool<typeof editorLaunchInput> {
@@ -19,13 +26,16 @@ export class EditorLaunchTool implements Tool<typeof editorLaunchInput> {
   readonly definition: ToolDefinition<typeof editorLaunchInput> = {
     title: 'Start the editor',
     description:
-      'Start the Godot editor for the project and wait until its "Godot MCP Tool" plugin connects, so the editor tools work. Use it when godot_status says the editor is not running. The editor opens with a window and keeps running after this session; it does nothing when the editor is already connected.',
+      'Start the Godot editor for the project and wait until its "Godot MCP Tool" plugin connects, so the editor tools work. Use it when godot_status says the editor is not running. The editor keeps running after this session; it does nothing when the editor is already connected.',
     inputSchema: editorLaunchInput,
     annotations: changingAnnotations({ destructive: false, idempotent: true }),
     alwaysLoad: false,
   };
 
-  constructor(private readonly starter: EditorStarter) {}
+  constructor(
+    private readonly starter: EditorStarter,
+    private readonly settings: EditorLaunchSettings = { headlessByDefault: false },
+  ) {}
 
   async execute(input: z.input<typeof editorLaunchInput>): Promise<CallToolResult> {
     const parsedInput = editorLaunchInput.safeParse(input);
@@ -34,7 +44,7 @@ export class EditorLaunchTool implements Tool<typeof editorLaunchInput> {
     }
     let launched: EditorLaunchResult;
     try {
-      launched = await this.starter.launch({ headless: parsedInput.data.headless });
+      launched = await this.starter.launch({ headless: parsedInput.data.headless ?? this.settings.headlessByDefault });
     } catch (error) {
       if (error instanceof EditorLaunchError) {
         return errorResult(error.message);

@@ -33,6 +33,15 @@ describe('editor_launch', () => {
     );
   });
 
+  it('starts the editor without a window by default when the server runs without windows', async () => {
+    const starter = starterAnswering({ kind: 'started', hello, pid: 4321, waitedMs: 7400, logPath: '/games/arena/.godot/godot_mcp_tool/editor.log' });
+
+    await new EditorLaunchTool(starter, { headlessByDefault: true }).execute({});
+    await new EditorLaunchTool(starter, { headlessByDefault: true }).execute({ headless: false });
+
+    expect(starter.requests).toEqual([{ headless: true }, { headless: false }]);
+  });
+
   it('says when the editor is already running', async () => {
     const result = await new EditorLaunchTool(starterAnswering({ kind: 'already running', hello })).execute({ headless: true });
 

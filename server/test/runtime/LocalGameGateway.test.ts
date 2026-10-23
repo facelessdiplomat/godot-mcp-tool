@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { BridgeRequestError } from '../../src/bridge/BridgeErrors.js';
 import type { BinaryLookup } from '../../src/godot/GodotBinaryLocator.js';
 import { LocalGameGateway, type LocalGameOptions } from '../../src/runtime/LocalGameGateway.js';
+import { FakeGameClient } from '../support/FakeGameClient.js';
 import { FakeProcessLauncher } from '../support/FakeProcessLauncher.js';
 
 const godotBinary: BinaryLookup = { found: true, path: '/opt/godot/godot', source: 'GODOT_BIN' };
@@ -15,6 +16,10 @@ function logFileFrom(args: readonly string[]): string {
     throw new Error('The game was launched without a log file');
   }
   return argument.slice('--mcp-log-file='.length);
+}
+
+function portFrom(args: readonly string[]): number {
+  return Number(args.find((candidate) => candidate.startsWith('--mcp-port='))?.slice('--mcp-port='.length));
 }
 
 function writeRecords(path: string, records: readonly unknown[]): void {
@@ -72,7 +77,14 @@ describe('LocalGameGateway', () => {
       saved_scripts: [],
     });
     expect(launcher.calls[0]?.command).toBe('/opt/godot/godot');
-    expect(launcher.calls[0]?.args).toEqual(['--path', projectRoot, '--', `--mcp-log-file=${join(projectRoot, '.godot', 'godot_mcp_tool', 'local_game.ndjson')}`]);
+    expect(launcher.calls[0]?.args).toEqual([
+      '--path',
+      projectRoot,
+      '--',
+      `--mcp-log-file=${join(projectRoot, '.godot', 'godot_mcp_tool', 'local_game.ndjson')}`,
+      expect.stringMatching(/^--mcp-port=\d+$/) as unknown,
+    ]);
+    expect(launcher.calls[0]?.environment['GODOT_MCP_GAME_TOKEN']).toMatch(/^[\w-]{20,}$/);
     expect(launcher.calls[0]?.workingDirectory).toBe(projectRoot);
   });
 
@@ -81,7 +93,7 @@ describe('LocalGameGateway', () => {
 
     await gateway().request('game.run', { scene: 'main', watch_ms: 0, stop_after: false, fixed_fps: 60 });
 
-    expect(launcher.calls[0]?.args).toEqual(['--path', projectRoot, '--fixed-fps', '60', '--', `--mcp-log-file=${join(projectRoot, '.godot', 'godot_mcp_tool', 'local_game.ndjson')}`]);
+    expect(launcher.calls[0]?.args.slice(0, 6)).toEqual(['--path', projectRoot, '--fixed-fps', '60', '--', `--mcp-log-file=${join(projectRoot, '.godot', 'godot_mcp_tool', 'local_game.ndjson')}`]);
   });
 
   it('runs a given scene, without a window when asked', async () => {
@@ -153,6 +165,47 @@ describe('LocalGameGateway', () => {
 
     await expect(local.request('game.stop', {})).resolves.toEqual({ was_running: true });
     await expect(local.request('game.stop', {})).resolves.toEqual({ was_running: false });
+  });
+
+  it('asks the game for its nodes over its connection to the server', async () => {
+    const games: FakeGameClient[] = [];
+    launcher.simulate = (process, args, environment) => {
+      readyGame([])(process, args);
+      void FakeGameClient.connect(portFrom(args), environment['GODOT_MCP_GAME_TOKEN'] ?? '', (request) => ({ id: request.id, result: { asked: request.method, params: request.params } })).then((game) => games.push(game));
+    };
+    const local = gateway();
+    await local.request('game.run', { scene: 'main', watch_ms: 0, stop_after: false });
+
+    const properties = await local.request('game.get_properties', { path: 'Player', names: ['velocity'] });
+    const waited = await local.request('game.wait', { physics_frames: 10 }, { timeoutMs: 2000 });
+
+    expect(properties).toEqual({ asked: 'properties.get', params: { path: 'Player', names: ['velocity'] } });
+    expect(waited).toEqual({ asked: 'wait', params: { physics_frames: 10 } });
+    for (const game of games) {
+      game.quit();
+    }
+  });
+
+  it('evaluates expressions only when the project allows unsafe tools', async () => {
+    launcher.simulate = (process, args, environment) => {
+      readyGame([])(process, args);
+      void FakeGameClient.connect(portFrom(args), environment['GODOT_MCP_GAME_TOKEN'] ?? '', (request) => ({ id: request.id, result: { value: 2 } }));
+    };
+    const local = gateway();
+    await local.request('game.run', { scene: 'main', watch_ms: 0, stop_after: false });
+
+    const refused = await local.request('game.eval', { expression: '1 + 1' }).catch((error: unknown) => error);
+    mkdirSync(join(projectRoot, '.godot', 'editor'), { recursive: true });
+    writeFileSync(join(projectRoot, '.godot', 'editor', 'project_metadata.cfg'), '[godot_mcp_tool]\n\nallow_unsafe_tools=true\n');
+    const evaluated = await local.request('game.eval', { expression: '1 + 1' });
+
+    expect(refused).toMatchObject({ code: -32009, message: 'Unsafe tools are turned off in the editor for this project' });
+    expect(evaluated).toEqual({ value: 2 });
+    await local.request('game.stop', {});
+  });
+
+  it('explains that a game which is not running cannot be asked', async () => {
+    await expect(gateway().request('game.get_tree', {})).rejects.toMatchObject({ code: -32006, message: 'The game is not running' });
   });
 
   it('cannot run the current scene without the editor', async () => {

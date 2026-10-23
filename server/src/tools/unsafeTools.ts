@@ -111,7 +111,7 @@ export function createGameEvalTool(game: EditorGateway): BridgeTool<typeof gameE
     definition: {
       title: 'Evaluate in the game',
       description:
-        'Evaluate a Godot expression on a node of the running game and return its value, for questions that properties and getters do not answer, such as the distance between two nodes or the number of nodes in a group. It can call any method, so it can change the game. The user confirms every call, and the editor must allow unsafe tools. Needs a game started from the editor.',
+        'Evaluate a Godot expression on a node of the running game and return its value, for questions that properties and getters do not answer, such as the distance between two nodes or the number of nodes in a group. It can call any method, so it can change the game. The user confirms every call, and the project must allow unsafe tools in the editor. Needs a game started with game_run, with or without the editor.',
       inputSchema: gameEvalInput,
       annotations: unsafeAnnotations,
       alwaysLoad: false,

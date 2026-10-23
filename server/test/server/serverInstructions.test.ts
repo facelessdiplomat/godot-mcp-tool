@@ -18,6 +18,10 @@ describe('serverInstructions', () => {
     expect(serverInstructions).toContain('Move or rename project files with filesystem_move');
   });
 
+  it('says that the game tools work without the editor', () => {
+    expect(serverInstructions).toContain('game_run, the other game_ tools and the docs tools work without it');
+  });
+
   it('points to breakpoints for finding bugs in game code', () => {
     expect(serverInstructions).toContain('debug_breakpoints');
   });

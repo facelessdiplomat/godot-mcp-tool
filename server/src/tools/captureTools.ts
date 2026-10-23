@@ -71,7 +71,7 @@ export function createGameScreenshotTool(game: EditorGateway, readCapture: Captu
     definition: {
       title: 'Game screenshot',
       description:
-        'See the running game: a screenshot of its window with the UI, or renders of its 3D world from other angles that leave the game camera alone. Returns the image and the path of its file. Pixel positions in a screenshot of the window are the positions that game_input clicks use. Needs a game started from the editor with a window.',
+        'See the running game: a screenshot of its window with the UI, or renders of its 3D world from other angles that leave the game camera alone. Returns the image and the path of its file. Pixel positions in a screenshot of the window are the positions that game_input clicks use. Needs a game started with game_run that has a window, with or without the editor.',
       inputSchema: gameScreenshotInput,
       annotations: readingAnnotations,
       alwaysLoad: false,

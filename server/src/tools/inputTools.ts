@@ -203,7 +203,7 @@ export function createGameInputTool(game: EditorGateway, readCapture: CaptureRea
     definition: {
       title: 'Play input into the game',
       description:
-        'Play input into the running game step by step: hold input actions or keys for a time, move and click the mouse, type text, wait. Use it to try gameplay, such as walking forward for a second and then jumping, then check the result with game_get_properties, game_wait, or a screenshot taken right after the last step (screenshot: true). Actions must exist in the project when the game starts. Needs a game started from the editor.',
+        'Play input into the running game step by step: hold input actions or keys for a time, move and click the mouse, type text, wait. Use it to try gameplay, such as walking forward for a second and then jumping, then check the result with game_get_properties, game_wait, or a screenshot taken right after the last step (screenshot: true). Actions must exist in the project when the game starts. Needs a game started with game_run, with or without the editor.',
       inputSchema: gameInputInput,
       annotations: changingAnnotations({ destructive: false, idempotent: false }),
       alwaysLoad: false,

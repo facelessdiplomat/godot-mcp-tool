@@ -43,7 +43,7 @@ export function createGameGetTreeTool(game: EditorGateway): BridgeTool<typeof ga
     definition: {
       title: 'Running game tree',
       description:
-        'Show the node tree of the running game, including nodes it created while running, such as spawned enemies or bullets: names, types, scripts, instanced scenes and groups. Needs a game started from the editor.',
+        'Show the node tree of the running game, including nodes it created while running, such as spawned enemies or bullets: names, types, scripts, instanced scenes and groups. Needs a game started with game_run, with or without the editor.',
       inputSchema: gameGetTreeInput,
       annotations: readingAnnotations,
       alwaysLoad: false,
@@ -71,7 +71,7 @@ export function createGameGetPropertiesTool(game: EditorGateway): BridgeTool<typ
     definition: {
       title: 'Running game properties',
       description:
-        'Read properties of a node in the running game, like the remote inspector: positions, velocities, health, and getters such as is_on_floor(). Use it to check what the game is doing after game_run or game_wait. Needs a game started from the editor.',
+        'Read properties of a node in the running game, like the remote inspector: positions, velocities, health, and getters such as is_on_floor(). Use it to check what the game is doing after game_run or game_wait. Needs a game started with game_run, with or without the editor.',
       inputSchema: gameGetPropertiesInput,
       annotations: readingAnnotations,
       alwaysLoad: false,
@@ -93,7 +93,7 @@ export function createGameSetPropertiesTool(game: EditorGateway): BridgeTool<typ
     definition: {
       title: 'Set running game properties',
       description:
-        'Change properties of a node in the running game to try something out, such as moving the player or raising its speed. The change lasts until the game stops; scene files stay as they are. Every value is read back. Needs a game started from the editor.',
+        'Change properties of a node in the running game to try something out, such as moving the player or raising its speed. The change lasts until the game stops; scene files stay as they are. Every value is read back. Needs a game started with game_run, with or without the editor.',
       inputSchema: gameSetPropertiesInput,
       annotations: changingAnnotations({ destructive: false, idempotent: true }),
       alwaysLoad: false,
@@ -130,7 +130,7 @@ export function createGameWaitTool(game: EditorGateway): BridgeTool<typeof gameW
     definition: {
       title: 'Wait in the game',
       description:
-        'Wait in the running game until a condition holds on a node, such as "is_on_floor()" on Player, or for a number of physics frames, frames or milliseconds. Pass exactly one of condition, physics_frames, frames or ms. Needs a game started from the editor.',
+        'Wait in the running game until a condition holds on a node, such as "is_on_floor()" on Player, or for a number of physics frames, frames or milliseconds. Pass exactly one of condition, physics_frames, frames or ms. Needs a game started with game_run, with or without the editor.',
       inputSchema: gameWaitInput,
       annotations: readingAnnotations,
       alwaysLoad: false,

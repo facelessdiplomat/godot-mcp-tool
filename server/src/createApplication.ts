@@ -107,12 +107,13 @@ export function createApplication(environment: ApplicationEnvironment): Applicat
     processRunner,
   });
   const policy = readToolPolicy(environment.variables);
+  const windowless = environment.variables['GODOT_MCP_HEADLESS'] === '1';
   const toolNotes: string[] = [];
   const localGame = new LocalGameGateway({
     projectRoot: project.found ? project.root : undefined,
     locateBinary: () => binaryLocator.locate(),
     launcher: new NodeProcessLauncher(),
-    headless: environment.variables['GODOT_MCP_HEADLESS'] === '1',
+    headless: windowless,
   });
   const gameGateway = new GameGatewayRouter(editor, localGame);
   const debugAdapterPort = parsePort(environment.variables['GODOT_DAP_PORT']);
@@ -133,7 +134,7 @@ export function createApplication(environment: ApplicationEnvironment): Applicat
       readVersion: (executablePath) => new GodotCli(processRunner, executablePath).version(),
       toolNotes,
     }),
-    new EditorLaunchTool(editorLauncher),
+    new EditorLaunchTool(editorLauncher, { headlessByDefault: windowless }),
     ...createEditorTools(editor, readFileSync),
     new ScriptValidateTool(
       createScriptValidator({
@@ -169,6 +170,9 @@ export function createApplication(environment: ApplicationEnvironment): Applicat
   ];
   const selection = applyToolPolicy(plainTools, policy);
   toolNotes.push(...selection.notes);
+  if (windowless) {
+    toolNotes.push('Windowless mode (GODOT_MCP_HEADLESS): games run without a window, editor_launch starts the editor without one, and screenshots are not available.');
+  }
   const tools = selection.tools.map((tool) => new ErrorReportingTool(tool, errorSummary));
   const resources = createGodotResources({
     projectInfo: createProjectInfoTool(editor),

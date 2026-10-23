@@ -8,14 +8,14 @@ export interface LaunchedProcess {
 }
 
 export interface ProcessLauncher {
-  launch(command: string, args: readonly string[], workingDirectory: string): LaunchedProcess;
+  launch(command: string, args: readonly string[], workingDirectory: string, environment?: Readonly<Record<string, string>>): LaunchedProcess;
 }
 
 const killGraceMs = 3_000;
 
 export class NodeProcessLauncher implements ProcessLauncher {
-  launch(command: string, args: readonly string[], workingDirectory: string): LaunchedProcess {
-    return new NodeLaunchedProcess(spawn(command, [...args], { cwd: workingDirectory, stdio: ['ignore', 'pipe', 'pipe'] }), command);
+  launch(command: string, args: readonly string[], workingDirectory: string, environment: Readonly<Record<string, string>> = {}): LaunchedProcess {
+    return new NodeLaunchedProcess(spawn(command, [...args], { cwd: workingDirectory, stdio: ['ignore', 'pipe', 'pipe'], env: { ...process.env, ...environment } }), command);
   }
 }
 

@@ -11,6 +11,22 @@ interface ListedCapabilities {
   readonly prompts: string[];
 }
 
+async function statusText(variables: Record<string, string>): Promise<string> {
+  const application = createApplication({ variables, workingDirectory: '/nonexistent', platform: process.platform, homeDirectory: '/nonexistent' });
+  const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+  await application.createMcpServer().connect(serverTransport);
+  const client = new Client({ name: 'tool-modes-test', version: '1.0.0' });
+  await client.connect(clientTransport);
+  try {
+    const result = await client.callTool({ name: 'godot_status', arguments: {} });
+    const [content] = result.content;
+    return content?.type === 'text' ? content.text : '';
+  } finally {
+    await client.close();
+    application.shutdown();
+  }
+}
+
 async function listedTools(variables: Record<string, string>): Promise<ListedCapabilities> {
   const application = createApplication({ variables, workingDirectory: '/nonexistent', platform: process.platform, homeDirectory: '/nonexistent' });
   const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
@@ -80,6 +96,16 @@ describe('tool modes', () => {
     expect(names).not.toContain('game_run');
     expect(names).not.toContain('game_eval');
     expect(instructions).toContain('read-only mode');
+  });
+
+  it('names the windowless mode in godot_status', async () => {
+    const windowless = await statusText({ GODOT_MCP_HEADLESS: '1' });
+    const windowed = await statusText({});
+
+    expect(windowless).toContain(
+      'Windowless mode (GODOT_MCP_HEADLESS): games run without a window, editor_launch starts the editor without one, and screenshots are not available.',
+    );
+    expect(windowed).not.toContain('Windowless mode');
   });
 
   it('turns off the tools that GODOT_MCP_DISABLE names', async () => {

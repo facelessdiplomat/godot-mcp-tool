@@ -22,3 +22,4 @@ When running one, record whether it passed, the number of tool calls and the tok
 | [tidy-the-project.md](tidy-the-project.md) | `resource_find_usages`, `filesystem_move`, `filesystem_delete` | `server/test/integration/fileTools.test.ts` |
 | [export-the-game.md](export-the-game.md) | `export_project` | `server/test/integration/exportProject.test.ts` |
 | [find-a-bug-with-breakpoints.md](find-a-bug-with-breakpoints.md) | `debug_breakpoints`, `debug_state`, `debug_continue` | `server/test/integration/debugging.test.ts` |
+| [playtest-without-a-window.md](playtest-without-a-window.md) | the game tools without the editor, `GODOT_MCP_HEADLESS` | `server/test/integration/windowlessPlaytest.test.ts` |

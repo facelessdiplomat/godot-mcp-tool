@@ -278,10 +278,13 @@ against one of them.
 
 **Runtime agent (autoload `GodotMcpRuntime`)**
 
-- Active only when the game runs with a debugger attached (`EngineDebugger.is_active()`); does nothing in exported
-  release builds.
+- Active only when the game runs with a debugger attached (`EngineDebugger.is_active()`), or when the server started
+  it without the editor; does nothing in exported release builds.
 - Receives commands via `EngineDebugger.register_message_capture("mcp", …)` and replies via
-  `EngineDebugger.send_message("mcp:…", […])`.
+  `EngineDebugger.send_message("mcp:…", […])`. In a game that the server started without the editor, it connects to
+  the server instead: the server listens on `127.0.0.1` for the run and passes the port after `--` as
+  `--mcp-port=N` and a random token in the environment variable `GODOT_MCP_GAME_TOKEN`; the agent sends the token
+  first and then answers the same requests as NDJSON lines, while its log goes to a file (ADR-4).
 - A `Logger` subclass (`OS.add_logger`) captures `print`, errors, warnings, script and shader errors together with
   `ScriptBacktrace`. The buffer is thread-safe (`Mutex`) and flushed once per frame.
 - Commands: viewport screenshots and renders from extra cameras, input (`Input.parse_input_event`,
@@ -289,8 +292,10 @@ against one of them.
   `Expression`, `Performance` monitors, pause and step.
 
 **Godot CLI (headless)** works without an open editor: import, script checks, docs, running the game and tests,
-export. Milestone 4 adds a "headless editor" mode (`--headless --editor`) in which the same addon runs, giving the
-full toolset without a window. This needs a spike (milestone 0).
+export. A headless editor (`--headless --editor`, spike 6) runs the same addon and gives the full toolset without a
+window: `editor_launch` starts one with `headless: true`. With `GODOT_MCP_HEADLESS=1` the whole server works without
+windows: `editor_launch` starts the editor headless by default, games started without the editor run with
+`--headless`, and `godot_status` says so; only screenshots need a window.
 
 ### 6.3 Key flows
 
@@ -386,7 +391,8 @@ The **editor ⇄ game** channel uses the same command format inside debugger mes
 ## 8. MCP tool catalog
 
 Legend. **M** — milestone (§12). **Kind**: R — read-only, W — modifies, D — potentially destructive.
-**Needs**: E — open editor, G — running game, C — the Godot CLI is enough.
+**Needs**: E — open editor, G — a game started with `game_run`, from the editor or without it, C — the Godot CLI is
+enough.
 
 About 65 tools across all milestones; 16 in the MVP.
 
@@ -1037,6 +1043,10 @@ Dropped and failed connections are the top complaint about almost every existing
   an RCE rated CVSS 9.6.
 - A 128-bit random token in the discovery file inside `.godot/` (never committed). The token is required in the first
   message and compared in constant time.
+- A game started without the editor connects back to the server, which listens on `127.0.0.1` only for that run and
+  accepts one connection that presents the run's token first, compared in constant time. The token travels in the
+  game's environment, which other users cannot read, not in its arguments, which every user sees in `ps`. The runtime
+  agent takes these arguments only in debug builds (`OS.is_debug_build()`), so an exported release game ignores them.
 - Raw TCP + NDJSON instead of HTTP/WebSocket: a web page can't open such a connection, and an HTTP request to this
   port is dropped as non-JSON. This closes browser-based attacks (CSRF, DNS rebinding).
 - Path sandbox: every path must resolve inside `res://`. `..`, absolute paths and symlinks pointing outside the
@@ -1382,9 +1392,12 @@ the next call showed a ⚠.
       as one Undo step; transitions advance by themselves from Start and with a condition or expression, and a
       machine that nothing leaves Start from comes with a warning; scenario `docs/evals/character-states.md`.
 - [ ] `gridmap_*` if evaluations show the need.
-- [ ] Windowless mode: scene operations through the headless editor or `--headless --script` (based on spike 6);
-      a TCP transport for the runtime agent when the game runs as a process (port and token passed as user
-      arguments after `--`).
+- [x] Windowless mode: scene operations through a headless editor (`editor_launch` with `headless: true`, the
+      default with `GODOT_MCP_HEADLESS=1`); a game started without the editor connects to the server over TCP (the
+      port after `--`, the token in the environment), so `game_get_tree`, `game_get_properties`, `game_set_properties`,
+      `game_wait`, `game_input`, `game_pause`, `game_step`, `game_performance` and `game_screenshot` work for it too, and
+      `game_eval` checks the project's Allow Unsafe Tools switch itself; scenario
+      `docs/evals/playtest-without-a-window.md`.
 - [x] Debugging through DAP: `debug_breakpoints`, `debug_state`, `debug_continue` — the editor's breakpoints, the
       stack, the code and the variables where the game stopped, and stepping, through the editor's debug adapter
       without clearing the user's breakpoints; game tools that need running frames refuse while the game is stopped;
@@ -1621,8 +1634,10 @@ in the Claude Code CLI — `claude --debug=mcp` (the server's stderr ends up in 
 
 - No new ports or authentication — the engine already established the channel. Automatically inactive in release
   builds. Works for a game embedded in the editor too. godot-ai and satelliteoflove take the same approach.
-- Limitation: only when the game is launched from the editor. For process runs (milestone 4) we add a TCP transport
-  with the port taken from the user arguments (`OS.get_cmdline_user_args()`).
+- Limitation: only when the game is launched from the editor. For process runs (milestone 4) the game connects to
+  the server over TCP instead: the server listens on an ephemeral port for the run, passes it in the user arguments
+  (`OS.get_cmdline_user_args()`) and the token in the environment, and sends the same requests, which the agent
+  answers with the same command router.
 
 ### ADR-5. Script diagnostics through the editor's LSP
 

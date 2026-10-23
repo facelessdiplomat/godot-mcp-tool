@@ -54,7 +54,7 @@ export function createGamePauseTool(game: EditorGateway): BridgeTool<typeof game
     definition: {
       title: 'Pause or resume the game',
       description:
-        'Pause the running game so that nothing moves, or resume it with paused: false. While it is paused, game_get_properties, game_screenshot and node_get_bounds read a frozen moment and game_step advances it by exact physics frames; game_wait and game_input still wait, but the game does not react. Nodes that the game sets to always process keep running. Needs a game started from the editor.',
+        'Pause the running game so that nothing moves, or resume it with paused: false. While it is paused, game_get_properties, game_screenshot and node_get_bounds read a frozen moment and game_step advances it by exact physics frames; game_wait and game_input still wait, but the game does not react. Nodes that the game sets to always process keep running. Needs a game started with game_run, with or without the editor.',
       inputSchema: gamePauseInput,
       annotations: changingAnnotations({ destructive: false, idempotent: true }),
       alwaysLoad: false,
@@ -86,7 +86,7 @@ export function createGameStepTool(game: EditorGateway): BridgeTool<typeof gameS
     definition: {
       title: 'Step the game',
       description:
-        'Advance the paused game by exactly the given number of physics frames and keep it paused, to check what happens frame by frame, such as the height of a jump after 10 frames. A running game is paused after the frames. Needs a game started from the editor.',
+        'Advance the paused game by exactly the given number of physics frames and keep it paused, to check what happens frame by frame, such as the height of a jump after 10 frames. A running game is paused after the frames. Needs a game started with game_run, with or without the editor.',
       inputSchema: gameStepInput,
       annotations: changingAnnotations({ destructive: false, idempotent: false }),
       alwaysLoad: false,
@@ -116,7 +116,7 @@ export function createGamePerformanceTool(game: EditorGateway): BridgeTool<typeo
     definition: {
       title: 'Game performance',
       description:
-        'Measure how the running game performs over a number of frames: frame time and FPS, time spent in process and physics code, draw calls and primitives, memory, counts of objects and nodes with orphan nodes (a sign of leaks), and the load of 3D physics. Needs a game started from the editor.',
+        'Measure how the running game performs over a number of frames: frame time and FPS, time spent in process and physics code, draw calls and primitives, memory, counts of objects and nodes with orphan nodes (a sign of leaks), and the load of 3D physics. Needs a game started with game_run, with or without the editor.',
       inputSchema: gamePerformanceInput,
       annotations: readingAnnotations,
       alwaysLoad: false,

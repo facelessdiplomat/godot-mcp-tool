@@ -40,19 +40,20 @@ export interface LaunchCall {
   readonly command: string;
   readonly args: readonly string[];
   readonly workingDirectory: string;
+  readonly environment: Readonly<Record<string, string>>;
 }
 
 export class FakeProcessLauncher implements ProcessLauncher {
   readonly calls: LaunchCall[] = [];
   readonly processes: FakeProcess[] = [];
-  simulate: (process: FakeProcess, args: readonly string[]) => void = () => undefined;
+  simulate: (process: FakeProcess, args: readonly string[], environment: Readonly<Record<string, string>>) => void = () => undefined;
 
-  launch(command: string, args: readonly string[], workingDirectory: string): LaunchedProcess {
+  launch(command: string, args: readonly string[], workingDirectory: string, environment: Readonly<Record<string, string>> = {}): LaunchedProcess {
     const process = new FakeProcess();
-    this.calls.push({ command, args, workingDirectory });
+    this.calls.push({ command, args, workingDirectory, environment });
     this.processes.push(process);
     setTimeout(() => {
-      this.simulate(process, args);
+      this.simulate(process, args, environment);
     }, 0);
     return process;
   }
