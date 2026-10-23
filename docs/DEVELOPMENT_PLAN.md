@@ -1604,9 +1604,11 @@ The whole integration suite, run next to that editor, found two more problems:
       Appendix B).
 - [x] Compatibility pass on the official 4.5.2 and 4.7.2 builds (§9.14): every test passes on 4.7.2 after small
       fixes, while 4.5 and 4.6 lack editor APIs that the addon needs, so 4.7 became the minimum (ADR-11).
-- [ ] CI: lint, unit tests, integration tests with headless Godot (matrix 4.7 / the pinned `master` commit). The
-      workflow is written (§9.14); it first runs once the GitHub repository exists, and this is done when it passes
-      there.
+- [x] CI: lint, unit tests, integration tests with headless Godot (matrix 4.7 / the pinned `master` commit), in
+      `.github/workflows/ci.yml` (§9.14). Its first run on GitHub (2026-10-23) failed to build `master` without
+      `zstandard`; with that fixed, every job passes on Linux: the build of `master` in 24 minutes, then cached by its
+      commit, the checks without Godot in under a minute, and the addon and integration tests in about 4.5 minutes
+      for each of 4.7.2 and `master`.
 - [ ] Publication to npm and the Godot Asset Store (it replaced the Asset Library in 4.7).
 
 **Done when** the package is published, CI is green and the user documentation passes its check (below).
