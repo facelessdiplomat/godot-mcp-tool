@@ -152,3 +152,40 @@ After `game_input` got `joypad_button` and `joypad_motion` steps and the tools t
 up front, `gamepad-controls` passed all 8 checks, including the two new ones in the running game (the left stick moves
 the player, the A button makes it jump), with 9 tool calls (66 in the first run), one tool search, $0.43 and 41 s.
 The agent tried the stick in one `game_input` with `read` steps.
+
+### Second full run, 2026-10-23
+
+The same model and versions after all the fixes above, one run per scenario; the numbers before the arrows are from
+the first full run. Checks are those of the second run: `gamepad-controls` has two more.
+
+| Scenario | Checks | Tool calls | Cost, $ | Time, s |
+|---|---|---|---|---|
+| build-an-arena | 6/6 | 16 → 15 | 0.36 → 0.33 | 62 → 54 |
+| third-person-prototype | 8/8 | 77 → 31 | 1.27 → 0.50 | 212 → 116 |
+| dash-with-a-test | 6/6 | 23 → 25 | 0.40 → 0.43 | 62 → 95 |
+| health-bar-hud | 3/3 | 23 → 24 | 0.35 → 0.34 | 45 → 44 |
+| fix-the-jump-error | 3/3 | 48 → 19 | 0.66 → 0.22 | 151 → 40 |
+| patrol-between-points | 6/6 | 28 → 19 | 0.38 → 0.25 | 79 → 41 |
+| collect-coins | 6/6 | 27 → 24 | 0.42 → 0.35 | 53 → 50 |
+| pause-menu | 4/4 | 30 → 20 | 0.50 → 0.33 | 82 → 43 |
+| camera-follow | 4/4 | 26 → 20 | 0.40 → 0.28 | 65 → 48 |
+| stop-the-slowdown | 4/4 | 18 → 26 | 0.26 → 0.29 | 66 → 62 |
+| gamepad-controls | 8/8 | 66 → 10 | 0.90 → 0.21 | 182 → 26 |
+| extract-an-enemy-scene | 6/6 | 23 → 26 | 0.34 → 0.35 | 37 → 35 |
+| import-a-character | 3/3 | 11 → 11 | 0.23 → 0.21 | 56 → 23 |
+| follow-the-player | 5/5 | 48 → 29 | 0.64 → 0.47 | 165 → 102 |
+| animate-a-door | 3/3 | 14 → 15 | 0.25 → 0.23 | 38 → 31 |
+| character-states | 6/6 | 23 → 23 | 0.37 → 0.34 | 69 → 43 |
+| tidy-the-project | 9/9 | 13 → 14 | 0.20 → 0.20 | 36 → 24 |
+| export-the-game | 3/3 | 7 → 3 | 0.14 → 0.10 | 21 → 17 |
+| find-a-bug-with-breakpoints | 3/5 | 24 → 23 | 0.29 → 0.29 | 49 → 51 |
+| playtest-without-a-window | 6/6 | 46 → 12 | 0.69 → 0.18 | 172 → 23 |
+| **19 of 20 passed** | | **591 → 389** | **9.06 → 5.90** | **1704 → 968** |
+
+- 19 of 20 passed, with 389 tool calls instead of 591, 7 failed calls instead of 17 and 20 tool searches instead of
+  44, for $5.90 instead of $9.06 and 16 minutes of the agent instead of 28.
+- `find-a-bug-with-breakpoints` failed: the agent stopped the game before removing its breakpoint, and the breakpoint
+  stayed, because the debug adapter of Godot forgets its breakpoints when a game ends. The server now sends the
+  current breakpoints of a script before removing any.
+- Three calls gave node references relative to the scene root (`"Player"` for `"../Player"`), and one nested the
+  properties of a new resource under `"properties"`; each agent corrected itself on the next call.

@@ -122,4 +122,16 @@ describe.skipIf(godotBinary === '')('debugging the running game with breakpoints
     expect(answeredAfterMs).toBeLessThan(5000);
     expect(state.text).toMatch(new RegExp(`^The game (?:stopped at a breakpoint|is stopped in the debugger) at res://main\\.gd:${String(jumpLine)} in _physics_process\\.`));
   });
+
+  it('removes a breakpoint after the game that stopped there ended, which makes the debug adapter forget it', async () => {
+    await tools().call('debug_breakpoints', { add: ['res://main.gd:10'] });
+    await tools().call('game_run');
+    await tools().call('debug_state', { wait_ms: 10_000 });
+    project?.write('main.gd', mainScript.replace('var doubled := counter * 2', 'var doubled := counter * 3'));
+    await tools().call('script_validate', { paths: ['res://main.gd'] });
+    await tools().call('game_stop');
+    const removed = await tools().call('debug_breakpoints', { remove: ['res://main.gd:10'] });
+
+    expect(removed.text).toBe('The project has no breakpoints. Add them with add, such as ["res://player/player.gd:42"].');
+  });
 });

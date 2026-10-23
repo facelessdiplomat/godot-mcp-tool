@@ -95,10 +95,11 @@ export class GameDebugger {
   }
 
   async changeBreakpoints(change: BreakpointChange): Promise<SourceLine[]> {
-    const linesByFile = new Map<string, Set<number>>();
+    const currentLinesByFile = new Map<string, number[]>();
     for (const breakpoint of await this.breakpoints()) {
-      linesByFile.set(breakpoint.file, (linesByFile.get(breakpoint.file) ?? new Set()).add(breakpoint.line));
+      currentLinesByFile.set(breakpoint.file, [...(currentLinesByFile.get(breakpoint.file) ?? []), breakpoint.line]);
     }
+    const linesByFile = new Map([...currentLinesByFile].map(([file, lines]) => [file, new Set(lines)]));
     const changedFiles = new Set<string>();
     if (change.clearAll) {
       for (const [file, lines] of linesByFile) {
@@ -116,8 +117,12 @@ export class GameDebugger {
     }
     const connection = await this.connection();
     for (const file of changedFiles) {
-      const lines = [...(linesByFile.get(file) ?? [])].sort((first, second) => first - second);
-      await connection.request('setBreakpoints', { source: this.sourceOf(file), breakpoints: lines.map((line) => ({ line: line - 1 })) });
+      const wanted = [...(linesByFile.get(file) ?? [])].sort((first, second) => first - second);
+      const current = currentLinesByFile.get(file) ?? [];
+      if (current.some((line) => !wanted.includes(line))) {
+        await connection.request('setBreakpoints', { source: this.sourceOf(file), breakpoints: current.map((line) => ({ line: line - 1 })) });
+      }
+      await connection.request('setBreakpoints', { source: this.sourceOf(file), breakpoints: wanted.map((line) => ({ line: line - 1 })) });
     }
     return this.breakpoints();
   }

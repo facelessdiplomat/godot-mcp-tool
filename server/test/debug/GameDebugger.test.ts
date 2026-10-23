@@ -13,6 +13,7 @@ interface FakeFrame {
 class FakeGodotDebugAdapter implements DebugAdapterConnection {
   readonly requests: { readonly command: string; readonly args: Record<string, unknown> }[] = [];
   readonly breakpoints = new Map<string, number[]>();
+  private readonly knownBreakpoints = new Map<string, Set<number>>();
   frames: FakeFrame[] = [];
   stepTo: FakeFrame[] | undefined;
   variablesNotSentYet = 0;
@@ -94,7 +95,21 @@ class FakeGodotDebugAdapter implements DebugAdapterConnection {
     const lines = (args['breakpoints'] as { line: number }[]).map((breakpoint) => breakpoint.line + 1);
     const file = `res://${source.path.slice(projectPath.length + 1)}`;
     if (file !== 'res://project.godot') {
-      this.breakpoints.set(file, lines);
+      const known = this.knownBreakpoints.get(file) ?? new Set<number>();
+      const inTheEditor = new Set(this.breakpoints.get(file) ?? []);
+      for (const line of lines) {
+        known.add(line);
+        inTheEditor.add(line);
+      }
+      for (const line of [...known].filter((knownLine) => !lines.includes(knownLine))) {
+        known.delete(line);
+        inTheEditor.delete(line);
+      }
+      this.knownBreakpoints.set(file, known);
+      this.breakpoints.set(
+        file,
+        [...inTheEditor].sort((first, second) => first - second),
+      );
     }
     return Promise.resolve({ breakpoints: lines.map((line) => ({ line, verified: true })) });
   }
@@ -185,6 +200,18 @@ describe('GameDebugger', () => {
       { file: 'res://player.gd', line: 12 },
       { file: 'res://player.gd', line: 30 },
     ]);
+  });
+
+  it('removes the breakpoints that the debug adapter forgot when the game stopped', async () => {
+    adapter.breakpoints.set('res://enemy.gd', [7, 9]);
+
+    const breakpoints = await gameDebugger().changeBreakpoints({ add: [], remove: [{ file: 'res://enemy.gd', line: 9 }], clearAll: false });
+
+    expect(adapter.requests.slice(1).map((request) => request.args)).toEqual([
+      { source: { name: 'enemy.gd', path: '/games/arena/enemy.gd', checksums: [] }, breakpoints: [{ line: 6 }, { line: 8 }] },
+      { source: { name: 'enemy.gd', path: '/games/arena/enemy.gd', checksums: [] }, breakpoints: [{ line: 6 }] },
+    ]);
+    expect(breakpoints).toEqual([{ file: 'res://enemy.gd', line: 7 }]);
   });
 
   it('clears every breakpoint of the project', async () => {
