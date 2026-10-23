@@ -16,16 +16,25 @@ var _router: CommandRouter
 var _build_hello_payload: Callable
 var _read_status: Callable
 var _wait_for_first_scan: Callable
+var _record_command: Callable
 var _last_sent_status: Variant = null
 var _notifications: Array = []
 
 
-func _init(authenticator: Authenticator, router: CommandRouter, build_hello_payload: Callable, read_status: Callable = Callable(), wait_for_first_scan: Callable = Callable()) -> void:
+func _init(
+	authenticator: Authenticator,
+	router: CommandRouter,
+	build_hello_payload: Callable,
+	read_status: Callable = Callable(),
+	wait_for_first_scan: Callable = Callable(),
+	record_command: Callable = Callable(),
+) -> void:
 	_authenticator = authenticator
 	_router = router
 	_build_hello_payload = build_hello_payload
 	_read_status = read_status
 	_wait_for_first_scan = wait_for_first_scan
+	_record_command = record_command
 
 
 func take_notifications() -> Array:
@@ -66,6 +75,15 @@ func _answer_hello(request_id: Variant, params: Dictionary) -> Dictionary:
 
 
 func _run_command(request_id: Variant, method: String, params: Dictionary) -> Dictionary:
+	var started_msec := Time.get_ticks_msec()
+	var answer := await _answer_command(request_id, method, params)
+	if _record_command.is_valid() and not method in KEEPALIVE_METHODS:
+		var error: Variant = answer.get("error")
+		_record_command.call(method, str((error as Dictionary)["message"]) if error is Dictionary else "", Time.get_ticks_msec() - started_msec)
+	return answer
+
+
+func _answer_command(request_id: Variant, method: String, params: Dictionary) -> Dictionary:
 	var command := _router.find(method)
 	if command == null:
 		return JsonRpc.failure(

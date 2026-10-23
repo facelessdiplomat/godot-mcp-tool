@@ -274,7 +274,9 @@ against one of them.
   start, next frame).
 - Variant codec JSON ⇄ Godot types (§9.1).
 - Its own `Logger` in the editor process catches parse, import and shader errors raised in the editor.
-- Milestone 5 adds a small dock: connection status, a log of recent agent commands, toggles for dangerous features.
+- The Godot MCP panel at the bottom of the editor, next to Output (milestone 5): the state of the bridge, the
+  number of connected MCP clients and the state of the game, the switch for the unsafe tools of the project, and the
+  latest 50 agent commands with their time, duration or error, which can be selected and copied.
 
 **Runtime agent (autoload `GodotMcpRuntime`)**
 
@@ -678,11 +680,11 @@ Connected to Godot <version>, project "<name>" (3D). Indentation: <tabs | N spac
   `GODOT_MCP_UNSAFE=1` registers them in the server, and the editor runs them only when the project allows them in
   Project → Tools → Godot MCP Tool → Allow Unsafe Tools. That switch is kept in the editor's project metadata
   (`.godot/editor/project_metadata.cfg`), so it belongs to one user and one project and never reaches version control;
-  the dock of milestone 5 will show it too. `_meta["anthropic/requiresUserInteraction"]` makes Claude Code ask for
-  confirmation on every call. `editor_run_script` wraps the code as the body of `func run(scene: Node) -> Variant` in an
-  in-memory `@tool` script and reports compile and runtime errors with the lines of the code; `node_call_method`
-  records the property changes of the node as one Undo step; `game_eval` evaluates an `Expression` on a node of the
-  running game.
+  the Godot MCP panel at the bottom of the editor shows it too. `_meta["anthropic/requiresUserInteraction"]` makes
+  Claude Code ask for confirmation on every call. `editor_run_script` wraps the code as the body of
+  `func run(scene: Node) -> Variant` in an in-memory `@tool` script and reports compile and runtime errors with the
+  lines of the code; `node_call_method` records the property changes of the node as one Undo step; `game_eval`
+  evaluates an `Expression` on a node of the running game.
 - No tool profiles for other clients (§3).
 - Installed as the Claude Code plugin `godot`, the server's tools are named `mcp__plugin_godot_godot__<tool>`, so
   permission rules and hook matchers use these names; its skill is `/godot:godot`.
@@ -1508,7 +1510,13 @@ The whole integration suite, run next to that editor, found two more problems:
       warnings to its context, and says nothing about clean scripts, other files or projects it cannot check. The
       repository is the marketplace `godot-mcp-tool` (`.claude-plugin/marketplace.json`), and `claude plugin validate`
       passes for both manifests.
-- [ ] An editor dock: status, a log of agent commands, toggles for dangerous features.
+- [x] An editor dock: status, a log of agent commands, toggles for dangerous features: the Godot MCP panel at the
+      bottom of the editor, next to Output, where its tab is always in sight (in a side dock of a default-size window
+      the tab hides behind the scroll arrows). It shows the state of the bridge, also when another editor serves the
+      project, the number of connected MCP clients and the state of the game; the switch for the unsafe tools, kept
+      in step with the Tools menu; and the latest 50 agent commands with their time and duration, or their error in
+      full, selectable and copyable, without the keepalive `ping`. It is placed through `EditorDock` where the engine
+      has it (4.6+) and through the bottom panel of 4.5 otherwise.
 - [ ] User documentation: how to connect and how to use (see [User documentation](#user-documentation)).
 - [ ] `CONTRIBUTING.md`, `SECURITY.md`.
 - [ ] Evaluation tasks (§13) and tool description tuning based on their results.
@@ -1815,6 +1823,9 @@ Checked against the sources in `~/Software/godot` (`master`, 4.8-beta, commit `6
 | The editor starts its plugins inside its first scan (`_first_scan_filesystem` calls `EditorNode::init_plugins`), before it imports new and changed files; `EditorFileSystem.is_scanning()` includes the `first_scan` flag, which turns false only after that import | `editor/file_system/editor_file_system.cpp` |
 | `project.godot` is written with its sections in alphabetical order (`_save_settings_text` walks an `RBMap` of sections) and a blank line after each header and each section | `core/config/project_settings.cpp` |
 | When an editor plugin's scripts change on disk, the running editor reloads them in place: a member variable that the new code adds starts empty, because `_enter_tree` has already run, so the plugin may fail until the editor restarts | observed on 4.8 |
+| `EditorDock` and `EditorPlugin.add_dock()` exist since 4.6; `add_control_to_dock()` and `add_control_to_bottom_panel()` now wrap a control in an `EditorDock` and exist only in builds with deprecated APIs (without `DISABLE_DEPRECATED`) | `editor/plugins/editor_plugin.cpp`, `doc/classes/EditorDock.xml` |
+| A dock added to a side slot of a default-size editor window lands behind the scroll arrows of its tab bar, while the bottom panel has room for one more tab | observed on 4.8 |
+| An unfocused editor window redraws only when something changes, so `RenderingServer.frame_post_draw` may not come for a long time; `RenderingServer.force_draw()` draws it at once | observed on 4.8 |
 | `OS.is_process_running(pid)` knows only child processes of the caller: for any other `pid` its `waitpid` fails, and it prints "The process … does not exist or is not a child of the calling process" and returns false | `drivers/unix/os_unix.cpp`, `doc/classes/OS.xml` |
 | On macOS a `StreamPeerTCP` that connects to a closed loopback port reports `STATUS_CONNECTED` after its first `poll()` and `STATUS_NONE` after the next one, while a connection to a listening port stays connected | observed on 4.8 |
 | `godot --import` and the command-line exports start a whole editor: the project's enabled editor plugins enter the tree, and leave it when that editor quits | observed on 4.8 |

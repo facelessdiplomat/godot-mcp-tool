@@ -25,6 +25,10 @@ func connection_count() -> int:
 	return _connections.size()
 
 
+func authenticated_count() -> int:
+	return _connections.filter(func(connection: BridgeConnection) -> bool: return connection.session.is_authenticated).size()
+
+
 func poll() -> void:
 	while _tcp_server.is_connection_available():
 		var peer := _tcp_server.take_connection()

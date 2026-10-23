@@ -28,10 +28,13 @@ func uninstall(plugin: EditorPlugin) -> void:
 	_menu = null
 
 
-func _on_item_pressed(item_id: int) -> void:
-	if item_id != ALLOW_ITEM_ID:
-		return
-	var allowed := not is_allowed()
+func set_allowed(allowed: bool) -> void:
 	EditorInterface.get_editor_settings().set_project_metadata(AddonInfo.SETTINGS_SECTION, AddonInfo.UNSAFE_TOOLS_KEY, allowed)
-	_menu.set_item_checked(_menu.get_item_index(ALLOW_ITEM_ID), allowed)
+	if is_instance_valid(_menu):
+		_menu.set_item_checked(_menu.get_item_index(ALLOW_ITEM_ID), allowed)
 	print("Godot MCP Tool: unsafe tools are %s in this project." % ("allowed" if allowed else "turned off"))
+
+
+func _on_item_pressed(item_id: int) -> void:
+	if item_id == ALLOW_ITEM_ID:
+		set_allowed(not is_allowed())

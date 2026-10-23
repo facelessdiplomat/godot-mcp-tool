@@ -4,6 +4,9 @@ extends EditorPlugin
 const REQUEST_FILE := "res://.mcp_test_request.json"
 const RESPONSE_FILE := "res://.mcp_test_response.json"
 const EXTERNAL_CHANGE_DIALOG_TITLE := "Files have been modified outside Godot"
+const MCP_DOCK_NAME := "Godot MCP"
+const SETTINGS_SECTION := "godot_mcp_tool"
+const UNSAFE_TOOLS_KEY := "allow_unsafe_tools"
 
 var _busy := false
 
@@ -31,6 +34,10 @@ func _handle(request: Dictionary) -> Dictionary:
 			return _undo_in_edited_scene()
 		"read_selection":
 			return _read_selection()
+		"read_mcp_dock":
+			return _read_mcp_dock()
+		"toggle_unsafe_tools_in_mcp_dock":
+			return _toggle_unsafe_tools_in_mcp_dock()
 	return {"error": "unknown action %s" % request.get("action", "")}
 
 
@@ -73,3 +80,26 @@ func _read_selection() -> Dictionary:
 	for node in EditorInterface.get_selection().get_selected_nodes():
 		nodes.append(str(scene_root.get_path_to(node)) if scene_root != null else str(node.name))
 	return {"nodes": nodes, "files": Array(EditorInterface.get_selected_paths())}
+
+
+func _find_mcp_dock() -> Control:
+	return EditorInterface.get_base_control().find_child(MCP_DOCK_NAME, true, false) as Control
+
+
+func _read_mcp_dock() -> Dictionary:
+	var dock := _find_mcp_dock()
+	if dock == null:
+		return {"error": "no %s dock" % MCP_DOCK_NAME}
+	dock.call("refresh")
+	var toggle := dock.call("unsafe_tools_toggle") as CheckBox
+	return {"status": dock.call("status_text"), "unsafe_tools": toggle.button_pressed, "commands": dock.call("command_lines")}
+
+
+func _toggle_unsafe_tools_in_mcp_dock() -> Dictionary:
+	var dock := _find_mcp_dock()
+	if dock == null:
+		return {"error": "no %s dock" % MCP_DOCK_NAME}
+	var toggle := dock.call("unsafe_tools_toggle") as CheckBox
+	toggle.button_pressed = not toggle.button_pressed
+	var allowed: bool = EditorInterface.get_editor_settings().get_project_metadata(SETTINGS_SECTION, UNSAFE_TOOLS_KEY, false)
+	return {"unsafe_tools": toggle.button_pressed, "allowed_in_project": allowed}

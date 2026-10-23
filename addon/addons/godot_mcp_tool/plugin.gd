@@ -2,10 +2,12 @@
 extends EditorPlugin
 
 const AddonInfo := preload("addon_info.gd")
+const BottomPanel := preload("editor/bottom_panel.gd")
 const Authenticator := preload("bridge/authenticator.gd")
 const BridgeServer := preload("bridge/bridge_server.gd")
 const BridgeSession := preload("bridge/bridge_session.gd")
 const CommandCatalog := preload("commands/command_catalog.gd")
+const CommandJournal := preload("editor/command_journal.gd")
 const CommandRouter := preload("commands/command_router.gd")
 const DiscoveryFile := preload("bridge/discovery_file.gd")
 const EditingContext := preload("scene/editing_context.gd")
@@ -19,6 +21,7 @@ const FirstScanGate := preload("editor/first_scan_gate.gd")
 const GameState := preload("runtime/game_state.gd")
 const GodotVersionText := preload("editor/godot_version_text.gd")
 const LogStore := preload("runtime/log_store.gd")
+const McpDock := preload("editor/mcp_dock.gd")
 const ResponsivenessController := preload("editor/responsiveness_controller.gd")
 const RunArguments := preload("runtime/run_arguments.gd")
 const RunRequest := preload("runtime/run_request.gd")
@@ -47,6 +50,9 @@ var _discovery_file: DiscoveryFile
 var _first_scan_gate: FirstScanGate
 var _token := ""
 var _unsafe_tools := UnsafeToolsSwitch.new()
+var _command_journal := CommandJournal.new()
+var _bridge_state := ""
+var _dock_panel: BottomPanel
 
 
 func _enter_tree() -> void:
@@ -63,24 +69,33 @@ func _enter_tree() -> void:
 	_router = CommandCatalog.build_router(context, _runtime, _read_indentation, ProjectSettings.save, EditorAutoloadRegistry.new(self), _unsafe_tools.is_allowed)
 	_token = TokenGenerator.generate()
 	_first_scan_gate = FirstScanGate.new(EditorFileSystemAccess.new())
+	_bridge_state = _start_bridge()
+	var dock := McpDock.new(_command_journal, _read_dock_status, _unsafe_tools.is_allowed, _unsafe_tools.set_allowed)
+	_dock_panel = BottomPanel.new(self, dock)
+	_dock_panel.add(McpDock.TAB_TITLE)
+
+
+func _start_bridge() -> String:
 	_bridge_server = BridgeServer.new(_create_session)
 	var listen_error := _bridge_server.listen(AddonInfo.LOOPBACK_ADDRESS, 0)
 	if listen_error != OK:
 		push_error("Godot MCP Tool: the bridge could not listen on %s: %s" % [AddonInfo.LOOPBACK_ADDRESS, error_string(listen_error)])
 		_bridge_server = null
-		return
+		return "off: it could not listen on %s (%s)" % [AddonInfo.LOOPBACK_ADDRESS, error_string(listen_error)]
 	var discovery_file := DiscoveryFile.new(_project_path().path_join(AddonInfo.DISCOVERY_RELATIVE_PATH))
 	var claim_error := discovery_file.claim(_build_discovery_record())
 	if claim_error == ERR_ALREADY_IN_USE:
 		print("Godot MCP Tool: the editor in process %d already serves this project, so this one keeps its bridge off." % discovery_file.owner_pid())
 		_bridge_server.stop()
 		_bridge_server = null
-		return
+		return "off: the editor in process %d already serves this project" % discovery_file.owner_pid()
+	var address := "%s:%d" % [AddonInfo.LOOPBACK_ADDRESS, _bridge_server.get_port()]
 	if claim_error != OK:
 		push_error("Godot MCP Tool: could not write %s: %s" % [discovery_file.path, error_string(claim_error)])
-		return
+		return "listening on %s, but no server finds it: %s could not be written" % [address, discovery_file.path]
 	_discovery_file = discovery_file
-	print("Godot MCP Tool: bridge listening on %s:%d" % [AddonInfo.LOOPBACK_ADDRESS, _bridge_server.get_port()])
+	print("Godot MCP Tool: bridge listening on %s" % address)
+	return "listening on %s" % address
 
 
 func _process(_delta: float) -> void:
@@ -92,6 +107,9 @@ func _process(_delta: float) -> void:
 
 
 func _exit_tree() -> void:
+	if _dock_panel != null:
+		_dock_panel.remove()
+		_dock_panel = null
 	_unsafe_tools.uninstall(self)
 	if _bridge_server != null:
 		_bridge_server.stop()
@@ -118,7 +136,21 @@ func _run_scene(_scene: String, args: PackedStringArray) -> PackedStringArray:
 
 
 func _create_session() -> BridgeSession:
-	return BridgeSession.new(Authenticator.new(_token, AddonInfo.BRIDGE_PROTOCOL_VERSION), _router, _build_hello_payload, _read_status, _first_scan_gate.wait_until_finished)
+	return BridgeSession.new(
+		Authenticator.new(_token, AddonInfo.BRIDGE_PROTOCOL_VERSION),
+		_router,
+		_build_hello_payload,
+		_read_status,
+		_first_scan_gate.wait_until_finished,
+		_command_journal.record)
+
+
+func _read_dock_status() -> Dictionary:
+	return {
+		"bridge": _bridge_state,
+		"clients": _bridge_server.authenticated_count() if _bridge_server != null else 0,
+		"game": _runtime.game.state,
+	}
 
 
 func _read_status() -> Dictionary:

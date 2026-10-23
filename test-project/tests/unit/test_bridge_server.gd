@@ -92,6 +92,16 @@ func test_records_the_time_of_the_last_request() -> void:
 	assert_gte(_server.last_activity_msec, 0)
 
 
+func test_counts_the_clients_that_said_hello() -> void:
+	for attempt in 50:
+		_server.poll()
+		_client.poll()
+		OS.delay_msec(2)
+	assert_eq(_server.authenticated_count(), 0)
+	_send_and_receive_line('{"jsonrpc":"2.0","id":1,"method":"hello","params":{"token":"secret","protocol":1}}\n')
+	assert_eq(_server.authenticated_count(), 1)
+
+
 func test_broadcasts_notifications_to_authenticated_clients() -> void:
 	_send_and_receive_line('{"jsonrpc":"2.0","id":1,"method":"hello","params":{"token":"secret","protocol":1}}\n')
 	_server.broadcast({"jsonrpc": "2.0", "method": "log", "params": {"message": "ready"}})

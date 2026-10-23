@@ -188,3 +188,24 @@ func test_answers_that_the_editor_is_busy_when_its_first_scan_does_not_end_in_ti
 	var response: Dictionary = await session.handle_line(_request_line(2, "record"))
 	assert_eq((response["error"] as Dictionary)["code"], JsonRpc.EDITOR_BUSY)
 	assert_false(recording.executed)
+
+
+func test_records_the_commands_it_answers_but_not_the_keepalive() -> void:
+	var recorded: Array = []
+	var router := CommandRouter.new()
+	router.register("ping", PingCommand.new())
+	router.register("fail", FailingCommand.new())
+	router.register("record", RecordingCommand.new())
+	var session := BridgeSession.new(
+		Authenticator.new("secret", 1),
+		router,
+		func() -> Dictionary: return {},
+		Callable(),
+		Callable(),
+		func(method: String, error_message: String, duration_msec: int) -> void: recorded.append([method, error_message, duration_msec >= 0]))
+	await session.handle_line(_hello_line("secret"))
+	await session.handle_line(_request_line(2, "ping"))
+	await session.handle_line(_request_line(3, "record"))
+	await session.handle_line(_request_line(4, "fail"))
+	await session.handle_line(_request_line(5, "missing"))
+	assert_eq_deep(recorded, [["record", "", true], ["fail", "Node not found", true], ["missing", "Unknown method missing", true]])
