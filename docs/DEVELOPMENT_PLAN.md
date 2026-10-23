@@ -1068,8 +1068,9 @@ Dropped and failed connections are the top complaint about almost every existing
   and the package build, and the addon and integration tests against the official 4.7.2 build and against the
   pinned `master` commit, which it builds from source once and caches by the commit; the window tests stay local.
   What it downloads is pinned: the actions by commit (`actions/checkout` v7.0.1, `actions/setup-node` v7.1.0,
-  `actions/cache` v6.1.0), the Godot archive by its SHA-512, and GUT and gdUnit4 by the commits of their release
-  tags, which the install scripts check.
+  `actions/cache` v6.1.0), the Godot archive by its SHA-512, GUT and gdUnit4 by the commits of their release tags,
+  which the install scripts check, and SCons and `zstandard`, which the build of Godot needs on Python before 3.14,
+  by version. The tests of 4.7.2 run even when the build of `master` fails.
 - MCP specification 2026-07-28 is incompatible with earlier revisions, but SDK v2 negotiates the version and serves
   both new and old clients.
 

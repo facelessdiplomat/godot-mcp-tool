@@ -84,7 +84,9 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install --yes libwayland-bin
-          pipx run --spec scons==4.11.1 scons platform=linuxbsd target=editor accesskit=no
+          python3 -m venv "$RUNNER_TEMP/build-tools"
+          "$RUNNER_TEMP/build-tools/bin/pip" install scons==4.11.1 zstandard==0.25.0
+          "$RUNNER_TEMP/build-tools/bin/scons" platform=linuxbsd target=editor accesskit=no
           mkdir -p "$GITHUB_WORKSPACE/$GODOT_MASTER_DIRECTORY"
           cp bin/godot.linuxbsd.editor.x86_64 "$GITHUB_WORKSPACE/$GODOT_MASTER_DIRECTORY/godot"
 
@@ -98,6 +100,7 @@ jobs:
   godot-tests:
     name: Godot ${{ matrix.godot }} tests
     needs: godot-master
+    if: ${{ !cancelled() }}
     runs-on: ubuntu-24.04
     timeout-minutes: 45
     strategy:
