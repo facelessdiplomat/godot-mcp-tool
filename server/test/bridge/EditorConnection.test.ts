@@ -107,6 +107,14 @@ describe('EditorConnection', () => {
     expect(!status.connected && status.reason).toContain('41234');
   });
 
+  it('explains that the editor of the project was closed', async () => {
+    const { connection } = connectionWith({ kind: 'closed', path: '/projects/game/.godot/godot_mcp_tool/bridge.json', executablePath: '/opt/godot/godot' }, []);
+
+    const status = await connection.status();
+
+    expect(!status.connected && status.reason).toBe('The Godot editor of this project was closed.');
+  });
+
   it('explains an invalid discovery file', async () => {
     const { connection } = connectionWith({ kind: 'invalid', path: '/bridge.json', reason: 'port: expected number' }, []);
 

@@ -2,42 +2,14 @@ import type { ChildProcess } from 'node:child_process';
 import { execFileSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { editorStartupTimeoutMs, godotBinary, McpSession, startHeadlessEditor, TemporaryProject } from './harness.js';
-
-interface HostPlatform {
-  readonly name: string;
-  readonly folder: string;
-  readonly file: string;
-}
-
-const hostPlatforms: Readonly<Partial<Record<NodeJS.Platform, HostPlatform>>> = {
-  darwin: { name: 'macOS', folder: 'macos', file: 'game.zip' },
-  linux: { name: 'Linux', folder: 'linux', file: 'game.x86_64' },
-  win32: { name: 'Windows Desktop', folder: 'windows', file: 'game.exe' },
-};
-const host = hostPlatforms[process.platform];
+import { editorStartupTimeoutMs, exportPresetsFor, godotBinary, hostExportPlatform, McpSession, startHeadlessEditor, TemporaryProject } from './harness.js';
 
 const mainScene = ['[gd_scene format=3]', '', '[node name="Main" type="Node3D"]', ''].join('\n');
 
 const quitScript = ['extends Node3D', '', '', 'func _ready() -> void:', '\tprint("The exported game runs")', '\tget_tree().quit()', ''].join('\n');
 
-function presetFor(platform: HostPlatform): string {
-  return [
-    '[preset.0]',
-    '',
-    `name="${platform.name}"`,
-    `platform="${platform.name}"`,
-    'runnable=true',
-    'export_filter="all_resources"',
-    'include_filter=""',
-    'exclude_filter=""',
-    `export_path="build/${platform.folder}/${platform.file}"`,
-    '',
-  ].join('\n');
-}
-
-describe.skipIf(godotBinary === '' || host === undefined)('exporting the game', () => {
-  const platform = host ?? { name: '', folder: '', file: '' };
+describe.skipIf(godotBinary === '' || hostExportPlatform === undefined)('exporting the game', () => {
+  const platform = hostExportPlatform ?? { name: '', folder: '', file: '' };
   let project: TemporaryProject | undefined;
   let editorProcess: ChildProcess | undefined;
   let session: McpSession | undefined;
@@ -60,7 +32,7 @@ describe.skipIf(godotBinary === '' || host === undefined)('exporting the game', 
     project = new TemporaryProject('MCP export', { mainScene: 'res://main.tscn' });
     project.write('main.tscn', mainScene);
     project.write('main.gd', quitScript);
-    project.write('export_presets.cfg', presetFor(platform));
+    project.write('export_presets.cfg', exportPresetsFor(platform));
     editorProcess = await startHeadlessEditor(project.root);
     session = await McpSession.connect(project.root);
   }, editorStartupTimeoutMs);

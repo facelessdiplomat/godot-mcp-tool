@@ -8,6 +8,7 @@ const VariantCodec := preload("../codec/variant_codec.gd")
 const STEPPED_TYPES := [TYPE_BOOL, TYPE_STRING, TYPE_STRING_NAME, TYPE_NODE_PATH, TYPE_OBJECT]
 const DEFAULT_LENGTH := 1.0
 const DECIMAL_SCALE := 1000.0
+const RESET_LENGTH := 0.001
 
 var _codec: VariantCodec
 var _root: Node
@@ -61,6 +62,25 @@ func build(planned_tracks: Array, length: float, loop_mode: int) -> Animation:
 		for key in track["keys"]:
 			animation.track_insert_key(index, key["time"], key["value"])
 	return animation
+
+
+func build_reset(previous: Animation, planned_tracks: Array) -> Animation:
+	var reset := previous.duplicate() as Animation if previous != null else Animation.new()
+	if previous == null:
+		reset.length = RESET_LENGTH
+	for track in planned_tracks:
+		var index := reset.add_track(Animation.TYPE_VALUE)
+		reset.track_set_path(index, NodePath(track["path"]))
+		reset.track_set_interpolation_type(index, track["interpolation"])
+		reset.value_track_set_update_mode(index, track["update"])
+		reset.track_insert_key(index, 0.0, current_value(track))
+	return reset
+
+
+func current_value(track: Dictionary) -> Variant:
+	var path := str(track["path"])
+	var node_part := path.get_slice(":", 0)
+	return _root.get_node(NodePath(node_part)).get_indexed(NodePath(":" + path.substr(node_part.length() + 1)))
 
 
 func describe(track: Dictionary) -> Dictionary:

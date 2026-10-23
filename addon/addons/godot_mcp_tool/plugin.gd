@@ -10,10 +10,12 @@ const CommandRouter := preload("commands/command_router.gd")
 const DiscoveryFile := preload("bridge/discovery_file.gd")
 const EditingContext := preload("scene/editing_context.gd")
 const EditorAutoloadRegistry := preload("editor/editor_autoload_registry.gd")
+const EditorFileSystemAccess := preload("editor/editor_file_system_access.gd")
 const EditorSceneAccess := preload("scene/editor_scene_access.gd")
 const EditorScriptEditorAccess := preload("editor/editor_script_editor_access.gd")
 const EditorGameLauncher := preload("runtime/editor_game_launcher.gd")
 const EditorUndoHistory := preload("scene/editor_undo_history.gd")
+const FirstScanGate := preload("editor/first_scan_gate.gd")
 const GameState := preload("runtime/game_state.gd")
 const GodotVersionText := preload("editor/godot_version_text.gd")
 const LogStore := preload("runtime/log_store.gd")
@@ -42,6 +44,7 @@ var _editor_logger: RuntimeLogger
 var _router: CommandRouter
 var _bridge_server: BridgeServer
 var _discovery_file: DiscoveryFile
+var _first_scan_gate: FirstScanGate
 var _token := ""
 var _unsafe_tools := UnsafeToolsSwitch.new()
 
@@ -59,17 +62,24 @@ func _enter_tree() -> void:
 	_unsafe_tools.install(self)
 	_router = CommandCatalog.build_router(context, _runtime, _read_indentation, ProjectSettings.save, EditorAutoloadRegistry.new(self), _unsafe_tools.is_allowed)
 	_token = TokenGenerator.generate()
+	_first_scan_gate = FirstScanGate.new(EditorFileSystemAccess.new())
 	_bridge_server = BridgeServer.new(_create_session)
 	var listen_error := _bridge_server.listen(AddonInfo.LOOPBACK_ADDRESS, 0)
 	if listen_error != OK:
 		push_error("Godot MCP Tool: the bridge could not listen on %s: %s" % [AddonInfo.LOOPBACK_ADDRESS, error_string(listen_error)])
 		_bridge_server = null
 		return
-	_discovery_file = DiscoveryFile.new(_project_path().path_join(AddonInfo.DISCOVERY_RELATIVE_PATH))
-	var write_error := _discovery_file.write(_build_discovery_record())
-	if write_error != OK:
-		push_error("Godot MCP Tool: could not write %s: %s" % [_discovery_file.path, error_string(write_error)])
+	var discovery_file := DiscoveryFile.new(_project_path().path_join(AddonInfo.DISCOVERY_RELATIVE_PATH))
+	var claim_error := discovery_file.claim(_build_discovery_record())
+	if claim_error == ERR_ALREADY_IN_USE:
+		print("Godot MCP Tool: the editor in process %d already serves this project, so this one keeps its bridge off." % discovery_file.owner_pid())
+		_bridge_server.stop()
+		_bridge_server = null
 		return
+	if claim_error != OK:
+		push_error("Godot MCP Tool: could not write %s: %s" % [discovery_file.path, error_string(claim_error)])
+		return
+	_discovery_file = discovery_file
 	print("Godot MCP Tool: bridge listening on %s:%d" % [AddonInfo.LOOPBACK_ADDRESS, _bridge_server.get_port()])
 
 
@@ -87,7 +97,7 @@ func _exit_tree() -> void:
 		_bridge_server.stop()
 		_bridge_server = null
 	if _discovery_file != null:
-		_discovery_file.remove()
+		_discovery_file.release(OS.get_process_id())
 		_discovery_file = null
 	if _runtime_debugger != null:
 		remove_debugger_plugin(_runtime_debugger)
@@ -108,7 +118,7 @@ func _run_scene(_scene: String, args: PackedStringArray) -> PackedStringArray:
 
 
 func _create_session() -> BridgeSession:
-	return BridgeSession.new(Authenticator.new(_token, AddonInfo.BRIDGE_PROTOCOL_VERSION), _router, _build_hello_payload, _read_status)
+	return BridgeSession.new(Authenticator.new(_token, AddonInfo.BRIDGE_PROTOCOL_VERSION), _router, _build_hello_payload, _read_status, _first_scan_gate.wait_until_finished)
 
 
 func _read_status() -> Dictionary:

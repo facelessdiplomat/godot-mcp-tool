@@ -74,6 +74,8 @@ describe.skipIf(godotBinary === '')('animating a door', () => {
     const listed = await tools().call('animation_get', { player: 'AnimationPlayer' });
 
     expect(deleted.text).toBe('Deleted the animation open of AnimationPlayer in res://level.tscn as one Undo step; the scene has unsaved changes.');
-    expect(listed.text).toContain('Animations: none yet; create one with animation_set');
+    expect(listed.text).toBe(
+      ['AnimationPlayer in res://level.tscn: tracks animate nodes from .., autoplay none', 'Animations:', '- RESET: 0.001 s, loop none, 1 track'].join('\n'),
+    );
   });
 });

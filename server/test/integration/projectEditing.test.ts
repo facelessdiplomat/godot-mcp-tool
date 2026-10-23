@@ -1,6 +1,6 @@
 import type { ChildProcess } from 'node:child_process';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { EditorTestHelper, editorStartupTimeoutMs, godotBinary, McpSession, startHeadlessEditor, TemporaryProject } from './harness.js';
+import { EditorTestHelper, editorStartupTimeoutMs, findFreePort, godotBinary, McpSession, startHeadlessEditor, TemporaryProject } from './harness.js';
 
 const gameStateScript = ['extends Node', '', 'var score := 0', ''].join('\n');
 const scoringScript = ['extends Node', '', '', 'func _ready() -> void:', '\tGameState.score += 1', ''].join('\n');
@@ -36,8 +36,9 @@ describe.skipIf(godotBinary === '')('autoloads, groups, selection and closing sc
     project = new TemporaryProject('MCP project editing', { withTestHelper: true });
     project.write('game_state.gd', gameStateScript);
     project.write('scoring.gd', scoringScript);
-    editorProcess = await startHeadlessEditor(project.root);
-    session = await McpSession.connect(project.root);
+    const languageServerPort = await findFreePort();
+    editorProcess = await startHeadlessEditor(project.root, { languageServer: languageServerPort });
+    session = await McpSession.connect(project.root, { GODOT_LSP_PORT: String(languageServerPort) });
     helper = new EditorTestHelper(project);
   }, editorStartupTimeoutMs);
 

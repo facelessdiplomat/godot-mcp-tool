@@ -24,7 +24,19 @@ class FrameWaitingCommand:
 		return {"waited": true}
 
 
+class RecordingCommand:
+	extends Command
+
+	var executed := false
+
+	func execute(_params: Dictionary) -> Variant:
+		executed = true
+		return {"executed": true}
+
+
 var _session: BridgeSession
+var _first_scan_finished := true
+var _background_response: Dictionary = {}
 
 
 func before_each() -> void:
@@ -33,6 +45,20 @@ func before_each() -> void:
 	router.register("fail", FailingCommand.new())
 	router.register("wait", FrameWaitingCommand.new())
 	_session = BridgeSession.new(Authenticator.new("secret", 1), router, func() -> Dictionary: return {"protocol": 1, "addon_version": "0.1.0"})
+
+
+func _gated_session(router: CommandRouter, wait_for_first_scan: Callable) -> BridgeSession:
+	return BridgeSession.new(Authenticator.new("secret", 1), router, func() -> Dictionary: return {}, Callable(), wait_for_first_scan)
+
+
+func _wait_for_first_scan() -> bool:
+	while not _first_scan_finished:
+		await (Engine.get_main_loop() as SceneTree).process_frame
+	return true
+
+
+func _send_in_background(session: BridgeSession, line: String) -> void:
+	_background_response = await session.handle_line(line)
 
 
 func _hello_line(token: String) -> String:
@@ -133,3 +159,32 @@ func test_sends_no_status_before_authentication() -> void:
 	await session.handle_line(_request_line(1, "ping"))
 	assert_eq(session.take_notifications(), [])
 
+
+func test_holds_commands_until_the_first_scan_ends_but_answers_ping_at_once() -> void:
+	var recording := RecordingCommand.new()
+	var router := CommandRouter.new()
+	router.register("ping", PingCommand.new())
+	router.register("record", recording)
+	_first_scan_finished = false
+	_background_response = {}
+	var session := _gated_session(router, _wait_for_first_scan)
+	await session.handle_line(_hello_line("secret"))
+	var ping: Dictionary = await session.handle_line(_request_line(2, "ping"))
+	_send_in_background(session, _request_line(3, "record"))
+	await wait_process_frames(3)
+	assert_false(recording.executed)
+	_first_scan_finished = true
+	await wait_until(func() -> bool: return not _background_response.is_empty(), 2.0)
+	assert_eq_deep(ping, {"jsonrpc": "2.0", "id": 2, "result": {"pong": true}})
+	assert_eq_deep(_background_response, {"jsonrpc": "2.0", "id": 3, "result": {"executed": true}})
+
+
+func test_answers_that_the_editor_is_busy_when_its_first_scan_does_not_end_in_time() -> void:
+	var recording := RecordingCommand.new()
+	var router := CommandRouter.new()
+	router.register("record", recording)
+	var session := _gated_session(router, func() -> bool: return false)
+	await session.handle_line(_hello_line("secret"))
+	var response: Dictionary = await session.handle_line(_request_line(2, "record"))
+	assert_eq((response["error"] as Dictionary)["code"], JsonRpc.EDITOR_BUSY)
+	assert_false(recording.executed)

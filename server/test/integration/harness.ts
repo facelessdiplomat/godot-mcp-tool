@@ -43,15 +43,47 @@ export interface EditorPorts {
 }
 
 export function startHeadlessEditor(projectRoot: string, ports: EditorPorts = {}): Promise<ChildProcess> {
-  const portArguments = [
+  return startEditor(projectRoot, ['--headless', ...portArgumentsFor(ports)]);
+}
+
+function portArgumentsFor(ports: EditorPorts): string[] {
+  return [
     ...(ports.languageServer === undefined ? [] : ['--lsp-port', String(ports.languageServer)]),
     ...(ports.debugAdapter === undefined ? [] : ['--dap-port', String(ports.debugAdapter)]),
   ];
-  return startEditor(projectRoot, ['--headless', ...portArguments]);
 }
 
-export function startWindowedEditor(projectRoot: string): Promise<ChildProcess> {
-  return startEditor(projectRoot, []);
+export interface ExportPlatform {
+  readonly name: string;
+  readonly folder: string;
+  readonly file: string;
+}
+
+const exportPlatforms: Readonly<Partial<Record<NodeJS.Platform, ExportPlatform>>> = {
+  darwin: { name: 'macOS', folder: 'macos', file: 'game.zip' },
+  linux: { name: 'Linux', folder: 'linux', file: 'game.x86_64' },
+  win32: { name: 'Windows Desktop', folder: 'windows', file: 'game.exe' },
+};
+
+export const hostExportPlatform = exportPlatforms[process.platform];
+
+export function exportPresetsFor(platform: ExportPlatform): string {
+  return [
+    '[preset.0]',
+    '',
+    `name="${platform.name}"`,
+    `platform="${platform.name}"`,
+    'runnable=true',
+    'export_filter="all_resources"',
+    'include_filter=""',
+    'exclude_filter=""',
+    `export_path="build/${platform.folder}/${platform.file}"`,
+    '',
+  ].join('\n');
+}
+
+export function startWindowedEditor(projectRoot: string, ports: EditorPorts = {}): Promise<ChildProcess> {
+  return startEditor(projectRoot, portArgumentsFor(ports));
 }
 
 async function startEditor(projectRoot: string, extraArguments: readonly string[]): Promise<ChildProcess> {

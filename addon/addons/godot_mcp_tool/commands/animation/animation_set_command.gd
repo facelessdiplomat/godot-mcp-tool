@@ -8,6 +8,8 @@ const EditingContext := preload("../../scene/editing_context.gd")
 const NodeLocator := preload("../../scene/node_locator.gd")
 const Params := preload("../params.gd")
 
+const RESET_NAME := "RESET"
+const DEFAULT_LIBRARY := ""
 const TRACKS_EXAMPLE := "Example: {\"player\": \"AnimationPlayer\", \"name\": \"open\", \"length\": 1, \"tracks\": [{\"path\": \"Door:position\", \"keys\": [{\"time\": 0, \"value\": [0, 0, 0]}, {\"time\": 1, \"value\": [0, 3, 0]}]}]}"
 
 var _context: EditingContext
@@ -58,31 +60,45 @@ func execute(params: Dictionary) -> Variant:
 		"loop": AnimationVocabulary.name_of(AnimationVocabulary.LOOP_MODES, loop_mode),
 		"tracks": (planned["tracks"] as Array).map(planner.describe),
 		"rejected": planned["rejected"],
+		"reset_tracks": [],
 	}
 	if (planned["tracks"] as Array).is_empty():
 		result["created"] = false
 		return result
-	var animation := planner.build(planned["tracks"], planned["length"], loop_mode)
-	_context.history.record("MCP: Set animation %s" % result["name"], scene_root, [_store(player, reference, animation)])
+	var stored := [[(reference as AnimationReference).library_name, (reference as AnimationReference).animation_name, planner.build(planned["tracks"], planned["length"], loop_mode)]]
+	if result["name"] != RESET_NAME:
+		var previous_reset := player.get_animation(RESET_NAME) if player.has_animation(RESET_NAME) else null
+		var reset_tracks := (planned["tracks"] as Array).filter(func(track: Dictionary) -> bool: return previous_reset == null or previous_reset.find_track(NodePath(track["path"]), Animation.TYPE_VALUE) == -1)
+		if not reset_tracks.is_empty():
+			result["reset_tracks"] = reset_tracks.map(func(track: Dictionary) -> String: return track["path"])
+			stored.append([DEFAULT_LIBRARY, RESET_NAME, planner.build_reset(previous_reset, reset_tracks)])
+	_context.history.record("MCP: Set animation %s" % result["name"], scene_root, [_store(player, stored)])
 	return result
 
 
-static func _store(player: AnimationPlayer, reference: AnimationReference, animation: Animation) -> ChangeSet:
+static func _store(player: AnimationPlayer, stored: Array) -> ChangeSet:
 	var changes := ChangeSet.new()
-	if not player.has_animation_library(reference.library_name):
-		var library := AnimationLibrary.new()
-		library.add_animation(reference.animation_name, animation)
-		changes.add_do_call(player, &"add_animation_library", [reference.library_name, library])
-		changes.add_do_reference(library)
-		changes.add_undo_call(player, &"remove_animation_library", [reference.library_name])
-		return changes
-	var library := player.get_animation_library(reference.library_name)
-	changes.add_do_call(library, &"add_animation", [reference.animation_name, animation])
-	changes.add_do_reference(animation)
-	if library.has_animation(reference.animation_name):
-		var previous := library.get_animation(reference.animation_name)
-		changes.add_undo_call(library, &"add_animation", [reference.animation_name, previous])
-		changes.add_undo_reference(previous)
-	else:
-		changes.add_undo_call(library, &"remove_animation", [reference.animation_name])
+	var new_libraries := {}
+	for entry in stored:
+		var library_name: String = entry[0]
+		var animation_name: String = entry[1]
+		var animation: Animation = entry[2]
+		if not player.has_animation_library(library_name):
+			if not new_libraries.has(library_name):
+				var new_library := AnimationLibrary.new()
+				new_libraries[library_name] = new_library
+				changes.add_do_call(player, &"add_animation_library", [library_name, new_library])
+				changes.add_do_reference(new_library)
+				changes.add_undo_call(player, &"remove_animation_library", [library_name])
+			(new_libraries[library_name] as AnimationLibrary).add_animation(animation_name, animation)
+			continue
+		var library := player.get_animation_library(library_name)
+		changes.add_do_call(library, &"add_animation", [animation_name, animation])
+		changes.add_do_reference(animation)
+		if library.has_animation(animation_name):
+			var previous := library.get_animation(animation_name)
+			changes.add_undo_call(library, &"add_animation", [animation_name, previous])
+			changes.add_undo_reference(previous)
+		else:
+			changes.add_undo_call(library, &"remove_animation", [animation_name])
 	return changes

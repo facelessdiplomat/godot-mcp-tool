@@ -37,6 +37,9 @@ func execute(params: Dictionary) -> Variant:
 	var library := player.get_animation_library(animation_reference.library_name)
 	var animation := library.get_animation(animation_reference.animation_name)
 	var changes := ChangeSet.new()
+	if player.autoplay == animation_reference.full_name():
+		changes.add_do_call(player, &"set_autoplay", [""])
+		changes.add_undo_call(player, &"set_autoplay", [player.autoplay])
 	changes.add_do_call(library, &"remove_animation", [animation_reference.animation_name])
 	changes.add_undo_call(library, &"add_animation", [animation_reference.animation_name, animation])
 	changes.add_undo_reference(animation)

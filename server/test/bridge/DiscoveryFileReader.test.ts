@@ -84,6 +84,15 @@ describe('DiscoveryFileReader', () => {
     expect(result).toMatchObject({ kind: 'stale', pid: 41234, executablePath: '/opt/godot/godot' });
   });
 
+  it('reports an editor that was closed, with the executable it ran from', () => {
+    writeDiscovery(JSON.stringify({ closed: true, executable_path: '/opt/godot/godot' }));
+
+    const reader = new DiscoveryFileReader(projectRoot, () => true);
+
+    expect(reader.read()).toEqual({ kind: 'closed', path: reader.path, executablePath: '/opt/godot/godot' });
+    expect(reader.lastEditorExecutable()).toBe('/opt/godot/godot');
+  });
+
   it('names the executable of the editor that last opened the project, running or not', () => {
     expect(new DiscoveryFileReader(projectRoot, () => false).lastEditorExecutable()).toBeUndefined();
 

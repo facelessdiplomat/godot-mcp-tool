@@ -100,6 +100,38 @@ describe('animation tools', () => {
     );
   });
 
+  it('animation_set names the properties whose current values it keyed in RESET', async () => {
+    const editor = new FakeEditorGateway()
+      .respondTo('animation.set', {
+        scene: 'res://level.tscn',
+        player: 'AnimationPlayer',
+        name: 'open',
+        created: true,
+        length: 1,
+        loop: 'none',
+        tracks: [{ path: 'Door:position', keys: 2, interpolation: 'linear', update: 'continuous', from: 'Vector3(0, 1, 0)', to: 'Vector3(0, 4, 0)' }],
+        rejected: [],
+        reset_tracks: ['Door:position'],
+      })
+      .respondTo('animation.set', {
+        scene: 'res://level.tscn',
+        player: 'AnimationPlayer',
+        name: 'dim',
+        created: true,
+        length: 1,
+        loop: 'none',
+        tracks: [{ path: 'Lamp:light_energy', keys: 2, interpolation: 'linear', update: 'continuous', from: 1, to: 0.2 }],
+        rejected: [],
+        reset_tracks: ['Lamp:light_energy', 'Lamp:light_color'],
+      });
+
+    const one = textOf(await createAnimationSetTool(editor).execute({ player: 'AnimationPlayer', name: 'open', length: 1, tracks: doorRising }));
+    const two = textOf(await createAnimationSetTool(editor).execute({ player: 'AnimationPlayer', name: 'dim', length: 1, tracks: doorRising }));
+
+    expect(one.split('\n').at(-1)).toBe('Keyed the current value of Door:position in RESET, the pose that the other animations and AnimationTree blends start from.');
+    expect(two.split('\n').at(-1)).toBe('Keyed the current values of Lamp:light_energy, Lamp:light_color in RESET, the pose that the other animations and AnimationTree blends start from.');
+  });
+
   it('animation_set says when it replaced an animation and fails when no track could be used', async () => {
     const replaced = new FakeEditorGateway().respondTo('animation.set', {
       scene: 'res://level.tscn',

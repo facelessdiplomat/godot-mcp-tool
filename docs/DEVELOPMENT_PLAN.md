@@ -357,8 +357,12 @@ windows: `editor_launch` starts the editor headless by default, games started wi
   }
   ```
 
-  The server checks that the `pid` process is alive and ignores a stale file. `executable_path` lets the server find
-  the Godot binary without any configuration while the editor runs; `game_log_path` is added in milestone 1.
+  The server checks that the `pid` process is alive and ignores a stale file. An editor writes the file only when no
+  other editor's bridge listens on the port in it, so a second editor of the project, or a `godot --import` or export
+  run, keeps its bridge off and leaves the file alone. A closing editor replaces the record with
+  `{"closed": true, "executable_path": "…"}`: the token and the port go away, and the server reports a closed editor.
+  `executable_path` lets the server find the Godot binary without any configuration, also after the editor closed;
+  `game_log_path` is added in milestone 1.
 - **Handshake:** the client's first message is `hello {token, protocol, client}`. A wrong token or an incompatible
   version means an error and a disconnect. The reply carries versions and the list of supported methods.
 - **Errors:** the standard `-32601` (method not found) and `-32602` (invalid params), plus our own codes in
@@ -601,7 +605,7 @@ right angles and in structured spatial checks.
 | `asset_import_settings_get` / `asset_import_settings_set` | Import options of any imported file from its `.import` file (`nodes/root_scale`, `nodes/root_type`, `materials/extract`, texture and sound options), and for 3D models the settings of their nodes, such as collision generation; `set` reimports at once and reports the size, nodes and collision shapes of the imported scene before and after | 4 | R/W | E |
 | `navigation_bake` | Bake the `NavigationMesh` of a `NavigationRegion3D`, or of every one in the scene, as one Undo step; report the polygons and the covered area of each, the reason when a region gets none (no geometry under it, or an agent too large), and a `cell_size` or `cell_height` finer than the navigation map | 4 | W | E |
 | `gridmap_set_cells` / `gridmap_get_cells` | `GridMap` (3D tiles) — only if evaluations show it's needed | 4 | R/W | E |
-| `animation_get` / `animation_set` / `animation_delete` | Animations of an `AnimationPlayer`: list them or read one track by track with its keys; create or replace one from property tracks (`Door:position`, `Door:position:y`, `.:visible`) with interpolation, update mode and loop by name; delete one. Each change is one Undo step | 4 | R/W | E |
+| `animation_get` / `animation_set` / `animation_delete` | Animations of an `AnimationPlayer`: list them or read one track by track with its keys; create or replace one from property tracks (`Door:position`, `Door:position:y`, `.:visible`) with interpolation, update mode and loop by name, keying the current values of newly animated properties in `RESET` as the editor does; delete one, clearing an `autoplay` that names it. Each change is one Undo step | 4 | R/W | E |
 | `animation_tree_get` / `animation_tree_set` | An `AnimationTree` as a state machine: read its states, transitions and conditions; set it up whole from states that each play an animation and transitions with a condition, an expression, a cross-fade, a switch mode and a priority, as one Undo step | 4 | R/W | E |
 
 Import settings live in the `.import` file next to the asset: the importer options in `[params]`, and the settings of
@@ -965,6 +969,12 @@ Dropped and failed connections are the top complaint about almost every existing
   happen;
 - a discovery file with the `pid`: if the process is dead, the file is stale; on a connection error the file is read
   again;
+- one editor owns the discovery file: another editor of the same project, or a `godot --import` or export run, finds
+  the bridge of the first one listening and leaves the file alone; a closing editor marks the file closed and keeps
+  only the path of its Godot executable;
+- requests wait for the editor's first scan: the editor starts its plugins inside that scan, before it imports new
+  files, so the bridge answers `hello` and `ping` at once but holds other requests until the scan ends, for up to
+  20 s, and then answers `EDITOR_BUSY`, before the server's own timeout of 30 s runs out;
 - the client connects strictly to `127.0.0.1`, not to `localhost` (which may resolve to `::1`; Godlink tripped on
   this);
 - reconnection with growing delays when the editor restarts; a clear state in `godot_status`;
@@ -1421,6 +1431,51 @@ Order of work: 3D first, each capability with its scenario in `docs/evals/` and 
 `resource_find_usages`); `export_project`; debugging through DAP; the windowless mode last, because it changes how
 every scene tool reaches a scene.
 
+Status: done, except `gridmap_*`, which waits for an evaluation that needs it. Every capability has its scenario in
+`docs/evals/` and an integration test. The capabilities work together in the automated acceptance test
+`server/test/integration/milestone4Scenario.test.ts`, headless or with a window when `GODOT_MCP_WINDOW_TESTS=1`: it
+scales an imported glTF character to 1.8 m, builds an enemy from it with a capsule, a navigation agent, an idle and a
+walk animation and a state machine, bakes navigation in an arena with a wall, watches the enemy walk around the wall
+to the player in its walk state, stops it at a breakpoint to read its variables, moves the imported art into a folder
+of its own, and exports the game data as a pack. Preparing it found two problems:
+
+- In the walk state the model was flattened to a scale of 0 on y: blends start from the `RESET` animation, and a
+  property that only `idle` animated blended from zero without one. `animation_set` now keys the current values of
+  newly animated properties in `RESET`, as the editor does (§8.9, Appendix B).
+- `animation_delete` left `autoplay` naming the deleted animation; it now clears it in the same Undo step, as the
+  editor does.
+
+It also showed that generated collision of an imported model is a `StaticBody3D`, which blocks a `CharacterBody3D`
+that the model is part of; the skill now says to give such a body its own shape.
+
+The live run in Claude Code on 2026-10-23 passed the same scenario in `test-project` with an editor window: the
+imported character went from 180 units to 1.8 m, `animation_set` keyed both animated properties in `RESET`, the
+arena's navigation mesh got 12 polygons, and the enemy walked around the wall upright, with a model scale of 1 and
+its sway, to the player. The breakpoint showed `direction` and `moving`, a step went on to the next line, and the
+game ran on after `debug_continue`; the art moved to `res://art/` with its `.import` file and UID, and the game ran
+again without errors; `export_project` explained how to add a preset, which `test-project` lacks. The run found two
+problems with the discovery file, now fixed:
+
+- The editor that had just been opened was not connected: the integration test with a real editor had started a
+  headless editor on `test-project`, whose discovery file replaced the editor's and stayed behind when the test
+  stopped it. Every `godot --import` or export run of the project did the same while it ran and deleted the file
+  when it quit, so a server that was not connected yet found no editor. The integration tests now use temporary
+  projects, and an editor writes the file only when no other editor's bridge listens on the port in it; it checks
+  the port rather than the `pid`, because `OS.is_process_running` knows only child processes (Appendix B).
+- After the editor closed, `editor_launch` found no Godot binary without `GODOT_BIN`: the plugin deleted the
+  discovery file on exit, and with it the path of the editor's executable. A closing editor now leaves
+  `{"closed": true, "executable_path": "…"}` (§7), from which the server still takes the binary.
+
+The whole integration suite, run next to that editor, found two more problems:
+
+- A tool called right after the editor started could find the project not imported yet: in 5 of 12 starts of a new
+  project, `asset_import_settings_get` answered that its model was not imported, because the editor starts its
+  plugins inside its first scan, before it imports new files. The bridge now holds requests until that scan ends
+  (§9.12), and the same check passed in 8 of 8 starts.
+- The test of autoloads started its editor with the default language server port, which the open editor of
+  `test-project` held, so `script_validate` fell back to `godot --check-only`, which does not know autoloads. It now
+  starts its editor with a free port, as the test of `script_validate` does.
+
 ### Milestone 5 — Polish and distribution
 
 - [ ] An npm package with the addon bundled; `install-addon`, `update-addon` and `doctor` (environment diagnostics)
@@ -1710,6 +1765,10 @@ Checked against the sources in `~/Software/godot` (`master`, 4.8-beta, commit `6
 | `InputEvent.as_text()` is not uniform for physical keys ("W - Physical", "Up"); the addon writes its own short text ("W", "Ctrl+S", "Mouse left", "Joypad a") | observed on 4.8 |
 | A static function on a preloaded script is shadowed by a `Resource` or `Object` method of the same name (`is_built_in`, `get_name`, …), because the call goes to the script resource itself | observed on 4.8 |
 | `TCPServer.listen(port, bind_address = "*")` listens on all interfaces by default; `get_local_port()` | `doc/classes/TCPServer.xml` |
+| The editor starts its plugins inside its first scan (`_first_scan_filesystem` calls `EditorNode::init_plugins`), before it imports new and changed files; `EditorFileSystem.is_scanning()` includes the `first_scan` flag, which turns false only after that import | `editor/file_system/editor_file_system.cpp` |
+| `OS.is_process_running(pid)` knows only child processes of the caller: for any other `pid` its `waitpid` fails, and it prints "The process … does not exist or is not a child of the calling process" and returns false | `drivers/unix/os_unix.cpp`, `doc/classes/OS.xml` |
+| On macOS a `StreamPeerTCP` that connects to a closed loopback port reports `STATUS_CONNECTED` after its first `poll()` and `STATUS_NONE` after the next one, while a connection to a listening port stays connected | observed on 4.8 |
+| `godot --import` and the command-line exports start a whole editor: the project's enabled editor plugins enter the tree, and leave it when that editor quits | observed on 4.8 |
 | The maximum debugger message size is 8 MiB | `core/debugger/remote_debugger_peer.cpp` |
 | LSP: port 6005, starts when the editor is ready, up to 8 clients; `didOpen` → parser + analyzer → `publishDiagnostics` | `modules/gdscript/language_server/` |
 | Default ports: debugger 6007, DAP 6006 | `editor/settings/editor_settings.cpp`, `editor/debugger/debug_adapter/` |
@@ -1761,6 +1820,7 @@ Checked against the sources in `~/Software/godot` (`master`, 4.8-beta, commit `6
 | An export preset that lacks keys the editor writes (`include_filter`, `exclude_filter`, the `preset.N.options` section) still exports, with an error printed for every missing key. The editor reads `export_presets.cfg` when it starts and again only when an export platform is added or removed, and writes its own list back when presets change in the Export dialog | `editor/export/editor_export.cpp`, observed on 4.8 |
 | The editor's debug adapter (DAP) listens on `127.0.0.1` at `network/debug_adapter/remote_port` (6006), in every editor, headless ones included, except in recovery mode; `--dap-port` overrides the port and is not visible to scripts. It answers requests without `initialize`; `initialize` clears every breakpoint of the editor unless `network/debug_adapter/sync_breakpoints` is on, and only a client that announced `supportsVariableType` there gets the types of variables. Without `initialize`, lines are counted from 0 in the `setBreakpoints` arguments and in `stackTrace`, while `setBreakpoints` responses and `breakpoint` events count from 1. A `source` without `name` and `checksums` makes the editor log "Dictionary::operator[] used when there was no value"; a path outside its project is refused with `wrong_path` and the editor's project path. There is no `stepOut`; `evaluate` sees the locals of the frame | `editor/debugger/debug_adapter/`, observed on 4.8 |
 | Breakpoints set through the debug adapter go into the script editor, and `ScriptEditor.get_breakpoints()` lists them as `res://path:line` counted from 1; one in a script that was never opened logs "Couldn't find the given section … and key "state"" once. `variables` right after `scopes` fails with "unknown" until the game has sent the variables of the frame. The adapter answers `continue` without a `continued` event to the client that asked, and sends one once the game has resumed, after `EditorDebuggerSession.continued`. While the game is stopped at a breakpoint, `EditorDebuggerPlugin` captures still answer | `editor/script/script_editor_plugin.cpp`, `editor/debugger/debug_adapter/`, observed on 4.8 |
+| An `AnimationTree` blends deterministically by default (`deterministic` is true for it and false for an `AnimationPlayer`): a track that the playing animations lack takes its value from the `RESET` animation, or the zero of its type when there is none, so a `scale:y` track of one state machine state flattens the node in the others, and physics shapes under it print "det == 0" from `basis.cpp` every frame. The editor keys new tracks into `RESET` by default (`editors/animation/default_create_reset_tracks`, `RESET` of length 0.001 s in the default library), and clears `autoplay` when it removes the animation that `autoplay` names. Outside the editor, setting `autoplay` on a player in the tree only prints a warning | `doc/classes/AnimationMixer.xml`, `scene/animation/animation_tree.cpp`, `editor/animation/animation_track_editor.cpp`, `editor/animation/animation_player_editor_plugin.cpp`, `scene/animation/animation_player.cpp`, observed on 4.8 |
 | `JSON.stringify` sorts the keys of dictionaries by default, so the bridge does not keep their order; ordered data travels as arrays | `core/io/json.h` (`sort_keys = true`) |
 | `InputMap` matches an event of an action against an incoming event only when the action's event has the device `ALL_DEVICES` (-1, not exposed to scripts) or the same device; new `InputEventKey` and mouse events get `DEVICE_ID_KEYBOARD` (16) and `DEVICE_ID_MOUSE` (32), joypad events default to device 0, the first gamepad, and the editor's Input Map dialog stores "All Devices" | `core/input/input_map.cpp`, `core/input/input_event.cpp`, `editor/settings/input_event_configuration_dialog.cpp` |
 | The analyzer reports a member that a class lacks when it is read through the class (`Player.SPEEDD` is a parse error), but a method or property that the type of a variable lacks (`player.dashh()` on a `Player` or a `CharacterBody3D` variable) compiles: only the `unsafe_method_access` and `unsafe_property_access` warnings report it, and both are off by default. `:=` cannot infer the type of a member that the static type lacks, so it works on a variable typed with the `class_name` of its script and fails on one typed with the native base | observed on 4.8 with `--check-only` |

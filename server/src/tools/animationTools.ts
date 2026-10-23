@@ -35,6 +35,7 @@ const animationChangeSchema = z.object({
   loop: z.string(),
   tracks: z.array(z.object({ path: z.string(), keys: z.number().int(), interpolation: z.string(), update: z.string(), from: z.unknown(), to: z.unknown() })),
   rejected: z.array(z.object({ path: z.string(), reason: z.string() })),
+  reset_tracks: z.array(z.string()).default([]),
 });
 
 type AnimationChange = z.infer<typeof animationChangeSchema>;
@@ -137,7 +138,7 @@ export function createAnimationSetTool(editor: EditorGateway): BridgeTool<typeof
     definition: {
       title: 'Create or replace animation',
       description:
-        'Create or replace an animation of an AnimationPlayer from property tracks, as one Undo step: each track animates one property, such as {"path": "Door:position", "keys": [{"time": 0, "value": [0, 0, 0]}, {"time": 1, "value": [0, 3, 0]}]}, with a node path relative to the parent of the player and values in the formats of node_set_properties. A track the editor cannot use is rejected with the reason and the others are kept. An animation plays when a script calls play("name") on the player or when the player\'s autoplay names it; check it in the running game with game_wait and game_get_properties.',
+        'Create or replace an animation of an AnimationPlayer from property tracks, as one Undo step: each track animates one property, such as {"path": "Door:position", "keys": [{"time": 0, "value": [0, 0, 0]}, {"time": 1, "value": [0, 3, 0]}]}, with a node path relative to the parent of the player and values in the formats of node_set_properties. A track the editor cannot use is rejected with the reason and the others are kept. Like the editor, it keys the current value of each newly animated property in the RESET animation, the pose that the other animations and AnimationTree blends start from; without it, a property that only some animations of a state machine animate would blend from zero. An animation plays when a script calls play("name") on the player or when the player\'s autoplay names it; check it in the running game with game_wait and game_get_properties.',
       inputSchema: animationSetInput,
       annotations: changingAnnotations({ destructive: true, idempotent: true }),
       alwaysLoad: false,
@@ -154,7 +155,13 @@ export function createAnimationSetTool(editor: EditorGateway): BridgeTool<typeof
       const tracks = change.tracks.map(
         (track) => `- ${track.path}: ${String(track.keys)} ${track.keys === 1 ? 'key' : 'keys'} from ${formatValue(track.from)} to ${formatValue(track.to)}, ${track.interpolation}, ${track.update}`,
       );
-      return textResult([summary, ...tracks, ...rejected].join('\n'));
+      const reset =
+        change.reset_tracks.length === 0
+          ? []
+          : [
+              `Keyed the current ${change.reset_tracks.length === 1 ? 'value' : 'values'} of ${change.reset_tracks.join(', ')} in RESET, the pose that the other animations and AnimationTree blends start from.`,
+            ];
+      return textResult([summary, ...tracks, ...rejected, ...reset].join('\n'));
     },
   });
 }

@@ -154,13 +154,55 @@ func test_explains_what_it_needs() -> void:
 	assert_false(_player.has_animation("open"))
 
 
+func test_keys_the_current_values_of_animated_properties_in_a_new_reset_animation() -> void:
+	var result: Dictionary = await _set_animation(_door_rising([{"time": 0, "value": [0, 3, 0]}, {"time": 1, "value": [0, 4, 0]}]))
+	assert_eq(result["reset_tracks"], ["Door:position"])
+	var reset := _player.get_animation("RESET")
+	assert_almost_eq(reset.length, 0.001, 0.0001)
+	assert_eq(reset.track_get_path(0), NodePath("Door:position"))
+	assert_eq(reset.track_get_key_count(0), 1)
+	assert_eq(reset.track_get_key_value(0, 0), Vector3(0, 1, 0))
+	assert_true(_history.undo())
+	assert_false(_player.has_animation("RESET"))
+	assert_false(_player.has_animation("open"))
+
+
+func test_adds_only_new_properties_to_an_existing_reset_animation() -> void:
+	await _set_animation(_door_rising())
+	_door.position = Vector3(0, 7, 0)
+	var result: Dictionary = await _set_animation({"player": "AnimationPlayer", "name": "dim", "tracks": [
+		{"path": "Door:position", "keys": [{"time": 0, "value": [0, 1, 0]}]},
+		{"path": "Lamp:light_energy", "keys": [{"time": 0, "value": 1.0}, {"time": 1, "value": 0.2}]},
+	]})
+	assert_eq(result["reset_tracks"], ["Lamp:light_energy"])
+	var reset := _player.get_animation("RESET")
+	assert_eq(reset.get_track_count(), 2)
+	assert_eq(reset.track_get_key_value(reset.find_track(NodePath("Door:position"), Animation.TYPE_VALUE), 0), Vector3(0, 1, 0))
+	assert_eq(reset.track_get_key_value(reset.find_track(NodePath("Lamp:light_energy"), Animation.TYPE_VALUE), 0), 1.0)
+	assert_true(_history.undo())
+	assert_eq(_player.get_animation("RESET").get_track_count(), 1)
+
+
+func test_keys_a_part_of_a_property_as_it_is_now() -> void:
+	_door.scale = Vector3(1, 2, 1)
+	var result: Dictionary = await _set_animation({"player": "AnimationPlayer", "name": "breathe", "tracks": [{"path": "Door:scale:y", "keys": [{"time": 0, "value": 2.0}, {"time": 1, "value": 2.1}]}]})
+	assert_eq(result["reset_tracks"], ["Door:scale:y"])
+	assert_eq(_player.get_animation("RESET").track_get_key_value(0, 0), 2.0)
+
+
+func test_leaves_reset_as_it_is_when_reset_itself_is_set() -> void:
+	var result: Dictionary = await _set_animation({"player": "AnimationPlayer", "name": "RESET", "tracks": [{"path": "Door:position", "keys": [{"time": 0, "value": [0, 2, 0]}]}]})
+	assert_eq(result["reset_tracks"], [])
+	assert_eq(_player.get_animation("RESET").track_get_key_value(0, 0), Vector3(0, 2, 0))
+
+
 func test_reads_the_animations_of_a_player_and_the_keys_of_one() -> void:
 	await _set_animation(_door_rising())
 	var listed: Dictionary = await AnimationGetCommand.new(_context).execute({"player": "AnimationPlayer"})
 	assert_eq(listed["player"], "AnimationPlayer")
 	assert_eq(listed["root_node"], "..")
 	assert_eq(listed["autoplay"], "")
-	assert_eq(listed["animations"], [{"name": "open", "length": 1.0, "loop": "none", "tracks": 1}])
+	assert_eq(listed["animations"], [{"name": "RESET", "length": 0.001, "loop": "none", "tracks": 1}, {"name": "open", "length": 1.0, "loop": "none", "tracks": 1}])
 	var detailed: Dictionary = await AnimationGetCommand.new(_context).execute({"player": "AnimationPlayer", "name": "open"})
 	assert_eq(detailed["animation"], {
 		"name": "open",
@@ -171,6 +213,17 @@ func test_reads_the_animations_of_a_player_and_the_keys_of_one() -> void:
 	var unknown: CommandError = await AnimationGetCommand.new(_context).execute({"player": "AnimationPlayer", "name": "close"})
 	assert_eq(unknown.code, JsonRpc.NOT_FOUND)
 	assert_string_contains(unknown.hint, "open")
+
+
+func test_clears_the_autoplay_that_named_the_deleted_animation() -> void:
+	await _set_animation(_door_rising())
+	_player.autoplay = "open"
+	await AnimationDeleteCommand.new(_context).execute({"player": "AnimationPlayer", "name": "open"})
+	assert_eq(_player.autoplay, "")
+	assert_true(_history.undo())
+	assert_eq(_player.autoplay, "open")
+	for setting_outside_the_editor in 3:
+		assert_engine_error("Setting autoplay after the node has been added to the scene has no effect")
 
 
 func test_deletes_an_animation_as_one_undo_step() -> void:

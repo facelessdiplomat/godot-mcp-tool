@@ -21,6 +21,11 @@ const discoveryFileSchema = z.object({
   started_at: z.string(),
 });
 
+const closedDiscoveryFileSchema = z.object({
+  closed: z.literal(true),
+  executable_path: z.string(),
+});
+
 export interface BridgeEndpoint {
   readonly protocol: number;
   readonly port: number;
@@ -39,6 +44,7 @@ export type DiscoveryResult =
   | { readonly kind: 'found'; readonly endpoint: BridgeEndpoint }
   | { readonly kind: 'missing'; readonly path: string }
   | { readonly kind: 'stale'; readonly path: string; readonly pid: number; readonly executablePath: string }
+  | { readonly kind: 'closed'; readonly path: string; readonly executablePath: string }
   | { readonly kind: 'invalid'; readonly path: string; readonly reason: string };
 
 export interface DiscoverySource {
@@ -71,6 +77,11 @@ export class DiscoveryFileReader implements DiscoverySource {
       parsedContent = JSON.parse(content);
     } catch (error) {
       return { kind: 'invalid', path: this.path, reason: `not valid JSON (${describeError(error)})` };
+    }
+
+    const closedEditor = closedDiscoveryFileSchema.safeParse(parsedContent);
+    if (closedEditor.success) {
+      return { kind: 'closed', path: this.path, executablePath: closedEditor.data.executable_path };
     }
 
     const validation = discoveryFileSchema.safeParse(parsedContent);
@@ -106,7 +117,7 @@ export class DiscoveryFileReader implements DiscoverySource {
     if (discovered.kind === 'found') {
       return discovered.endpoint.executablePath;
     }
-    return discovered.kind === 'stale' ? discovered.executablePath : undefined;
+    return discovered.kind === 'stale' || discovered.kind === 'closed' ? discovered.executablePath : undefined;
   }
 }
 

@@ -9,20 +9,23 @@ var is_authenticated := false
 var should_close := false
 
 const STATUS_NOTIFICATION := "log.status"
+const KEEPALIVE_METHODS := ["ping"]
 
 var _authenticator: Authenticator
 var _router: CommandRouter
 var _build_hello_payload: Callable
 var _read_status: Callable
+var _wait_for_first_scan: Callable
 var _last_sent_status: Variant = null
 var _notifications: Array = []
 
 
-func _init(authenticator: Authenticator, router: CommandRouter, build_hello_payload: Callable, read_status: Callable = Callable()) -> void:
+func _init(authenticator: Authenticator, router: CommandRouter, build_hello_payload: Callable, read_status: Callable = Callable(), wait_for_first_scan: Callable = Callable()) -> void:
 	_authenticator = authenticator
 	_router = router
 	_build_hello_payload = build_hello_payload
 	_read_status = read_status
+	_wait_for_first_scan = wait_for_first_scan
 
 
 func take_notifications() -> Array:
@@ -70,11 +73,23 @@ func _run_command(request_id: Variant, method: String, params: Dictionary) -> Di
 			JsonRpc.METHOD_NOT_FOUND,
 			"Unknown method %s" % method,
 			"Available methods: %s" % ", ".join(_router.methods()))
+	if not await _is_editor_ready_for(method):
+		return JsonRpc.failure(
+			request_id,
+			JsonRpc.EDITOR_BUSY,
+			"The editor is still scanning and importing the project, as it does after it starts",
+			"Call again in a few seconds: the first import of a large project takes a while.")
 	var outcome: Variant = await command.execute(params)
 	_queue_status_if_changed()
 	if outcome is CommandError:
 		return JsonRpc.failure(request_id, outcome.code, outcome.message, outcome.hint)
 	return JsonRpc.success(request_id, outcome)
+
+
+func _is_editor_ready_for(method: String) -> bool:
+	if method in KEEPALIVE_METHODS or not _wait_for_first_scan.is_valid():
+		return true
+	return await _wait_for_first_scan.call()
 
 
 func _queue_status_if_changed() -> void:
