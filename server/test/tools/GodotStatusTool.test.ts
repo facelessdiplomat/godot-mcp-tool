@@ -115,6 +115,19 @@ describe('GodotStatusTool', () => {
     expect(await statusText(tool)).toContain('Godot binary: /opt/godot/godot (from running editor), version unknown: permission denied');
   });
 
+  it('warns about a Godot binary older than the addon needs', async () => {
+    const tool = new GodotStatusTool({
+      project: foundProject,
+      editor: editorReporting({ connected: false, reason: 'The Godot editor is not running for this project.' }),
+      binaryLocator: { locate: () => ({ found: true, path: '/opt/godot-4.6/godot', source: 'GODOT_BIN' }) },
+      readVersion: () => Promise.resolve(GodotVersion.parse('4.6.2.stable.official.71f334935')),
+    });
+
+    expect(await statusText(tool)).toContain(
+      'Godot binary: /opt/godot-4.6/godot (from GODOT_BIN), version 4.6.2.stable.official.71f334935, older than 4.7, which Godot MCP Tool needs: set GODOT_BIN to Godot 4.7 or newer.',
+    );
+  });
+
   it('reports a missing project', async () => {
     const tool = new GodotStatusTool({
       project: { found: false, reason: 'No project.godot was found.' },

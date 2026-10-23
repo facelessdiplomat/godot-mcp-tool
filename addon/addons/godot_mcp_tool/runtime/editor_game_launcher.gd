@@ -24,9 +24,7 @@ func stop() -> void:
 
 
 func unsaved_scenes() -> PackedStringArray:
-	if not EditorInterface.has_method(&"get_unsaved_scenes"):
-		return PackedStringArray()
-	return PackedStringArray(EditorInterface.call(&"get_unsaved_scenes"))
+	return EditorInterface.get_unsaved_scenes()
 
 
 func saves_before_running() -> bool:

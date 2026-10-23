@@ -14,7 +14,7 @@ traces, take screenshots and simulate input.
 
 ## Development
 
-Requirements: Node.js 22 or newer, Godot 4.5 or newer.
+Requirements: Node.js 22 or newer, Godot 4.7 or newer.
 
 ```bash
 cd server

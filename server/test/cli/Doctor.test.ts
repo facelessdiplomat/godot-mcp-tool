@@ -127,9 +127,9 @@ describe('the doctor command', () => {
     installAddon('0.2.0');
     enablePlugin();
 
-    const report = await doctor({ readVersion: () => Promise.resolve(GodotVersion.parse('4.4.1.stable.official.49a5bc7b6')) }).check();
+    const report = await doctor({ readVersion: () => Promise.resolve(GodotVersion.parse('4.6.2.stable.official.71f334935')) }).check();
 
-    expect(report.lines).toContain('warning  Godot 4.4.1.stable.official.49a5bc7b6 at /opt/godot/godot (from running editor) is older than 4.5, which the addon needs.');
+    expect(report.lines).toContain('warning  Godot 4.6.2.stable.official.71f334935 at /opt/godot/godot (from running editor) is older than 4.7, which the addon needs.');
   });
 
   it('reports a Godot executable that does not tell its version', async () => {

@@ -3,6 +3,7 @@ import * as z from 'zod/v4';
 import type { EditorStatus, EditorStatusProvider } from '../bridge/EditorConnection.js';
 import type { BinaryLocator } from '../godot/GodotBinaryLocator.js';
 import type { GodotVersion } from '../godot/GodotVersion.js';
+import { isSupportedGodotVersion, minimumGodotVersionText } from '../godot/supportedGodotVersion.js';
 import type { ProjectLookup } from '../project/ProjectLocator.js';
 import { SERVER_VERSION } from '../serverInfo.js';
 import { describeError } from '../util/errors.js';
@@ -53,7 +54,9 @@ export class GodotStatusTool implements Tool<typeof inputSchema> {
     const binaryDescription = `Godot binary: ${binary.path} (from ${binary.source})`;
     try {
       const version = await this.dependencies.readVersion(binary.path);
-      return `${binaryDescription}, version ${version.toString()}`;
+      return isSupportedGodotVersion(version)
+        ? `${binaryDescription}, version ${version.toString()}`
+        : `${binaryDescription}, version ${version.toString()}, older than ${minimumGodotVersionText}, which Godot MCP Tool needs: set GODOT_BIN to Godot ${minimumGodotVersionText} or newer.`;
     } catch (error) {
       return `${binaryDescription}, version unknown: ${describeError(error)}`;
     }

@@ -62,6 +62,7 @@ export function createApplication(environment: ApplicationEnvironment): Applicat
     editor,
     readDiscovery: () => discovery?.read() ?? { kind: 'missing', path: '' },
     locateBinary: () => binaryLocator.locate(),
+    readVersion: (executablePath) => new GodotCli(processRunner, executablePath).version(),
     launcher: new NodeDetachedLauncher(),
     clock: systemClock,
     ports: { languageServer: parsePort(environment.variables['GODOT_LSP_PORT']), debugAdapter: parsePort(environment.variables['GODOT_DAP_PORT']) },

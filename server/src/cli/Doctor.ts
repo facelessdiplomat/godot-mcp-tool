@@ -5,6 +5,7 @@ import { isPluginEnabled } from '../addon/PluginActivation.js';
 import type { EditorStatus, EditorStatusProvider } from '../bridge/EditorConnection.js';
 import type { BinaryLocator } from '../godot/GodotBinaryLocator.js';
 import type { GodotVersion } from '../godot/GodotVersion.js';
+import { isSupportedGodotVersion, minimumGodotVersionText } from '../godot/supportedGodotVersion.js';
 import type { ProjectLookup } from '../project/ProjectLocator.js';
 import { counted } from '../tools/formatting/counting.js';
 import { describeError } from '../util/errors.js';
@@ -27,7 +28,6 @@ interface Check {
 }
 
 const minimumNodeMajorVersion = 22;
-const minimumGodotVersion = { major: 4, minor: 5 };
 const statusColumnWidth = 9;
 
 export class Doctor {
@@ -71,10 +71,9 @@ export class Doctor {
     } catch (error) {
       return { status: 'problem', text: `Godot ${location} did not tell its version: ${describeError(error)}` };
     }
-    const minimum = `${String(minimumGodotVersion.major)}.${String(minimumGodotVersion.minor)}`;
-    return version.isAtLeast(minimumGodotVersion.major, minimumGodotVersion.minor)
+    return isSupportedGodotVersion(version)
       ? { status: 'ok', text: `Godot ${version.toString()} ${location}` }
-      : { status: 'warning', text: `Godot ${version.toString()} ${location} is older than ${minimum}, which the addon needs.` };
+      : { status: 'warning', text: `Godot ${version.toString()} ${location} is older than ${minimumGodotVersionText}, which the addon needs.` };
   }
 
   private checkAddon(projectRoot: string): Check {

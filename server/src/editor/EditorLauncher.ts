@@ -4,6 +4,8 @@ import type { HelloResult } from '../bridge/BridgeClient.js';
 import type { DiscoveryResult } from '../bridge/DiscoveryFileReader.js';
 import type { EditorStatusProvider } from '../bridge/EditorConnection.js';
 import type { BinaryLookup } from '../godot/GodotBinaryLocator.js';
+import type { GodotVersion } from '../godot/GodotVersion.js';
+import { isSupportedGodotVersion, minimumGodotVersionText } from '../godot/supportedGodotVersion.js';
 import type { DetachedLauncher } from '../process/DetachedLauncher.js';
 
 export interface Clock {
@@ -26,6 +28,7 @@ export interface EditorLaunchDependencies {
   readonly editor: EditorStatusProvider;
   readonly readDiscovery: () => DiscoveryResult;
   readonly locateBinary: () => BinaryLookup;
+  readonly readVersion: (executablePath: string) => Promise<GodotVersion>;
   readonly launcher: DetachedLauncher;
   readonly clock: Clock;
   readonly ports?: EditorPorts | undefined;
@@ -69,6 +72,12 @@ export class EditorLauncher {
     const binary = this.dependencies.locateBinary();
     if (!binary.found) {
       throw new EditorLaunchError(binary.reason);
+    }
+    const version = await this.dependencies.readVersion(binary.path).catch(() => undefined);
+    if (version !== undefined && !isSupportedGodotVersion(version)) {
+      throw new EditorLaunchError(
+        `Godot ${version.toString()} at ${binary.path} (from ${binary.source}) is older than ${minimumGodotVersionText}, which Godot MCP Tool needs, so its plugin would not start. Set GODOT_BIN to Godot ${minimumGodotVersionText} or newer.`,
+      );
     }
     const logPath = join(projectRoot, editorLogPath);
     mkdirSync(dirname(logPath), { recursive: true });

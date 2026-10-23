@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { EditorStatus } from '../../src/bridge/EditorConnection.js';
 import type { DiscoveryResult } from '../../src/bridge/DiscoveryFileReader.js';
 import { type Clock, EditorLaunchError, EditorLauncher, type EditorLaunchDependencies } from '../../src/editor/EditorLauncher.js';
+import { GodotVersion } from '../../src/godot/GodotVersion.js';
 import type { DetachedLauncher, DetachedProcess } from '../../src/process/DetachedLauncher.js';
 
 const hello = { protocol: 1, godotVersion: '4.8.beta', addonVersion: '0.1.0', projectPath: '/game', executablePath: '/opt/godot', methods: [] };
@@ -57,6 +58,7 @@ describe('EditorLauncher', () => {
       editor: { status: () => Promise.resolve(statuses.length > 1 ? (statuses.shift() ?? notRunning) : (statuses[0] ?? notRunning)) },
       readDiscovery: () => discovery,
       locateBinary: () => ({ found: true, path: '/opt/godot/godot', source: 'GODOT_BIN' }),
+      readVersion: () => Promise.resolve(GodotVersion.parse('4.8.beta.custom_build.679066724')),
       launcher,
       clock,
       ...overrides,
@@ -73,6 +75,25 @@ describe('EditorLauncher', () => {
 
   afterEach(() => {
     rmSync(projectRoot, { recursive: true, force: true });
+  });
+
+  it('refuses a Godot older than 4.7, whose plugin would not start', async () => {
+    const launching = editorLauncher({ readVersion: () => Promise.resolve(GodotVersion.parse('4.6.2.stable.official.71f334935')) }).launch({ headless: true });
+
+    await expect(launching).rejects.toThrow(EditorLaunchError);
+    await expect(launching).rejects.toThrow(
+      'Godot 4.6.2.stable.official.71f334935 at /opt/godot/godot (from GODOT_BIN) is older than 4.7, which Godot MCP Tool needs, so its plugin would not start. Set GODOT_BIN to Godot 4.7 or newer.',
+    );
+    expect(launcher.starts).toEqual([]);
+  });
+
+  it('starts a Godot whose version it cannot read and leaves the verdict to the plugin', async () => {
+    statuses = [notRunning, connected];
+
+    const result = await editorLauncher({ readVersion: () => Promise.reject(new Error('--version failed')) }).launch({ headless: true });
+
+    expect(result.kind).toBe('started');
+    expect(launcher.starts).toHaveLength(1);
   });
 
   it('starts the editor for the project and waits until the plugin connects', async () => {

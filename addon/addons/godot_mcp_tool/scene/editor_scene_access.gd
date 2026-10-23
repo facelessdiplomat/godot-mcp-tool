@@ -32,9 +32,7 @@ func save_all_scenes() -> Error:
 
 
 func is_scene_unsaved(scene_root: Node) -> bool:
-	if not EditorInterface.has_method(&"get_unsaved_scenes"):
-		return false
-	return scene_root.scene_file_path in EditorInterface.call(&"get_unsaved_scenes")
+	return scene_root.scene_file_path in EditorInterface.get_unsaved_scenes()
 
 
 func register_new_file(file_path: String) -> void:

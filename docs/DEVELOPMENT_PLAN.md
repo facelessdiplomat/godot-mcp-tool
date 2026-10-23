@@ -60,9 +60,9 @@ There are already quite a few Godot MCP servers (§5). We adopt their proven pat
 dropped connections, incomplete error capture, property writes that silently don't apply, and agent edits
 overwritten by a stale copy held in editor memory.
 
-Target: **Godot 4.8** (the `master` build) first, **4.7 stable** in CI; the minimum supported version is **4.5**
-(it introduced `Logger` and `ScriptBacktrace`). The game is **3D** and written in **GDScript**; the only client is
-**Claude Code** (§3).
+Target: **Godot 4.8** (the `master` build) first, **4.7 stable** in CI; the minimum supported version is **4.7**,
+the first one with the editor APIs that keep unsaved scripts and scenes safe (ADR-11). The game is **3D** and written
+in **GDScript**; the only client is **Claude Code** (§3).
 
 Order of work: skeleton and spikes → MVP "editor under control" → "eyes and hands" (runtime, diagnostics, docs,
 3D views) → project settings, resources, tests → 3D tooling and advanced features → polish and distribution.
@@ -121,7 +121,7 @@ Answers to the open questions of v0.1 (2026-10-21):
 
 | Question | Decision | Consequences |
 |---|---|---|
-| Godot version for the game | **4.8 from `master`** (the local source build) | 4.8 is the primary test target; 4.7 stable runs in CI; the minimum stays 4.5; we pin the engine commit we test against and update it deliberately |
+| Godot version for the game | **4.8 from `master`** (the local source build) | 4.8 is the primary test target; 4.7 stable runs in CI and is the minimum since the compatibility pass (ADR-11); we pin the engine commit we test against and update it deliberately |
 | 2D or 3D | **3D** | 3D tools come first: renders from arbitrary cameras, node bounds, model import, navigation baking (§8.9); TileMap tools move to the backlog |
 | Scripting language | **GDScript only** | no C#/.NET support planned |
 | License and publication | **Open source, MIT** | public GitHub repository; later npm (the name `godot-mcp-tool` was free on 2026-10-21) and the Godot Asset Store |
@@ -1051,8 +1051,17 @@ Dropped and failed connections are the top complaint about almost every existing
 - The primary target is a `master` build of the engine. We record the engine commit we test against in
   `docs/spikes.md`, update it deliberately and rerun the integration tests after every update; CI on 4.7 stable helps
   tell our bugs from engine regressions.
-- The addon reports the Godot version; newer APIs are feature-detected with `has_method` (e.g.
-  `EditorInterface.get_unsaved_scenes()` exists only since 4.7).
+- The minimum is 4.7 (ADR-11). `plugin.gd` checks the engine version before it loads the rest of the addon
+  (`editor/supported_engine.gd`), so an older editor says which version the plugin needs instead of failing on
+  classes it lacks; `doctor`, `godot_status` and `editor_launch` check the Godot executable the same way
+  (`supportedGodotVersion.ts`). The addon reports the Godot version; APIs newer than 4.7 are feature-detected with
+  `has_method`.
+- The compatibility pass of 2026-10-23 used the official 4.5.2 and 4.7.2 builds. 4.7.2 passes the addon tests (652),
+  the integration tests (172) and the window tests (36), as 4.8 does. 4.5.2 failed 32 integration tests: without
+  `EditorPlugin._run_scene` (4.6) games started from the editor got none of the addon's arguments, so they opened a
+  window in windowless mode, ignored `fixed_fps` and stopped in the debugger on script errors; without the 4.7 APIs
+  of the script editor and `EditorInterface` the addon could tell neither unsaved scripts nor unsaved scenes and
+  could not reload scripts changed on disk. GUT 9.7.1, the version in `test-project`, does not load on 4.5.
 - The bridge protocol version is part of the handshake; on a mismatch the error explains how to update the addon.
 - Version parsing handles custom builds: `4.8.beta.custom_build.679066724`.
 - MCP specification 2026-07-28 is incompatible with earlier revisions, but SDK v2 negotiates the version and serves
@@ -1556,8 +1565,7 @@ The whole integration suite, run next to that editor, found two more problems:
       the tab hides behind the scroll arrows). It shows the state of the bridge, also when another editor serves the
       project, the number of connected MCP clients and the state of the game; the switch for the unsafe tools, kept
       in step with the Tools menu; and the latest 50 agent commands with their time and duration, or their error in
-      full, selectable and copyable, without the keepalive `ping`. It is placed through `EditorDock` where the engine
-      has it (4.6+) and through the bottom panel of 4.5 otherwise.
+      full, selectable and copyable, without the keepalive `ping`. It is an `EditorDock` in the bottom slot.
 - [ ] User documentation: how to connect and how to use (see [User documentation](#user-documentation)).
 - [ ] `CONTRIBUTING.md`, `SECURITY.md`.
 - [x] Evaluation tasks (§13) and tool description tuning based on their results: the 20 scenarios of `docs/evals/`
@@ -1574,7 +1582,9 @@ The whole integration suite, run next to that editor, found two more problems:
       in `game_input` (done); then a second full run (done: 19 of 20 passed, with 389 tool calls instead of 591 and
       $5.90 instead of $9.06; the one failure came from a quirk of Godot's debug adapter, now worked around,
       Appendix B).
-- [ ] CI: lint, unit tests, integration tests with headless Godot (matrix 4.5 / 4.7 / the pinned `master` commit).
+- [x] Compatibility pass on the official 4.5.2 and 4.7.2 builds (§9.14): every test passes on 4.7.2 after small
+      fixes, while 4.5 and 4.6 lack editor APIs that the addon needs, so 4.7 became the minimum (ADR-11).
+- [ ] CI: lint, unit tests, integration tests with headless Godot (matrix 4.7 / the pinned `master` commit).
 - [ ] Publication to npm and the Godot Asset Store (it replaced the Asset Library in 4.7).
 
 **Done when** the package is published, CI is green and the user documentation passes its check (below).
@@ -1583,9 +1593,9 @@ Order of work: the npm package with the bundled addon and its `install-addon`, `
 first, since the plugin, the documentation and the publication build on it; then the Claude Code plugin with the `.gd`
 validation hook; the editor dock; the evaluation tasks and the tuning of tool descriptions, which change the texts
 that the tool reference is generated from; CI with the version matrix, after a compatibility pass on Godot 4.5 and
-4.7; the user documentation, `CONTRIBUTING.md` and `SECURITY.md`, and the check of the documentation on a fresh
-project; the publication last. The public GitHub repository, the downloads of Godot 4.5 and 4.7 for the
-compatibility pass and the publication itself wait for your go-ahead.
+4.7 (done); the user documentation, `CONTRIBUTING.md` and `SECURITY.md`, and the check of the documentation on a
+fresh project; the publication last. The public GitHub repository and the publication itself wait for your
+go-ahead.
 
 ### User documentation
 
@@ -1595,7 +1605,7 @@ seen the project.
 
 **`docs/setup.md` — how to connect**
 
-1. Requirements: Godot 4.5 or newer (tested on 4.7 and 4.8), Node.js 22 or newer, Claude Code.
+1. Requirements: Godot 4.7 or newer (tested on 4.7 and 4.8), Node.js 22 or newer, Claude Code.
 2. Installing the addon into a game project and enabling it in Project → Project Settings → Plugins.
 3. Connecting Claude Code: the Claude Code plugin, `.mcp.json` or `claude mcp add`; setting `GODOT_BIN` when Godot
    isn't on `PATH`.
@@ -1844,6 +1854,17 @@ in the Claude Code CLI — `claude --debug=mcp` (the server's stderr ends up in 
   outside folders with project files; the build folder gets a `.gdignore` file. Exports to other places are made by
   the user in Project → Export. Claude Code still asks before each call unless the user allows the tool.
 
+### ADR-11. Godot 4.7 is the minimum version
+
+- The compatibility pass (§9.14) showed that the addon needs editor APIs of 4.6 (`EditorPlugin._run_scene`,
+  `EditorDock`) and of 4.7 (`ScriptEditor.get_unsaved_files()`, `ScriptEditor.reload_open_files()`,
+  `EditorInterface.get_unsaved_scenes()`). Without them the tools cannot keep a stale script tab from overwriting an
+  agent's edit, and `scene_close` would discard unsaved changes without asking; workarounds would rely on editor
+  internals and still be unreliable.
+- So the minimum is 4.7, the current stable since 2026-06; its editor also brings the Asset Store we publish to.
+  Older editors get a clear message from the plugin, which then does nothing, and the server warns about older
+  Godot executables. Cost: projects on 4.5 and 4.6 cannot use the tool until they move to 4.7.
+
 ---
 
 ## Appendix B. Verified Godot API facts
@@ -1942,6 +1963,7 @@ Checked against the sources in `~/Software/godot` (`master`, 4.8-beta, commit `6
 | 3D: `NavigationRegion3D.bake_navigation_mesh()` and the `bake_finished` signal; `Viewport.world_3d` / `own_world_3d`; `physics/3d/physics_engine` (`DEFAULT` currently means GodotPhysics3D; Jolt can be selected); CSG nodes (`CSGBox3D`, `CSGCombiner3D`, …); `GridMap.set_cell_item` | `doc/classes/`, `modules/csg/doc_classes/` |
 | Language servers before 4.8 send the `code` of a diagnostic as a number (0 for warnings on 4.7; on 4.5 -1 for errors and the number of the warning) and put the name of a warning before its message, as `(UNUSED_VARIABLE): …`; since 4.8 `code` is the name of the warning and is empty for errors. The server reads both forms | `modules/gdscript/language_server/gdscript_extend_parser.cpp` (2026-08), observed on 4.5.2 and 4.7.2 |
 | Since 4.6 the editor stores an autoload that it adds as `*uid://…` when the script already has a UID, and as `*res://…` otherwise; the addon resolves both | `editor/settings/editor_autoload_settings.cpp` (2025-10), observed on 4.7.2 |
+| `EditorPlugin._run_scene` and `EditorDock` exist since 4.6; `ScriptEditor.reload_open_files()`, `EditorInterface.get_unsaved_scenes()` and `ScriptEditor.get_unsaved_files()` since 4.7. A script that names a class its engine lacks, or calls a method that an engine singleton lacks, fails to parse, and so does every script that preloads it, while a method that an object lacks fails only when it is called | `editor/plugins/editor_plugin.cpp`, `editor/script/script_editor_plugin.cpp`, `editor/editor_interface.cpp` (their history), observed on 4.5.2 |
 | `MeshInstance3D.skeleton` defaults to `..` on 4.5 and to an empty path since 4.6, so on 4.5 every mesh holds a node path to its parent; moving a node therefore reports only the node paths whose text changes | `scene/3d/mesh_instance_3d.cpp` (2025-10), observed on 4.5.2 |
 
 ---
