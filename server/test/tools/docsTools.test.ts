@@ -95,6 +95,10 @@ const provider = { load: () => Promise.resolve(library) };
 describe('docs_class', () => {
   const tool = new DocsClassTool(provider);
 
+  it('loads on demand, like docs_search', () => {
+    expect([tool.definition.alwaysLoad, new DocsSearchTool(provider).definition.alwaysLoad]).toEqual([false, false]);
+  });
+
   it('shows a class with its ancestry and its members in short', async () => {
     const text = textOf(await tool.execute({ name: 'CharacterBody3D' }));
 

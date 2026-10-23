@@ -75,7 +75,7 @@ export function createSceneBatchEditTool(editor: EditorGateway): BridgeTool<type
         'Apply many scene changes in one call and as one Undo step: add, delete, change, move and duplicate nodes, set their groups, connect and disconnect signals. Later operations can use the nodes that earlier ones added or renamed. If any operation fails or any property is rejected, nothing is changed and the error names the operation; a value that the engine adjusts, such as a size raised to the minimum of a control, is kept and reported. Use it to build or rework a scene.',
       inputSchema: sceneBatchEditInput,
       annotations: changingAnnotations({ destructive: true, idempotent: false }),
-      alwaysLoad: false,
+      alwaysLoad: true,
     },
     method: 'scene.batch_edit',
     responseSchema: batchResultSchema,

@@ -152,6 +152,24 @@ describe.skipIf(godotBinary === '')('playing input into the game', () => {
     expect(velocityIn(afterTheFrame.text).y).toBeCloseTo(jumpVelocity, 4);
   });
 
+  it('presses gamepad buttons and tilts sticks in the game', async () => {
+    await tools().call('input_map_set', {
+      actions: {
+        move_forward: ['W', 'Up', { type: 'joypad_motion', axis: 'left_y', direction: -1 }],
+        jump: ['Space', { type: 'joypad_button', button: 'a' }],
+      },
+    });
+    await tools().call('game_run');
+    await tools().call('game_wait', { condition: 'is_on_floor()', node: 'Player', timeout_ms: 5000 });
+    const jumped = await tools().call('game_input', {
+      steps: [{ joypad_button: 'a', physics_frames: 1 }, { wait_physics_frames: 9 }, { read: 'Player', names: ['velocity'] }],
+    });
+    const walked = await tools().call('game_input', { steps: [{ joypad_motion: 'left_y', value: -1, physics_frames: 10 }, { read: 'Player', names: ['velocity'] }] });
+
+    expect(velocityIn(jumped.text).y).toBeCloseTo(jumpVelocity - 9 * gravityPerFrame, 4);
+    expect(velocityIn(walked.text).z).toBeCloseTo(-5, 4);
+  });
+
   it('suggests the action it did not find', async () => {
     const played = await tools().call('game_input', { steps: [{ action: 'jmp' }] });
 
@@ -163,7 +181,7 @@ describe.skipIf(godotBinary === '')('playing input into the game', () => {
   it('removes an action', async () => {
     const changed = await tools().call('input_map_set', { actions: { jump: null } });
 
-    expect(changed.text).toContain('Removed jump (was Space)');
+    expect(changed.text).toContain('Removed jump (was Space, Joypad a)');
     expect(project?.read('project.godot')).not.toContain('jump={');
   });
 });

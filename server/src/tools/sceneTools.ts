@@ -101,7 +101,7 @@ export function createSceneSaveTool(editor: EditorGateway): BridgeTool<typeof sc
         'Save scenes from the editor to disk: the current scene, a given scene, or all open scenes. Changes made with the scene and node tools stay unsaved until then, as in the editor. Save when a logical change is complete. Refuses with a conflict when a script changed on disk while the editor has unsaved changes to it.',
       inputSchema: sceneSaveInput,
       annotations: changingAnnotations({ destructive: false, idempotent: true }),
-      alwaysLoad: false,
+      alwaysLoad: true,
     },
     method: 'scene.save',
     responseSchema: savedScenesSchema,

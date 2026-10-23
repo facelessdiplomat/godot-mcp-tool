@@ -52,11 +52,15 @@ describe('createEditorTools', () => {
     ]);
   });
 
-  it('loads the core editing loop up front', () => {
+  it('loads the tools that most sessions use up front', () => {
     expect(tools.filter((tool) => tool.definition.alwaysLoad).map((tool) => tool.name)).toEqual([
+      'project_info',
+      'editor_rescan',
+      'input_map_get',
+      'scene_save',
       'scene_get_tree',
-      'node_add',
-      'node_set_properties',
+      'scene_batch_edit',
+      'node_get_properties',
     ]);
   });
 

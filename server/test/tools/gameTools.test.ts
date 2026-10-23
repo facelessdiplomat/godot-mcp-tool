@@ -163,18 +163,18 @@ describe('game tools', () => {
     expect(textOf(await createGameStopTool(editor).execute({}))).toBe('The game was not running.');
   });
 
-  it('loads game_run and game_get_output up front', () => {
+  it('loads the game tools that most sessions use up front', () => {
     const tools = createGameTools(new FakeEditorGateway(), new GameOutputCursor(), () => Buffer.alloc(0));
 
     expect(tools.map((tool) => [tool.name, tool.definition.alwaysLoad])).toEqual([
       ['game_run', true],
-      ['game_stop', false],
+      ['game_stop', true],
       ['game_get_output', true],
       ['game_get_tree', false],
-      ['game_get_properties', false],
+      ['game_get_properties', true],
       ['game_set_properties', false],
-      ['game_wait', false],
-      ['game_input', false],
+      ['game_wait', true],
+      ['game_input', true],
       ['game_screenshot', false],
       ['game_pause', false],
       ['game_step', false],

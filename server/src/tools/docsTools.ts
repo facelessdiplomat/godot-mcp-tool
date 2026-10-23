@@ -33,7 +33,7 @@ export class DocsClassTool implements Tool<typeof docsClassInput> {
       'Read the reference of the installed Godot version for a class: what it inherits, its properties, methods with their signatures, signals, enums and constants, each with a short summary; with member, the full description of one of them. Covers engine classes, built-in types such as Vector3, @GlobalScope functions such as lerp, and the class_name classes of the project. Use it before writing code with an API you are unsure of.',
     inputSchema: docsClassInput,
     annotations: readingAnnotations,
-    alwaysLoad: true,
+    alwaysLoad: false,
   };
 
   constructor(private readonly provider: DocsProvider) {}

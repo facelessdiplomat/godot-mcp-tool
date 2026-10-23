@@ -11,7 +11,8 @@ const MAXIMUM_PHYSICS_FRAMES := 3600
 const MAXIMUM_MILLISECONDS := 60_000
 const TAP_PHYSICS_FRAMES := 2
 const STATES := ["tap", "down", "up"]
-const STEP_KINDS := "{\"action\": name}, {\"key\": name}, {\"mouse_motion\": [dx, dy]}, {\"click\": [x, y]}, {\"text\": text}, {\"wait_ms\": n}, {\"wait_physics_frames\": n} or {\"read\": node, \"names\": [...]}"
+const STEP_KINDS := "{\"action\": name}, {\"key\": name}, {\"joypad_button\": name}, {\"joypad_motion\": axis, \"value\": v}, {\"mouse_motion\": [dx, dy]}, {\"click\": [x, y]}, {\"text\": text}, {\"wait_ms\": n}, {\"wait_physics_frames\": n} or {\"read\": node, \"names\": [...]}"
+const JOYPAD_DEVICE := 0
 
 var _capture: Command
 var _time: GameTime
@@ -119,6 +120,10 @@ static func _plan(step: Variant) -> Variant:
 		return _plan_button(description, _action_target(str(description["action"]), description.get("strength", 1.0)))
 	if description.has("key"):
 		return _plan_button(description, _key_target(description))
+	if description.has("joypad_button"):
+		return _plan_button(description, _joypad_button_target(description))
+	if description.has("joypad_motion"):
+		return _plan_button(description, _joypad_motion_target(description))
 	if description.has("mouse_motion"):
 		var relative: Variant = _vector_of(description["mouse_motion"])
 		return {"kind": "mouse_motion", "relative": relative} if relative is Vector2 else "mouse_motion is [dx, dy] in pixels of the game view"
@@ -181,6 +186,29 @@ static func _key_target(description: Dictionary) -> Variant:
 	return {"label": "key %s" % description["key"], "event": event}
 
 
+static func _joypad_button_target(description: Dictionary) -> Variant:
+	var decoded: Variant = InputEventCodec.decode({"type": "joypad_button", "button": description["joypad_button"]})
+	if decoded is String:
+		return decoded
+	var event := decoded as InputEventJoypadButton
+	event.device = JOYPAD_DEVICE
+	return {"label": "joypad_button %s" % description["joypad_button"], "event": event}
+
+
+static func _joypad_motion_target(description: Dictionary) -> Variant:
+	var value: Variant = description.get("value")
+	var centers := str(description.get("state", "tap")) == "up"
+	if not centers and not ((value is int or value is float) and absf(value) <= 1.0):
+		return "joypad_motion needs a value from -1 to 1, such as {\"joypad_motion\": \"left_x\", \"value\": 0.5}"
+	var decoded: Variant = InputEventCodec.decode({"type": "joypad_motion", "axis": description["joypad_motion"], "direction": 1})
+	if decoded is String:
+		return decoded
+	var event := decoded as InputEventJoypadMotion
+	event.device = JOYPAD_DEVICE
+	event.axis_value = 0.0 if centers else float(value)
+	return {"label": "joypad_motion %s" % description["joypad_motion"], "event": event}
+
+
 static func _plan_click(description: Dictionary) -> Variant:
 	var position: Variant = _vector_of(description["click"])
 	if not position is Vector2:
@@ -215,7 +243,11 @@ static func _vector_of(value: Variant) -> Variant:
 
 func _send(template: InputEvent, pressed: bool) -> void:
 	var event := template.duplicate() as InputEvent
-	event.set("pressed", pressed)
+	if event is InputEventJoypadMotion:
+		if not pressed:
+			(event as InputEventJoypadMotion).axis_value = 0.0
+	else:
+		event.set("pressed", pressed)
 	_time.deliver(event)
 
 

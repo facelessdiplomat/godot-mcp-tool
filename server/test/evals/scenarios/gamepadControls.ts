@@ -1,4 +1,4 @@
-import { checked, gameVector, horizontalDistance, type Scenario } from '../Scenario.js';
+import { checked, gameVector, horizontalDistance, type Scenario, vectorIn } from '../Scenario.js';
 import { arenaScene, buildPrototype, keyboardActions } from './fixtures.js';
 
 const stick = (axis: string, direction: number): Readonly<Record<string, unknown>> => ({ type: 'joypad_motion', axis, direction });
@@ -35,6 +35,15 @@ export const gamepadControls: Scenario = {
     const after = await gameVector(tools, 'Player', 'global_position');
     const distance = start === undefined || after === undefined ? 0 : horizontalDistance(start, after);
     checks.push(checked('the keyboard still moves the player', distance > 2, `${distance.toFixed(2)} m in 1 s`));
+    await tools.call('game_input', { steps: [{ joypad_motion: 'left_y', value: -1, physics_frames: 60 }] });
+    const afterStick = await gameVector(tools, 'Player', 'global_position');
+    const stickDistance = after === undefined || afterStick === undefined ? 0 : horizontalDistance(after, afterStick);
+    checks.push(checked('the left stick moves the player', stickDistance > 2, `${stickDistance.toFixed(2)} m in 60 physics frames`));
+    const jump = await tools.call('game_input', {
+      steps: [{ joypad_button: 'a', physics_frames: 1 }, { wait_physics_frames: 10 }, { read: 'Player', names: ['global_position'] }],
+    });
+    const height = vectorIn(jump.text, 'global_position')?.y ?? 0;
+    checks.push(checked('the A button makes the player jump', height > 0.3, `${height.toFixed(2)} m up after 11 physics frames`));
     return checks;
   },
 };

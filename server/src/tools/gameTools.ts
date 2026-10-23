@@ -163,7 +163,7 @@ export function createGameStopTool(editor: EditorGateway): BridgeTool<typeof gam
       description: 'Stop the running game.',
       inputSchema: gameStopInput,
       annotations: changingAnnotations({ destructive: false, idempotent: true }),
-      alwaysLoad: false,
+      alwaysLoad: true,
     },
     method: 'game.stop',
     responseSchema: stoppedGameSchema,

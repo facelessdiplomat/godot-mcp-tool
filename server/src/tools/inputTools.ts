@@ -11,6 +11,7 @@ const defaultDeadzone = 0.2;
 const physicsFramesPerSecond = 60;
 const tapPhysicsFrames = 2;
 const inputAllowanceMs = 15_000;
+const labelledStepKinds = ['key', 'joypad_button', 'joypad_motion'];
 
 const describedEventSchema = z.object({ type: z.string(), text: z.string() });
 
@@ -71,7 +72,7 @@ export function createInputMapGetTool(editor: EditorGateway): BridgeTool<typeof 
         'List the input actions of the project (Project Settings → Input Map) with their keys, mouse buttons and joypad events. The built-in ui_ actions are left out unless include_builtin is true.',
       inputSchema: inputMapGetInput,
       annotations: readingAnnotations,
-      alwaysLoad: false,
+      alwaysLoad: true,
     },
     method: 'input_map.get',
     responseSchema: inputMapSchema,
@@ -170,6 +171,27 @@ const keyStep = z.strictObject({
   ...holdDuration,
 });
 
+const joypadButtonStep = z.strictObject({
+  joypad_button: z
+    .string()
+    .min(1)
+    .describe('A gamepad button: a, b, x, y, back, guide, start, left_stick, right_stick, left_shoulder, right_shoulder, dpad_up, dpad_down, dpad_left or dpad_right.'),
+  state: pressState,
+  ...holdDuration,
+});
+
+const joypadMotionStep = z.strictObject({
+  joypad_motion: z.string().min(1).describe('A gamepad axis: left_x, left_y, right_x, right_y, trigger_left or trigger_right.'),
+  value: z
+    .number()
+    .min(-1)
+    .max(1)
+    .optional()
+    .describe('Where to hold the axis, from -1 to 1: left and up are negative, and a trigger goes from 0 to 1. Needed unless state is "up", which centers it again.'),
+  state: pressState,
+  ...holdDuration,
+});
+
 const pointInView = z.array(z.number()).length(2);
 
 const mouseMotionStep = z.strictObject({
@@ -198,7 +220,18 @@ const readStep = z.strictObject({
     .describe('Properties and getters to read, such as ["position", "velocity", "is_on_floor()"]. The result lists them with the physics frames played since the input began.'),
 });
 
-const inputStep = z.union([actionStep, keyStep, mouseMotionStep, clickStep, textStep, waitMillisecondsStep, waitPhysicsFramesStep, readStep]);
+const inputStep = z.union([
+  actionStep,
+  keyStep,
+  joypadButtonStep,
+  joypadMotionStep,
+  mouseMotionStep,
+  clickStep,
+  textStep,
+  waitMillisecondsStep,
+  waitPhysicsFramesStep,
+  readStep,
+]);
 
 type InputStep = z.infer<typeof inputStep>;
 
@@ -223,10 +256,10 @@ export function createGameInputTool(game: EditorGateway, readCapture: CaptureRea
     definition: {
       title: 'Play input into the game',
       description:
-        'Play input into the running game step by step: hold input actions or keys, move and click the mouse, type text, wait, and read nodes at exact moments with read steps, such as the height of a jump 10 physics frames after the press, which a later call would miss. A hold of N physics frames lasts exactly N frames of the game. While game_pause holds the game, the input plays it only for its holds and waits, then pauses it again. Also check the result with game_get_properties or a screenshot right after the last step (screenshot: true). Actions must exist in the project when the game starts. Needs a game started with game_run, with or without the editor.',
+        'Play input into the running game step by step: hold input actions, keys, gamepad buttons and sticks, move and click the mouse, type text, wait, and read nodes at exact moments with read steps, such as the height of a jump 10 physics frames after the press, which a later call would miss. A hold of N physics frames lasts exactly N frames of the game. While game_pause holds the game, the input plays it only for its holds and waits, then pauses it again. Also check the result with game_get_properties or a screenshot right after the last step (screenshot: true). Actions must exist in the project when the game starts. Needs a game started with game_run, with or without the editor.',
       inputSchema: gameInputInput,
       annotations: changingAnnotations({ destructive: false, idempotent: false }),
-      alwaysLoad: false,
+      alwaysLoad: true,
     },
     method: 'game.input',
     responseSchema: playedInputSchema,
@@ -254,7 +287,7 @@ function estimatedDurationMs(step: InputStep): number {
   if ('read' in step) {
     return 0;
   }
-  if ('action' in step || 'key' in step) {
+  if ('action' in step || 'key' in step || 'joypad_button' in step || 'joypad_motion' in step) {
     return step.ms ?? framesToMs(step.physics_frames ?? tapPhysicsFrames);
   }
   return framesToMs(tapPhysicsFrames);
@@ -299,8 +332,8 @@ function describePhysicsFrames(count: number): string {
 }
 
 function releaseStepFor(heldLabel: string): string {
-  const keyPrefix = 'key ';
-  return heldLabel.startsWith(keyPrefix)
-    ? `{"key": "${heldLabel.slice(keyPrefix.length)}", "state": "up"}`
+  const [kind, ...nameParts] = heldLabel.split(' ');
+  return kind !== undefined && labelledStepKinds.includes(kind) && nameParts.length > 0
+    ? `{"${kind}": "${nameParts.join(' ')}", "state": "up"}`
     : `{"action": "${heldLabel}", "state": "up"}`;
 }

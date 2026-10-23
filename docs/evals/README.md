@@ -145,3 +145,10 @@ The numbers before the arrows are from the first full run.
   was `scene_get_tree`, which still needs the editor.
 - The agents of `health-bar-hud` and `stop-the-slowdown` did not need the batch or the `"main"` fixes this time.
 - In each run the plugin checked the scripts that the agent wrote with `Write`, which it never did in the first run.
+
+### Gamepad input and the tools loaded up front, 2026-10-23
+
+After `game_input` got `joypad_button` and `joypad_motion` steps and the tools that most sessions use began to load
+up front, `gamepad-controls` passed all 8 checks, including the two new ones in the running game (the left stick moves
+the player, the A button makes it jump), with 9 tool calls (66 in the first run), one tool search, $0.43 and 41 s.
+The agent tried the stick in one `game_input` with `read` steps.

@@ -62,6 +62,10 @@ func before_each() -> void:
 	var key := InputEventKey.new()
 	key.physical_keycode = KEY_J
 	InputMap.action_add_event(JUMP_ACTION, key)
+	var button := InputEventJoypadButton.new()
+	button.button_index = JOY_BUTTON_A
+	button.device = -1
+	InputMap.action_add_event(JUMP_ACTION, button)
 	_recorder = InputRecorder.new()
 	add_child_autofree(_recorder)
 	_arena = Node.new()
@@ -196,6 +200,34 @@ func test_presses_keys_that_trigger_actions() -> void:
 	assert_eq(keys.map(func(event: InputEventKey) -> bool: return event.pressed), [true, false])
 	assert_eq((keys[0] as InputEventKey).physical_keycode, KEY_J)
 	assert_true(observed.has(true))
+
+
+func test_presses_a_joypad_button_for_the_given_physics_frames() -> void:
+	var pressed_frames := _watched("pressed_frames")
+	var result: Dictionary = await _command.execute({"steps": [{"joypad_button": "a", "physics_frames": 3}]})
+	assert_eq(_watched("pressed_frames") - pressed_frames, 3)
+	assert_eq(result["physics_frames"], 3)
+	assert_false(Input.is_joy_button_pressed(0, JOY_BUTTON_A))
+
+
+func test_tilts_a_stick_and_centers_it_again() -> void:
+	var tilted: Dictionary = await _command.execute({"steps": [{"joypad_motion": "left_x", "value": -0.5, "state": "down"}], "release_at_end": false})
+	assert_eq(tilted["held"], ["joypad_motion left_x"])
+	assert_almost_eq(Input.get_joy_axis(0, JOY_AXIS_LEFT_X), -0.5, 0.0001)
+	await _command.execute({"steps": [{"joypad_motion": "left_x", "state": "up"}]})
+	assert_eq(Input.get_joy_axis(0, JOY_AXIS_LEFT_X), 0.0)
+
+
+func test_explains_a_stick_without_a_value() -> void:
+	var error: Variant = await _command.execute({"steps": [{"joypad_motion": "left_x"}]})
+	assert_true(error is CommandError)
+	assert_string_contains((error as CommandError).message, "Step 1")
+	assert_string_contains((error as CommandError).message, "value")
+
+
+func test_explains_an_unknown_joypad_button() -> void:
+	var error: Variant = await _command.execute({"steps": [{"joypad_button": "z"}]})
+	assert_string_contains((error as CommandError).message, "Unknown joypad button \"z\"")
 
 
 func test_moves_the_mouse_and_clicks_in_viewport_coordinates() -> void:

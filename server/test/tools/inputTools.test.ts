@@ -111,6 +111,34 @@ describe('input tools', () => {
     expect(text).toContain('Release it with {"key": "W", "state": "up"}.');
   });
 
+  it('game_input presses gamepad buttons, tilts sticks and says how to let go of them', async () => {
+    const editor = new FakeEditorGateway().respondTo('game.input', {
+      steps: 2,
+      waited_ms: 50,
+      released: [],
+      held: ['joypad_motion left_y', 'joypad_button right_shoulder'],
+      physics_frames: 3,
+      paused: false,
+      game_frame: 90,
+    });
+    const steps = [
+      { joypad_button: 'a', physics_frames: 3 },
+      { joypad_motion: 'left_y', value: -1, state: 'down' as const },
+      { joypad_button: 'right_shoulder', state: 'down' as const },
+    ];
+
+    const text = textOf(await createGameInputTool(editor, () => Buffer.alloc(0)).execute({ steps, release_at_end: false }));
+
+    expect(editor.requests[0]?.params).toEqual({ steps, release_at_end: false, screenshot: false });
+    expect(text).toContain('Still held: joypad_motion left_y, joypad_button right_shoulder. Release it with {"joypad_motion": "left_y", "state": "up"}.');
+  });
+
+  it('game_input refuses a stick tilted beyond its range', async () => {
+    const result = await createGameInputTool(new FakeEditorGateway(), () => Buffer.alloc(0)).execute({ steps: [{ joypad_motion: 'left_x', value: 2 }] });
+
+    expect(result.isError).toBe(true);
+  });
+
   it('game_input refuses steps with unknown fields', async () => {
     const result = await createGameInputTool(new FakeEditorGateway(), () => Buffer.alloc(0)).execute({ steps: [{ action: 'jump', hold: 5 }] } as never);
 

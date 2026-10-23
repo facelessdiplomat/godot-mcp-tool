@@ -523,7 +523,7 @@ doesn't carry.
 | `game_stop` | Stop the game | 1 | W | E/C |
 | `game_get_output` | Logs and errors with stack traces after a cursor (only new entries), level filter, line limit | 1 | R | E/C |
 | `game_screenshot` | Screenshot of the game viewport: scale, format; in 3D, optionally renders from extra cameras without touching the active one (§8.9) | 2 | R | G |
-| `game_input` | A sequence of steps: actions, keys, mouse motion and clicks, text, pauses, reads of nodes at exact moments; optionally a screenshot at the end | 2 | W | G |
+| `game_input` | A sequence of steps: actions, keys, gamepad buttons and sticks, mouse motion and clicks, text, pauses, reads of nodes at exact moments; optionally a screenshot at the end | 2 | W | G |
 | `game_wait` | Wait for render frames, physics frames, milliseconds or a condition (`Expression`), with a timeout | 2 | R | G |
 | `game_get_tree` | The runtime node tree | 2 | R | G |
 | `game_get_properties` / `game_set_properties` | Like the remote inspector | 2 | R/W | G |
@@ -678,9 +678,13 @@ Connected to Godot <version>, project "<name>" (3D). Indentation: <tabs | N spac
 
 ### 8.12 Modes and Claude Code specifics
 
-- Claude Code's tool search is on by default: only tool names are loaded at startup. The core loop
-  (`godot_status`, `scene_get_tree`, `node_add`, `node_set_properties`, `game_run`, `game_get_output`,
-  `script_validate`, `docs_class`) is marked `_meta["anthropic/alwaysLoad"]`, so it is available immediately.
+- Claude Code's tool search is on by default: only tool names are loaded at startup. The tools that most sessions
+  use are marked `_meta["anthropic/alwaysLoad"]`, so they are available immediately: `godot_status`, `project_info`,
+  `editor_rescan`, `input_map_get`, `scene_save`, `scene_get_tree`, `scene_batch_edit`, `node_get_properties`,
+  `script_validate`, `game_run`, `game_stop`, `game_get_output`, `game_get_properties`, `game_wait` and
+  `game_input`. The choice follows the first evaluation runs (35 sessions): these tools were used in 31–88% of them,
+  and every tool search for one of them cost the agent a turn; `node_add`, `node_set_properties` and `docs_class`,
+  loaded up front before, were used in 0–14% of them, since agents build scenes with `scene_batch_edit`.
 - `GODOT_MCP_READ_ONLY=1` exposes read-only tools only (those annotated `readOnlyHint`); `GODOT_MCP_DISABLE=tool1,tool2`
   turns off individual tools. `godot_status` names the modes that differ from the defaults, unknown names in
   `GODOT_MCP_DISABLE` included, and the server instructions say when the server is read-only.
@@ -945,6 +949,9 @@ On a script error the editor's debugger pauses the game by default — to the ag
   (`canvas_items` / `viewport`) — otherwise clicks miss.
 - Relative mouse motion (`InputEventMouseMotion.relative`) drives mouse look, including when the mouse is captured.
 - Hold durations are given in physics frames or milliseconds: press, wait, release.
+- Gamepad buttons and sticks are `InputEventJoypadButton` and `InputEventJoypadMotion` of device 0; Godot updates
+  `is_joy_button_pressed`, `get_joy_axis` and the actions bound to them from such events as from a real gamepad, with
+  no gamepad connected. Letting go of a stick sends it back to 0.
 - Devices: an event of an action matches only events from its own device unless its device is "all devices" (-1).
   `input_map_set` stores every event for all devices, as the editor's Input Map does by default, so a gamepad
   button works on any gamepad; events that `game_input` injects keep the devices of real ones (16 for the keyboard,
@@ -1556,8 +1563,8 @@ The whole integration suite, run next to that editor, found two more problems:
       breakpoint, and what the instructions say about tool calls sent in one message; the four jump scenarios went
       from 237 tool calls to 74); the smaller tool fixes (done: the hook after `Write`, reading the project without
       the editor, the ports of `editor_launch`, values that the engine adjusts in `scene_batch_edit`,
-      `anchors_preset`, and "main" as a scene); the tools that are loaded from the start; joypad input; then a second
-      full run.
+      `anchors_preset`, and "main" as a scene); the tools that are loaded from the start (done, §8.12); gamepad input
+      in `game_input` (done); then a second full run.
 - [ ] CI: lint, unit tests, integration tests with headless Godot (matrix 4.5 / 4.7 / the pinned `master` commit).
 - [ ] Publication to npm and the Godot Asset Store (it replaced the Asset Library in 4.7).
 

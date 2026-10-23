@@ -33,10 +33,10 @@ are described in the files linked at the end.
    on disk.
 5. **Run** with `game_run` and read errors with `game_get_output`. A ⚠ line in any result means new errors: read them
    before you go on.
-6. **Observe** the running game: `game_input` for actions, keys and the mouse, with `read` steps for values at exact
-   moments; `game_wait` for a state such as `is_on_floor()`; `game_get_properties` for values, getters included;
-   `node_get_bounds` for placement and scale; `game_screenshot`, with `views` for 3D; `game_pause` and `game_step` for
-   frame-exact checks; `game_performance`.
+6. **Observe** the running game: `game_input` for actions, keys, the mouse and the gamepad, with `read` steps for
+   values at exact moments; `game_wait` for a state such as `is_on_floor()`; `game_get_properties` for values,
+   getters included; `node_get_bounds` for placement and scale; `game_screenshot`, with `views` for 3D; `game_pause`
+   and `game_step` for frame-exact checks; `game_performance`.
 7. **Test** with GUT tests in `res://test` and `test_run`.
    To find why code misbehaves, stop the game on a line with `debug_breakpoints`, read the stack and the variables
    with `debug_state`, step with `debug_continue`, and remove the breakpoints when done.
