@@ -3,6 +3,26 @@
   "version": "0.1.0",
   "description": "MCP server that connects Claude Code to the Godot editor",
   "license": "MIT",
+  "author": "facelessdiplomat",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/facelessdiplomat/godot-mcp-tool.git",
+    "directory": "server"
+  },
+  "homepage": "https://github.com/facelessdiplomat/godot-mcp-tool#readme",
+  "bugs": {
+    "url": "https://github.com/facelessdiplomat/godot-mcp-tool/issues"
+  },
+  "keywords": [
+    "godot",
+    "godot-engine",
+    "gdscript",
+    "game-development",
+    "mcp",
+    "model-context-protocol",
+    "claude",
+    "claude-code"
+  ],
   "type": "module",
   "bin": {
     "godot-mcp-tool": "dist/index.js"

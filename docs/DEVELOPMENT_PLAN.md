@@ -1221,6 +1221,8 @@ godot-mcp-tool/
 │   │   ├── hooks/                the check of a script after Claude edits it, for the plugin's hook
 │   │   └── util/                 errors, truncation, pagination, images
 │   ├── addon/                    the addon copied in by the build and shipped in the npm package (not in Git)
+│   ├── README.md                 the page of the package on npm
+│   ├── LICENSE                   a copy of the repository's license for the package
 │   └── test/
 ├── addon/
 │   └── addons/godot_mcp_tool/    copied (or symlinked) into the game project
@@ -1560,7 +1562,10 @@ The whole integration suite, run next to that editor, found two more problems:
       the editor of the project is closed, through a hidden folder and with a rollback; both leave a linked addon
       alone. `doctor` checks Node.js, the project, Godot and its version, the addon and its version, the plugin and
       the connection to the editor, and says how to fix each problem; `godot_status` says when the editor runs an
-      addon of another version than the server.
+      addon of another version than the server. Ready to publish: the package has its own `README.md`, a copy of the
+      `LICENSE` that a test keeps equal to the repository's, and the npm fields for the repository, its issues and
+      keywords; `npm pack` ships 534 files (223 KB), and the packed package, installed as `npx` would, installed the
+      addon into a new project and connected to a Godot 4.7.2 editor running it.
 - [x] A Claude Code plugin that bundles the MCP server configuration, the `.gd` validation hook and the skill:
       the plugin `godot` in `plugin/` starts the server with `npx -y godot-mcp-tool@<version>`, pinned to the version
       of the package, and asks for the Godot executable, which may stay empty; its `PostToolUse` hook runs
