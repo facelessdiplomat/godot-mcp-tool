@@ -684,6 +684,8 @@ Connected to Godot <version>, project "<name>" (3D). Indentation: <tabs | N spac
   records the property changes of the node as one Undo step; `game_eval` evaluates an `Expression` on a node of the
   running game.
 - No tool profiles for other clients (§3).
+- Installed as the Claude Code plugin `godot`, the server's tools are named `mcp__plugin_godot_godot__<tool>`, so
+  permission rules and hook matchers use these names; its skill is `/godot:godot`.
 - Claude Code runs the tool calls of one message at the same time (seen in the milestone 2 live run): a
   `game_get_properties` sent together with `game_input` read the state before the input. The server instructions
   tell the agent to read game state in a later message than the `game_input` or `game_wait` it depends on.
@@ -848,7 +850,11 @@ reaches the agent with the next call. A result can cover errors: `script_validat
 scripts it checked, so it leaves the editor's parse errors and failed loads of those scripts out of the summary —
 they repeat its report or belong to an older version of the file. `test_run` does the same for the test scripts it
 reports as failing to load; since its tests run outside the bridge, it pings the connected editor after the run, so
-the errors the editor printed meanwhile arrive with its result rather than with the next call.
+the errors the editor printed meanwhile arrive with its result rather than with the next call. The hook of the
+Claude Code plugin checks scripts in a process of its own, so the server does not know what it reported; the
+addon stamps each recent error with the wall-clock time it was logged, and the summary leaves out the editor's parse
+errors and failed loads of a script that changed, or was deleted, after that time: they belong to an older version
+of the file, which the hook or the next check covers.
 
 `editor_rescan` returns only after the editor has applied the scan, so the parse errors of the scripts the editor
 loads meanwhile come with its result. An editor with a window loads every script that a scan found new or changed
@@ -1153,7 +1159,8 @@ godot-mcp-tool/
 │   │   ├── resources/            MCP resources
 │   │   ├── prompts/              MCP prompts
 │   │   ├── addon/                the addon in a game project: inspection, installation, plugin activation
-│   │   ├── cli/                  the commands install-addon, update-addon and doctor
+│   │   ├── cli/                  the commands install-addon, update-addon, doctor and check-edited-script
+│   │   ├── hooks/                the check of a script after Claude edits it, for the plugin's hook
 │   │   └── util/                 errors, truncation, pagination, images
 │   ├── addon/                    the addon copied in by the build and shipped in the npm package (not in Git)
 │   └── test/
@@ -1167,7 +1174,12 @@ godot-mcp-tool/
 │       ├── debugger/             EditorDebuggerPlugin
 │       ├── runtime/              autoload GodotMcpRuntime and its commands
 │       └── logging/              Logger subclass
-├── plugin/                       Claude Code plugin (manifest and .mcp.json in milestone 5)
+├── .claude-plugin/
+│   └── marketplace.json          the repository as the marketplace godot-mcp-tool
+├── plugin/                       the Claude Code plugin godot
+│   ├── .claude-plugin/plugin.json
+│   ├── .mcp.json                 starts the server with npx
+│   ├── hooks/hooks.json          checks every .gd file that Claude writes or edits
 │   └── skills/godot/             the companion skill: SKILL.md, gdscript.md, 3d.md, testing.md
 ├── test-project/                 3D Godot project for integration tests (addon symlinked)
 └── scripts/                      dev scripts: install GUT and gdUnit4, run the addon tests, release
@@ -1305,9 +1317,8 @@ against a headless editor, Ctrl+Z included, and it passed in a live Claude Code 
       `node_duplicate`, `node_find`.
 - [x] `signal_list`, `signal_connect`, `signal_disconnect`: persistent connections that are saved with the scene;
       a missing or mismatched method is reported with the function to add.
-- [ ] Optional: a Claude Code `PostToolUse` hook for `.gd` files — after every script edit Claude immediately gets the
-      diagnostics without a separate `script_validate` call. It is enabled in the game project's settings, at your
-      discretion.
+- [x] Optional: a Claude Code `PostToolUse` hook for `.gd` files — after every script edit Claude immediately gets the
+      diagnostics without a separate `script_validate` call. It came with the Claude Code plugin of milestone 5.
 
 Order of work: `script_validate`; a request channel from the editor to the running game, then `game_get_tree`,
 `game_get_properties`, `game_set_properties` and `game_wait`; `game_input` together with `input_map_get` /
@@ -1489,9 +1500,14 @@ The whole integration suite, run next to that editor, found two more problems:
       alone. `doctor` checks Node.js, the project, Godot and its version, the addon and its version, the plugin and
       the connection to the editor, and says how to fix each problem; `godot_status` says when the editor runs an
       addon of another version than the server.
-- [ ] A Claude Code plugin that bundles the MCP server configuration, the `.gd` validation hook and the skill:
-      `plugin/` gains `.claude-plugin/plugin.json` and a `.mcp.json` that points at the server through
-      `${CLAUDE_PLUGIN_ROOT}`; the skill is already in `plugin/skills/godot/`.
+- [x] A Claude Code plugin that bundles the MCP server configuration, the `.gd` validation hook and the skill:
+      the plugin `godot` in `plugin/` starts the server with `npx -y godot-mcp-tool@<version>`, pinned to the version
+      of the package, and asks for the Godot executable, which may stay empty; its `PostToolUse` hook runs
+      `godot-mcp-tool check-edited-script` after every `Write` or `Edit` of a `.gd` file, which checks the file with
+      the editor's language server or with `godot --check-only` and shows Claude the errors (exit code 2) or adds the
+      warnings to its context, and says nothing about clean scripts, other files or projects it cannot check. The
+      repository is the marketplace `godot-mcp-tool` (`.claude-plugin/marketplace.json`), and `claude plugin validate`
+      passes for both manifests.
 - [ ] An editor dock: status, a log of agent commands, toggles for dangerous features.
 - [ ] User documentation: how to connect and how to use (see [User documentation](#user-documentation)).
 - [ ] `CONTRIBUTING.md`, `SECURITY.md`.
@@ -1567,7 +1583,20 @@ the agent works.
 
 ## 14. Connecting to Claude Code
 
-Claude Code (including the Code tab of the desktop app) reads `.mcp.json` from the root of the game repository and
+Once the package is published, the Claude Code plugin is the simplest way: it bundles the server configuration, the
+hook that checks every `.gd` file Claude writes and the skill. The repository is its own marketplace:
+
+```text
+/plugin marketplace add <owner>/godot-mcp-tool
+/plugin install godot@godot-mcp-tool
+```
+
+The plugin asks for the Godot executable, which can stay empty when Godot is on `PATH`, in its standard location, or
+when the project is opened in the editor first. `claude --plugin-dir plugin` loads it for one session from a
+checkout, and `claude plugin validate plugin --strict` and `claude plugin validate . --strict` check the manifests.
+The plugin starts the server with `npx`, so it works once the package is published.
+
+Without the plugin, Claude Code (including the Code tab of the desktop app) reads `.mcp.json` from the root of the game repository and
 asks for confirmation the first time:
 
 ```json
@@ -1861,6 +1890,10 @@ Checked on 2026-10-21.
 - MCP Inspector: https://github.com/modelcontextprotocol/inspector
 - MCP in Claude Code: https://code.claude.com/docs/en/mcp
 - Claude Code environment variables: https://code.claude.com/docs/en/env-vars
+- Claude Code plugins: https://code.claude.com/docs/en/plugins/manifest-reference,
+  https://code.claude.com/docs/en/plugins/components, https://code.claude.com/docs/en/plugins/marketplace-reference
+  and https://code.claude.com/docs/en/plugins/cli-reference (checked on 2026-10-23)
+- Claude Code hooks: https://code.claude.com/docs/en/hooks (checked on 2026-10-23)
 - Anthropic, "Writing effective tools for AI agents": https://www.anthropic.com/engineering/writing-tools-for-agents
 
 **Existing Godot MCP servers**

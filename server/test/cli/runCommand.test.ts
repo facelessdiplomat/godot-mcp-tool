@@ -12,6 +12,7 @@ describe('running a command of the command line', () => {
   let projectRoot: string;
   let output: string[];
   let errors: string[];
+  let hookInput: string;
 
   beforeEach(() => {
     workspace = mkdtempSync(join(tmpdir(), 'run-command-'));
@@ -23,6 +24,7 @@ describe('running a command of the command line', () => {
     writeFileSync(join(projectRoot, 'project.godot'), ['config_version=5', ''].join('\n'));
     output = [];
     errors = [];
+    hookInput = '';
   });
 
   afterEach(() => {
@@ -36,7 +38,15 @@ describe('running a command of the command line', () => {
     }
     return runCommand(
       request,
-      { variables: {}, workingDirectory, platform: process.platform, homeDirectory: workspace, nodeVersion: '22.12.0', bundledAddonDirectory: bundleDirectory },
+      {
+        variables: {},
+        workingDirectory,
+        platform: process.platform,
+        homeDirectory: workspace,
+        nodeVersion: '22.12.0',
+        bundledAddonDirectory: bundleDirectory,
+        readInput: () => Promise.resolve(hookInput),
+      },
       { write: (line) => output.push(line), writeError: (line) => errors.push(line) },
     );
   }
@@ -74,6 +84,20 @@ describe('running a command of the command line', () => {
 
     expect(await run(['install-addon'])).toBe(1);
     expect(output).toEqual([`This package has no addon in ${bundleDirectory}. Build it with: npm run build`]);
+  });
+
+  it('lets the hook pass edits of files that are not scripts in silence', async () => {
+    hookInput = JSON.stringify({ hook_event_name: 'PostToolUse', tool_name: 'Write', tool_input: { file_path: join(projectRoot, 'notes.md'), content: '# Notes' } });
+
+    expect(await run(['check-edited-script'])).toBe(0);
+    expect([...output, ...errors]).toEqual([]);
+  });
+
+  it('lets the hook pass input that is not JSON in silence', async () => {
+    hookInput = 'not json';
+
+    expect(await run(['check-edited-script'])).toBe(0);
+    expect([...output, ...errors]).toEqual([]);
   });
 
   it('shows the help, the version and the usage after a wrong command', async () => {

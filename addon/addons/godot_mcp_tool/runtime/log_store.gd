@@ -8,12 +8,14 @@ var error_count := 0
 var warning_count := 0
 
 var _capacity: int
+var _wall_clock_msec: Callable
 var _entries: Array = []
 var _recent_errors: Array = []
 
 
-func _init(capacity: int = DEFAULT_CAPACITY) -> void:
+func _init(capacity: int = DEFAULT_CAPACITY, wall_clock_msec: Callable = Callable()) -> void:
 	_capacity = capacity
+	_wall_clock_msec = wall_clock_msec if wall_clock_msec.is_valid() else _system_wall_clock_msec
 
 
 func append(entry: Dictionary, source: String) -> void:
@@ -27,7 +29,9 @@ func append(entry: Dictionary, source: String) -> void:
 	match stored.get("level"):
 		"error":
 			error_count += 1
-			_recent_errors.append(_summary_of(stored))
+			var summary := _summary_of(stored)
+			summary["logged_at_ms"] = _wall_clock_msec.call()
+			_recent_errors.append(summary)
 			if _recent_errors.size() > RECENT_ERROR_LIMIT:
 				_recent_errors.pop_front()
 		"warning":
@@ -60,6 +64,10 @@ func entries_after(after_seq: int, levels: PackedStringArray, limit: int) -> Dic
 
 func status() -> Dictionary:
 	return {"last_seq": last_seq, "errors": error_count, "warnings": warning_count, "recent_errors": _recent_errors.duplicate()}
+
+
+func _system_wall_clock_msec() -> int:
+	return int(Time.get_unix_time_from_system() * 1000.0)
 
 
 static func _summary_of(entry: Dictionary) -> Dictionary:

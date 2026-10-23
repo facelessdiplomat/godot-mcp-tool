@@ -1,0 +1,14 @@
+{
+  "name": "godot-mcp-tool",
+  "owner": {
+    "name": "facelessdiplomat"
+  },
+  "description": "A Claude Code plugin for building Godot 4 games through the Godot editor.",
+  "plugins": [
+    {
+      "name": "godot",
+      "source": "./plugin",
+      "description": "The godot MCP server for the Godot 4 editor and the running game, a hook that checks GDScript after every edit, and a skill for the workflow."
+    }
+  ]
+}

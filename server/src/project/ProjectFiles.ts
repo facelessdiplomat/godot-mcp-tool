@@ -1,4 +1,4 @@
-import { readdirSync } from 'node:fs';
+import { readdirSync, statSync } from 'node:fs';
 import { join, relative, sep } from 'node:path';
 
 export interface ProjectFile {
@@ -32,4 +32,12 @@ export function listScenes(projectRoot: string): string[] {
 
 export function toResourcePath(pathInProject: string): string {
   return `${resourcePrefix}${pathInProject.split(sep).join('/')}`;
+}
+
+export function fileChangedAfter(projectRoot: string, resourcePath: string, timeMs: number): boolean {
+  try {
+    return statSync(join(projectRoot, resourcePath.slice(resourcePrefix.length))).mtimeMs > timeMs;
+  } catch {
+    return true;
+  }
 }

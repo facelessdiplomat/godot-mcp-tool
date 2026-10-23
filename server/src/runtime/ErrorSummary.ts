@@ -1,4 +1,5 @@
 import * as z from 'zod/v4';
+import { scriptOfLoadError } from '../scripts/ScriptLoadErrors.js';
 
 const statusNotification = 'log.status';
 const gameSource = 'game';
@@ -8,11 +9,14 @@ const recentErrorSchema = z.object({
   source: z.string(),
   message: z.string(),
   location: z.string().optional(),
+  logged_at_ms: z.number().optional(),
 });
 
 type RecentError = z.infer<typeof recentErrorSchema>;
 
-export type LoggedError = Omit<RecentError, 'seq'>;
+export type LoggedError = Omit<RecentError, 'seq' | 'logged_at_ms'>;
+
+export type ScriptChangeCheck = (resourcePath: string, timeMs: number) => boolean;
 
 export interface ErrorDismissal {
   dismiss(isCovered: (error: LoggedError) => boolean): void;
@@ -37,6 +41,8 @@ export class ErrorSummary implements ErrorDismissal {
   private reportedSeq = 0;
   private latest: LogStatus | undefined;
   private readonly dismissedSeqs = new Set<number>();
+
+  constructor(private readonly scriptChangedAfter?: ScriptChangeCheck) {}
 
   observe(connection: number, method: string, params: unknown): void {
     if (method !== statusNotification) {
@@ -74,6 +80,7 @@ export class ErrorSummary implements ErrorDismissal {
     if (latest === undefined) {
       return undefined;
     }
+    this.dismissErrorsOfChangedScripts();
     const newCount = latest.errors - this.reportedErrors - this.dismissedSeqs.size;
     const newErrors = this.unreportedErrors();
     this.acknowledge();
@@ -85,6 +92,19 @@ export class ErrorSummary implements ErrorDismissal {
       lines.push('Read the game output with game_get_output.');
     }
     return lines.join('\n');
+  }
+
+  private dismissErrorsOfChangedScripts(): void {
+    const scriptChangedAfter = this.scriptChangedAfter;
+    if (scriptChangedAfter === undefined) {
+      return;
+    }
+    for (const error of this.unreportedErrors()) {
+      const scriptPath = scriptOfLoadError(error);
+      if (scriptPath !== undefined && error.logged_at_ms !== undefined && scriptChangedAfter(scriptPath, error.logged_at_ms)) {
+        this.dismissedSeqs.add(error.seq);
+      }
+    }
   }
 
   private unreportedErrors(): RecentError[] {

@@ -2,11 +2,13 @@ extends GutTest
 
 const LogStore := preload("res://addons/godot_mcp_tool/runtime/log_store.gd")
 
+const LOGGED_AT_MSEC := 1_761_200_000_000
+
 var _store: LogStore
 
 
 func before_each() -> void:
-	_store = LogStore.new(5)
+	_store = LogStore.new(5, func() -> int: return LOGGED_AT_MSEC)
 
 
 func _sequence_numbers(page: Dictionary) -> Array:
@@ -30,9 +32,17 @@ func test_counts_errors_and_warnings_and_keeps_the_recent_errors() -> void:
 	assert_eq(status["errors"], 2)
 	assert_eq(status["warnings"], 1)
 	assert_eq(status["recent_errors"], [
-		{"seq": 1, "source": "game", "message": "first", "location": "res://player.gd:3"},
-		{"seq": 3, "source": "editor", "message": "second"},
+		{"seq": 1, "source": "game", "message": "first", "location": "res://player.gd:3", "logged_at_ms": LOGGED_AT_MSEC},
+		{"seq": 3, "source": "editor", "message": "second", "logged_at_ms": LOGGED_AT_MSEC},
 	])
+
+
+func test_tells_when_an_error_was_logged_by_the_system_clock() -> void:
+	var store := LogStore.new()
+	var before_msec := int(Time.get_unix_time_from_system() * 1000.0)
+	store.append({"level": "error", "message": "parse error"}, "editor")
+	var logged_at_msec: int = (store.status()["recent_errors"] as Array)[0]["logged_at_ms"]
+	assert_between(logged_at_msec, before_msec, int(Time.get_unix_time_from_system() * 1000.0))
 
 
 func test_keeps_only_the_latest_errors_in_the_status() -> void:

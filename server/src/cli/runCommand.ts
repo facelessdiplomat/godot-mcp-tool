@@ -2,9 +2,14 @@ import { AddonInstaller } from '../addon/AddonInstaller.js';
 import { readAddonVersion } from '../addon/InstalledAddon.js';
 import { type ApplicationEnvironment, createGodotContext, type GodotContext } from '../createGodotContext.js';
 import { GodotCli } from '../godot/GodotCli.js';
+import { EditedScriptCheck } from '../hooks/EditedScriptCheck.js';
+import { respondToEditedScript } from '../hooks/hookResponse.js';
 import { NodeProcessRunner } from '../process/ProcessRunner.js';
+import { createScriptValidator } from '../scripts/createScriptValidator.js';
+import type { ValidationResult } from '../scripts/ScriptValidator.js';
 import { SERVER_NAME, SERVER_VERSION } from '../serverInfo.js';
 import { describeError } from '../util/errors.js';
+import { parsePort } from '../util/ports.js';
 import { type CommandLineRequest, type ProjectCommand, usage } from './CommandLine.js';
 import { type CommandReport, failed } from './CommandReport.js';
 import { Doctor } from './Doctor.js';
@@ -12,6 +17,7 @@ import { Doctor } from './Doctor.js';
 export interface CommandLineEnvironment extends ApplicationEnvironment {
   readonly nodeVersion: string;
   readonly bundledAddonDirectory: string;
+  readonly readInput: () => Promise<string>;
 }
 
 export interface CommandOutput {
@@ -39,6 +45,8 @@ export async function runCommand(request: CommandRequest, environment: CommandLi
         output.writeError(line);
       });
       return usageErrorExitCode;
+    case 'check-edited-script':
+      return checkEditedScript(environment, output);
     default:
       return runProjectCommand(request.kind, request.projectPath, environment, output);
   }
@@ -55,6 +63,40 @@ async function runProjectCommand(command: ProjectCommand, projectPath: string | 
   } catch (error) {
     output.writeError(`${command} failed: ${describeError(error)}`);
     return failureExitCode;
+  } finally {
+    context.editor.close();
+  }
+}
+
+async function checkEditedScript(environment: CommandLineEnvironment, output: CommandOutput): Promise<number> {
+  let hookInput: unknown;
+  try {
+    hookInput = JSON.parse(await environment.readInput());
+  } catch {
+    return 0;
+  }
+  const outcome = await new EditedScriptCheck((projectRoot, scriptPath) => validateScript(environment, projectRoot, scriptPath)).check(hookInput);
+  const response = respondToEditedScript(outcome);
+  response.standardOutput.forEach((line) => {
+    output.write(line);
+  });
+  response.standardError.forEach((line) => {
+    output.writeError(line);
+  });
+  return response.exitCode;
+}
+
+async function validateScript(environment: CommandLineEnvironment, projectRoot: string, scriptPath: string): Promise<ValidationResult> {
+  const context = createGodotContext(environment, projectRoot);
+  try {
+    const validator = createScriptValidator({
+      projectRoot,
+      editor: context.editor,
+      locateGodot: context.locateGodot,
+      processRunner: new NodeProcessRunner(),
+      languageServerPort: parsePort(environment.variables['GODOT_LSP_PORT']),
+    });
+    return await validator.validate([scriptPath]);
   } finally {
     context.editor.close();
   }

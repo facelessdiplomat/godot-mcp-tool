@@ -109,6 +109,38 @@ describe('ErrorSummary', () => {
     expect(summary.takeSummary()).toContain("Invalid access to property 'speed'.");
   });
 
+  it('leaves out the load errors of a script that changed after the editor logged them', () => {
+    const summary = new ErrorSummary((resourcePath, loggedAtMs) => resourcePath === 'res://player.gd' && loggedAtMs < 2000);
+    summary.observe(1, 'log.status', status(2, 0));
+    summary.observe(
+      1,
+      'log.status',
+      status(5, 3, [
+        { seq: 3, source: 'editor', message: 'Parse Error: Identifier "SPEEDD" not declared in the current scope.', location: 'res://player.gd:5', logged_at_ms: 1000 },
+        { seq: 4, source: 'editor', message: 'Failed to load script "res://player.gd" with error "Parse error".', location: 'modules/gdscript/gdscript.cpp:3041', logged_at_ms: 1000 },
+        { seq: 5, source: 'editor', message: 'Parse Error: Unexpected "Indent".', location: 'res://enemy.gd:3', logged_at_ms: 1000 },
+      ]),
+    );
+
+    expect(summary.takeSummary()).toBe(['⚠ New error since the last call:', '- in the editor: res://enemy.gd:3: Parse Error: Unexpected "Indent".'].join('\n'));
+  });
+
+  it('keeps the load errors of a script that has not changed since', () => {
+    const summary = new ErrorSummary((_resourcePath, loggedAtMs) => loggedAtMs < 2000);
+    summary.observe(1, 'log.status', status(2, 0));
+    summary.observe(1, 'log.status', status(3, 1, [{ seq: 3, source: 'editor', message: 'Parse Error: Expected end of statement', location: 'res://player.gd:7', logged_at_ms: 3000 }]));
+
+    expect(summary.takeSummary()).toBe(['⚠ New error since the last call:', '- in the editor: res://player.gd:7: Parse Error: Expected end of statement.'].join('\n'));
+  });
+
+  it('keeps errors of the game about a script that changed', () => {
+    const summary = new ErrorSummary(() => true);
+    summary.observe(1, 'log.status', status(10, 0));
+    summary.observe(1, 'log.status', status(12, 1, [{ ...speedError, logged_at_ms: 1000 }]));
+
+    expect(summary.takeSummary()).toContain("- in the game: res://player.gd:12: Invalid access to property 'speed'.");
+  });
+
   it('starts over when it connects to another editor', () => {
     const summary = new ErrorSummary();
     summary.observe(1, 'log.status', status(20, 9));

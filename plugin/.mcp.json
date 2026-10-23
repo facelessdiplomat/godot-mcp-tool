@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "godot": {
+      "command": "npx",
+      "args": ["-y", "godot-mcp-tool@0.1.0"],
+      "env": {
+        "GODOT_BIN": "${user_config.godot_path}"
+      }
+    }
+  }
+}

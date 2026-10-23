@@ -2,7 +2,7 @@ import { accessSync, constants, statSync } from 'node:fs';
 import { BridgeClient } from './bridge/BridgeClient.js';
 import { DiscoveryFileReader, isProcessAlive } from './bridge/DiscoveryFileReader.js';
 import { EditorConnection, type EditorSession, UnavailableEditor } from './bridge/EditorConnection.js';
-import { GodotBinaryLocator } from './godot/GodotBinaryLocator.js';
+import { type BinaryLookup, GodotBinaryLocator } from './godot/GodotBinaryLocator.js';
 import { type ProjectLookup, ProjectLocator } from './project/ProjectLocator.js';
 import { BRIDGE_PROTOCOL_VERSION, SERVER_NAME, SERVER_VERSION } from './serverInfo.js';
 
@@ -18,6 +18,7 @@ export interface GodotContext {
   readonly discovery: DiscoveryFileReader | undefined;
   readonly editor: EditorSession;
   readonly binaryLocator: GodotBinaryLocator;
+  readonly locateGodot: () => Promise<BinaryLookup>;
 }
 
 const bridgeRequestTimeoutMs = 30_000;
@@ -43,7 +44,11 @@ export function createGodotContext(environment: ApplicationEnvironment, commandL
     isExecutableFile,
     lastEditorExecutable: () => discovery?.lastEditorExecutable(),
   });
-  return { project, discovery, editor, binaryLocator };
+  const locateGodot = async (): Promise<BinaryLookup> => {
+    const editorStatus = await editor.status();
+    return binaryLocator.locate(editorStatus.connected ? editorStatus.hello.executablePath : undefined);
+  };
+  return { project, discovery, editor, binaryLocator, locateGodot };
 }
 
 function isExecutableFile(path: string): boolean {

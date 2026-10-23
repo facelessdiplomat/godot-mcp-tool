@@ -1,0 +1,19 @@
+{
+  "name": "godot",
+  "version": "0.1.0",
+  "description": "Build Godot 4 games with Claude Code: the godot MCP server drives the Godot editor and the running game, a hook checks every GDScript file that Claude writes, and a skill describes the workflow.",
+  "author": {
+    "name": "facelessdiplomat"
+  },
+  "license": "MIT",
+  "keywords": ["godot", "gdscript", "game-development", "3d", "mcp"],
+  "userConfig": {
+    "godot_path": {
+      "type": "file",
+      "title": "Godot executable",
+      "description": "The Godot 4 editor executable, such as /Applications/Godot.app/Contents/MacOS/Godot. Leave it empty when Godot is on PATH or in its standard location, or when you open the project in the Godot editor yourself.",
+      "required": false,
+      "default": ""
+    }
+  }
+}

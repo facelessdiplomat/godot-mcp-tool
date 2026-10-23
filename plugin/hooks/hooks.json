@@ -1,0 +1,18 @@
+{
+  "description": "Checks every GDScript file that Claude writes or edits, with the language server of the Godot editor or with godot --check-only, and shows Claude its errors.",
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "npx -y godot-mcp-tool@0.1.0 check-edited-script",
+            "if": "Edit(*.gd)",
+            "timeout": 120
+          }
+        ]
+      }
+    ]
+  }
+}

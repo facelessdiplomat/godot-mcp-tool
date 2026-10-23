@@ -12,6 +12,11 @@ describe('the command line', () => {
     expect(parseCommandLine(['doctor', '/projects/game'])).toEqual({ kind: 'doctor', projectPath: '/projects/game' });
   });
 
+  it('takes the check that the hook of the Claude Code plugin runs, without arguments', () => {
+    expect(parseCommandLine(['check-edited-script'])).toEqual({ kind: 'check-edited-script' });
+    expect(parseCommandLine(['check-edited-script', 'player.gd'])).toEqual({ kind: 'invalid', reason: 'check-edited-script reads the hook input from standard input and takes no arguments.' });
+  });
+
   it('shows the help and the version', () => {
     expect(parseCommandLine(['--help'])).toEqual({ kind: 'help' });
     expect(parseCommandLine(['-h'])).toEqual({ kind: 'help' });
@@ -29,7 +34,7 @@ describe('the command line', () => {
 
   it('describes every command in the help', () => {
     expect(usage).toContain('Usage: godot-mcp-tool [command] [project folder]');
-    for (const command of ['install-addon', 'update-addon', 'doctor']) {
+    for (const command of ['install-addon', 'update-addon', 'doctor', 'check-edited-script']) {
       expect(usage).toContain(`  ${command} `);
     }
   });
