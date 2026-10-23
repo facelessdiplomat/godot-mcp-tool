@@ -53,7 +53,8 @@ npm run build
 The tests that need Godot take its path in `GODOT_BIN`: `scripts/install-gut.sh` and `scripts/install-gdunit4.sh`
 install the test frameworks into `test-project/`, `scripts/test-addon.sh` runs the addon tests, and
 `npm run test:integration` in `server/` runs the integration tests. After changing a tool, `npm run docs:tools`
-updates the [tool reference](docs/tools.md).
+updates the [tool reference](docs/tools.md). [CONTRIBUTING.md](CONTRIBUTING.md) has the details and the rules for
+changes; [SECURITY.md](SECURITY.md) tells how to report a security problem.
 
 ## License
 

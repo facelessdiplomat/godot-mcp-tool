@@ -1132,7 +1132,7 @@ Dropped and failed connections are the top complaint about almost every existing
 - No network access beyond localhost; no telemetry.
 - In Claude Code, read-only tools can be allowed in advance in the permission rules; modifying tools ask for
   confirmation.
-- Open-source hygiene: `SECURITY.md` with a reporting channel (milestone 5).
+- Open-source hygiene: `SECURITY.md` with a reporting channel, GitHub's private vulnerability reports (milestone 5).
 
 ---
 
@@ -1193,6 +1193,8 @@ godot-mcp-tool/
 ├── README.md
 ├── LICENSE                       MIT
 ├── CLAUDE.md                     rules for Claude Code: code style, TDD, commits
+├── CONTRIBUTING.md               how to set up, run the checks and change a tool
+├── SECURITY.md                   how to report a security problem, and how the tool protects the project
 ├── docs/
 │   ├── DEVELOPMENT_PLAN.md       ← this document
 │   ├── setup.md                  user guide: how to connect (milestone 5)
@@ -1577,7 +1579,9 @@ The whole integration suite, run next to that editor, found two more problems:
       [setup.md](setup.md), [usage.md](usage.md), the README quick start, and [tools.md](tools.md), which a unit test
       compares with what the server lists, so `npm run docs:tools` must regenerate it after a tool changes. The check
       of the guides on a fresh project, described below, is still to do.
-- [ ] `CONTRIBUTING.md`, `SECURITY.md`.
+- [x] `CONTRIBUTING.md`, `SECURITY.md`: how the project fits together, its checks and rules, how to change a tool;
+      the security model of §10 in plain words and private reports through GitHub's "Report a vulnerability", which
+      needs private vulnerability reporting switched on once the repository exists.
 - [x] Evaluation tasks (§13) and tool description tuning based on their results: the 20 scenarios of `docs/evals/`
       run as code with `npm run eval`, each with a reference solution and checks through the MCP tools. The first
       full run passed 16 of 20 ([results](evals/README.md#results)); its findings are fixed in this order: the
