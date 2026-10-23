@@ -173,12 +173,50 @@ func test_accepts_null_for_an_object() -> void:
 	assert_null(_decoded(null, _property(TYPE_OBJECT, PROPERTY_HINT_RESOURCE_TYPE, "Material")))
 
 
+func test_creates_a_resource_with_its_properties_nested_under_properties() -> void:
+	var style: Variant = _decoded({"new": "StyleBoxFlat", "properties": {"bg_color": "#ff0000", "corner_radius_top_left": 4}}, _property(TYPE_OBJECT, PROPERTY_HINT_RESOURCE_TYPE, "StyleBox"))
+	assert_true(style is StyleBoxFlat)
+	assert_eq((style as StyleBoxFlat).bg_color, Color(1, 0, 0))
+	assert_eq((style as StyleBoxFlat).corner_radius_top_left, 4)
+
+
 func test_resolves_a_node_reference_relative_to_the_target() -> void:
 	var owner_node: Node3D = autofree(Node3D.new())
 	var enemy := Node3D.new()
 	enemy.name = "Enemy"
 	owner_node.add_child(enemy)
 	assert_eq(_decoded("Enemy", _property(TYPE_OBJECT, PROPERTY_HINT_NODE_TYPE, "Node3D"), owner_node), enemy)
+
+
+func _scene_with_hud_and_player() -> Node3D:
+	var arena: Node3D = autofree(Node3D.new())
+	arena.name = "Arena"
+	for node_name in ["Hud", "Player"]:
+		var node := Node3D.new()
+		node.name = node_name
+		arena.add_child(node)
+		node.owner = arena
+	return arena
+
+
+func test_resolves_a_node_reference_relative_to_the_scene_root() -> void:
+	var arena := _scene_with_hud_and_player()
+	var hud := arena.get_node("Hud")
+	assert_eq(_decoded("Player", _property(TYPE_OBJECT, PROPERTY_HINT_NODE_TYPE, "Node3D"), hud), arena.get_node("Player"))
+
+
+func test_prefers_a_node_relative_to_the_target_to_one_of_the_scene_root() -> void:
+	var arena := _scene_with_hud_and_player()
+	var hud := arena.get_node("Hud")
+	var own_player := Node3D.new()
+	own_player.name = "Player"
+	hud.add_child(own_player)
+	assert_eq(_decoded("Player", _property(TYPE_OBJECT, PROPERTY_HINT_NODE_TYPE, "Node3D"), hud), own_player)
+
+
+func test_rejects_a_node_found_neither_from_the_target_nor_from_the_scene_root() -> void:
+	var hud := _scene_with_hud_and_player().get_node("Hud")
+	assert_eq(_error("Ghost", _property(TYPE_OBJECT, PROPERTY_HINT_NODE_TYPE, "Node3D"), hud), "node \"Ghost\" was found neither relative to Hud nor from the scene root Arena")
 
 
 func test_rejects_a_node_reference_of_the_wrong_type() -> void:

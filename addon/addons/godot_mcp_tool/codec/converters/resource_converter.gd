@@ -2,6 +2,9 @@ extends "converter.gd"
 
 const ResourceFactory := preload("../../resources/resource_factory.gd")
 
+const CLASS_KEY := "new"
+const NESTED_PROPERTIES_KEY := "properties"
+
 
 func handles(property: Dictionary) -> bool:
 	return property.get("type") == TYPE_OBJECT and property.get("hint") == PROPERTY_HINT_RESOURCE_TYPE
@@ -43,18 +46,27 @@ func _create_resource(specification: Dictionary, allowed_types: PackedStringArra
 	var properties_by_name := {}
 	for resource_property in resource.get_property_list():
 		properties_by_name[resource_property["name"]] = resource_property
-	for property_name in specification:
-		if property_name == "new":
-			continue
+	var values := _values_of(specification, properties_by_name)
+	for property_name in values:
 		if not properties_by_name.has(property_name):
 			var similar := _similar_names(property_name, properties_by_name.keys())
 			var suggestion := "" if similar.is_empty() else " Similar: %s." % ", ".join(similar)
 			return _failure("%s has no property \"%s\".%s" % [type_name, property_name, suggestion])
-		var nested := decoder.decode(specification[property_name], properties_by_name[property_name], resource)
+		var nested := decoder.decode(values[property_name], properties_by_name[property_name], resource)
 		if not nested.is_success:
 			return _failure("%s.%s: %s" % [type_name, property_name, nested.error])
 		resource.set(property_name, nested.value)
 	return _success(resource)
+
+
+static func _values_of(specification: Dictionary, properties_by_name: Dictionary) -> Dictionary:
+	var nested_values: Variant = specification.get(NESTED_PROPERTIES_KEY)
+	var nests_its_values := nested_values is Dictionary and not properties_by_name.has(NESTED_PROPERTIES_KEY)
+	var values := (nested_values as Dictionary).duplicate() if nests_its_values else {}
+	for property_name in specification:
+		if property_name != CLASS_KEY and not (nests_its_values and property_name == NESTED_PROPERTIES_KEY):
+			values[property_name] = specification[property_name]
+	return values
 
 
 static func _is_allowed(resource: Object, allowed_types: PackedStringArray) -> bool:

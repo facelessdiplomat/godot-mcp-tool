@@ -19,7 +19,7 @@ const propertyValuesDescription = [
   'colors as "#ff8800", "orange" or [r, g, b, a] with channels from 0 to 1;',
   'enums by option name ("Double-Sided") or number; flags as a list of names; physics and render layers as layer numbers ([1, 3]);',
   'resources as a "res://…" path, or {"new": "Class", …properties} to create one;',
-  'a script as "res://….gd"; node references as paths relative to the node ("../Player");',
+  'a script as "res://….gd"; node references as paths relative to the node ("../Player") or to the scene root ("Player");',
   'Transform3D, Basis, AABB and Rect2 in Godot syntax ("Transform3D(…)"). Scripting properties such as global_position work too.',
   'Every value is read back after it is set.',
 ].join(' ');

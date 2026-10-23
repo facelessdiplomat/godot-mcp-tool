@@ -21,7 +21,7 @@ describe('serverInstructions', () => {
 
   it('says which tools work without the editor', () => {
     expect(serverInstructions).toContain(
-      'project_info, project_settings_get and input_map_get, game_run and the other game_ tools, script_validate, test_run, export_project and the docs tools work without it',
+      'without it, the tools that read the project and its scenes, game_run and the other game_ tools, script_validate, test_run, export_project and the docs tools still work',
     );
   });
 

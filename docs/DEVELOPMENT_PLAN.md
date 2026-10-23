@@ -299,9 +299,11 @@ window: `editor_launch` starts one with `headless: true`, with the language serv
 server (`--lsp-port`, `--dap-port`) when `GODOT_LSP_PORT` or `GODOT_DAP_PORT` sets them. With `GODOT_MCP_HEADLESS=1`
 the whole server works without windows: `editor_launch` starts the editor headless by default, games started without
 the editor run with `--headless`, and `godot_status` says so; only screenshots need a window. Without an editor,
-`project_info`, `project_settings_get` and `input_map_get` run the same commands in a headless Godot with the
-addon's `project/project_query.gd`, which prints the answer on one marked line; the indentation then comes from the
-project's scripts, since the editor settings are not there.
+the tools that read the project and its scenes (`project_info`, `project_settings_get`, `input_map_get`,
+`scene_get_tree`, `node_find`, `node_get_properties`, `node_get_bounds`, `signal_list`) run the same commands in a
+headless Godot with the addon's `project/project_query.gd`, which prints the answer on one marked line. Scenes are
+read from disk and need a `scene` such as `"main"`; the indentation comes from the project's scripts, since the
+editor settings are not there.
 
 ### 6.3 Key flows
 
@@ -746,7 +748,10 @@ The most important part of the addon: it decides whether the agent can set prope
   `Mesh`);
 - a new embedded sub-resource: `{"new": "BoxShape3D", "size": [1, 2, 1]}`,
   `{"new": "StandardMaterial3D", "albedo_color": "#c04020"}` — the everyday case for `CollisionShape3D.shape`,
-  `MeshInstance3D.mesh` and materials;
+  `MeshInstance3D.mesh` and materials; its properties may also come nested under `"properties"`, as agents sometimes
+  write them, unless the class has a property of that name;
+- a node reference (an exported `Node3D` or similar): a path relative to the node (`"../Player"`), or relative to
+  the scene root (`"Player"`) when the first finds nothing;
 - typed collections `Array[T]` and `Dictionary[K, V]` are created with the right element types — otherwise the
   assignment silently doesn't happen (that's how godot-ai lost writes);
 - enums and flags by name (`"SHADOW_CASTING_SETTING_OFF"` or `"Off"`) via `hint_string`; flags as an array of names;
@@ -1457,8 +1462,8 @@ the next call showed a ⚠.
       default with `GODOT_MCP_HEADLESS=1`); a game started without the editor connects to the server over TCP (the
       port after `--`, the token in the environment), so `game_get_tree`, `game_get_properties`, `game_set_properties`,
       `game_wait`, `game_input`, `game_pause`, `game_step`, `game_performance` and `game_screenshot` work for it too, and
-      `game_eval` checks the project's Allow Unsafe Tools switch itself; `project_info`, `project_settings_get` and
-      `input_map_get` read the project through a headless Godot (§6.2); scenario
+      `game_eval` checks the project's Allow Unsafe Tools switch itself; the tools that read the project and its
+      scenes work through a headless Godot (§6.2); scenario
       `docs/evals/playtest-without-a-window.md`.
 - [x] Debugging through DAP: `debug_breakpoints`, `debug_state`, `debug_continue` — the editor's breakpoints, the
       stack, the code and the variables where the game stopped, and stepping, through the editor's debug adapter
@@ -1555,7 +1560,7 @@ The whole integration suite, run next to that editor, found two more problems:
       has it (4.6+) and through the bottom panel of 4.5 otherwise.
 - [ ] User documentation: how to connect and how to use (see [User documentation](#user-documentation)).
 - [ ] `CONTRIBUTING.md`, `SECURITY.md`.
-- [ ] Evaluation tasks (§13) and tool description tuning based on their results: the 20 scenarios of `docs/evals/`
+- [x] Evaluation tasks (§13) and tool description tuning based on their results: the 20 scenarios of `docs/evals/`
       run as code with `npm run eval`, each with a reference solution and checks through the MCP tools. The first
       full run passed 16 of 20 ([results](evals/README.md#results)); its findings are fixed in this order: the
       harness and three wrong checks (done); watching the running game (done: reading the game inside `game_input`,
@@ -1563,7 +1568,9 @@ The whole integration suite, run next to that editor, found two more problems:
       breakpoint, and what the instructions say about tool calls sent in one message; the four jump scenarios went
       from 237 tool calls to 74); the smaller tool fixes (done: the hook after `Write`, reading the project without
       the editor, the ports of `editor_launch`, values that the engine adjusts in `scene_batch_edit`,
-      `anchors_preset`, and "main" as a scene); the tools that are loaded from the start (done, §8.12); gamepad input
+      `anchors_preset`, and "main" as a scene; after the second run also node references from the scene root,
+      nested properties of new resources and reading scenes without the editor); the tools that are loaded from the
+      start (done, §8.12); gamepad input
       in `game_input` (done); then a second full run (done: 19 of 20 passed, with 389 tool calls instead of 591 and
       $5.90 instead of $9.06; the one failure came from a quirk of Godot's debug adapter, now worked around,
       Appendix B).

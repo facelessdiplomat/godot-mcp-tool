@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { godotBinary, McpSession, TemporaryProject } from './harness.js';
+import { godotBinary, McpSession, positionIn, TemporaryProject } from './harness.js';
 
 const playerScript = [
   'extends CharacterBody3D',
@@ -89,6 +89,18 @@ describe.skipIf(godotBinary === '')('playtesting without the editor or a window'
     expect(info.text).toContain('Main scene: res://main.tscn');
     expect(info.text).toContain('Indentation in .gd files: tabs');
     expect(actions.text).toBe('jump: Space');
+  });
+
+  it('reads the scenes of the project without the editor', async () => {
+    const tree = await tools().call('scene_get_tree', { scene: 'main' });
+    const shapes = await tools().call('node_find', { scene: 'main', type: 'CollisionShape3D' });
+    const player = await tools().call('node_get_properties', { scene: 'main', path: 'Player', names: ['position'] });
+    const noScene = await tools().call('scene_get_tree', {});
+
+    expect(tree.text).toContain('Player: CharacterBody3D [script res://player.gd]');
+    expect(shapes.text).toContain('Player/Shape: CollisionShape3D');
+    expect(positionIn(player.text)).toEqual({ x: 0, y: 2, z: 0 });
+    expect(noScene.text).toBe('Without the editor no scene is open\nHint: Pass "scene", such as "main" or "res://levels/arena.tscn".');
   });
 
   it('runs the game as a process without a window and waits for the player to land', async () => {

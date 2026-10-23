@@ -189,3 +189,11 @@ the first full run. Checks are those of the second run: `gamepad-controls` has t
   current breakpoints of a script before removing any.
 - Three calls gave node references relative to the scene root (`"Player"` for `"../Player"`), and one nested the
   properties of a new resource under `"properties"`; each agent corrected itself on the next call.
+
+### The last small fixes, 2026-10-23
+
+After node references began to resolve from the scene root, new resources began to take their properties nested
+under `"properties"`, and the scene tools began to read scenes without the editor, the four scenarios with failed
+calls in the second run passed without any: `health-bar-hud` (3 failed calls before), `patrol-between-points` (1),
+`camera-follow` (1) and `playtest-without-a-window` (1), for $1.17 together. In `camera-follow` the agent again set
+`"target": "Player"`, which now works, and in `playtest-without-a-window` it read the main scene without the editor.

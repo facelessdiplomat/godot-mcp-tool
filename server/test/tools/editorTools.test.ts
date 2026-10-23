@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import * as z from 'zod/v4';
+import { BridgeRequestError } from '../../src/bridge/BridgeErrors.js';
 import { createEditorTools } from '../../src/tools/editorTools.js';
 import { FakeEditorGateway } from '../support/FakeEditorGateway.js';
 
@@ -62,6 +63,21 @@ describe('createEditorTools', () => {
       'scene_batch_edit',
       'node_get_properties',
     ]);
+  });
+
+  it('reads the project and its scenes through the project reader, which works without the editor too', async () => {
+    const methods = ['project.info', 'project.settings_get', 'input_map.get', 'scene.get_tree', 'node.find', 'node.get_properties', 'node.get_bounds', 'signal.list'];
+    const editor = new FakeEditorGateway();
+    const projectReader = methods.reduce((gateway, method) => gateway.respondTo(method, new BridgeRequestError('Read', -32010, undefined, undefined)), new FakeEditorGateway());
+    const readingTools = createEditorTools(editor, projectReader, () => Buffer.alloc(0));
+    const readers = ['project_info', 'project_settings_get', 'input_map_get', 'scene_get_tree', 'node_find', 'node_get_properties', 'node_get_bounds', 'signal_list'];
+
+    for (const tool of readingTools.filter((candidate) => readers.includes(candidate.name))) {
+      await tool.execute({ scene: 'main', path: 'Player', names: ['position'], node: 'Player' } as never);
+    }
+
+    expect(editor.requests).toEqual([]);
+    expect(projectReader.requests.map((request) => request.method)).toEqual(methods);
   });
 
   it('describes every parameter', () => {
