@@ -24,7 +24,10 @@ static func plan(scene_root: Node, moved: Node, new_parent: Node, new_name: Stri
 			var target_names_after := _relocated(target_names, old_location, new_location)
 			if holder_names_after == holder_names and target_names_after == target_names:
 				continue
-			updates.append({"node": holder, "property": StringName(property["name"]), "old_path": path, "new_path": _relative_path(holder_names_after, target_names_after, path)})
+			var new_path := _relative_path(holder_names_after, target_names_after, path)
+			if new_path == path:
+				continue
+			updates.append({"node": holder, "property": StringName(property["name"]), "old_path": path, "new_path": new_path})
 	return updates
 
 

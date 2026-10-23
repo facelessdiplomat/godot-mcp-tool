@@ -155,7 +155,7 @@ describe.skipIf(godotBinary === '')('the milestone 3 scenario: a dash with its G
     expect(changed.text).toContain('dash: Shift, Joypad b (new)');
     expect(listed.text).toContain('dash: Shift, Joypad b');
     expect(workspace().read('project.godot')).toContain('dash={');
-    expect(workspace().read('project.godot').match(/"device": -?\d+/g)).toEqual(['"device": -1', '"device": -1']);
+    expect([...workspace().read('project.godot').matchAll(/"device": ?(?<device>-?\d+)/g)].map((match) => match.groups?.['device'])).toEqual(['-1', '-1']);
   });
 
   it('creates a physics material for ice and lays an icy patch with it in the arena', async () => {

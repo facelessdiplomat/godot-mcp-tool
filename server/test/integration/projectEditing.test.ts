@@ -56,7 +56,7 @@ describe.skipIf(godotBinary === '')('autoloads, groups, selection and closing sc
     const checkedWithoutAutoload = await tools().call('script_validate', { paths: ['res://scoring.gd'] });
 
     expect(added.text).toMatch(/^Added the autoload GameState → res:\/\/game_state\.gd and saved project\.godot/);
-    expect(savedProject).toContain('GameState="*res://game_state.gd"');
+    expect(savedProject).toMatch(/^GameState="\*(?:res:\/\/game_state\.gd|uid:\/\/\w+)"$/m);
     expect(checked.text).toMatch(/^No problems in 1 script: res:\/\/scoring\.gd/);
     expect(removed.text).toMatch(/^Removed the autoload GameState \(res:\/\/game_state\.gd\)/);
     expect(`${added.text}\n${removed.text}`).not.toContain('⚠');

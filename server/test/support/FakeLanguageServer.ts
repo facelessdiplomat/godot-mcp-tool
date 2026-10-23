@@ -12,7 +12,7 @@ export interface FakeDiagnostic {
   readonly character: number;
   readonly severity: number;
   readonly message: string;
-  readonly code?: string;
+  readonly code?: string | number;
 }
 
 export class FakeLanguageServer {

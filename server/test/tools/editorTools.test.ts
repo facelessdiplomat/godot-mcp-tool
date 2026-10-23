@@ -73,7 +73,7 @@ describe('createEditorTools', () => {
     const readers = ['project_info', 'project_settings_get', 'input_map_get', 'scene_get_tree', 'node_find', 'node_get_properties', 'node_get_bounds', 'signal_list'];
 
     for (const tool of readingTools.filter((candidate) => readers.includes(candidate.name))) {
-      await tool.execute({ scene: 'main', path: 'Player', names: ['position'], node: 'Player' } as never);
+      await tool.execute({ scene: 'main', path: 'Player', names: ['position'], node: 'Player' });
     }
 
     expect(editor.requests).toEqual([]);

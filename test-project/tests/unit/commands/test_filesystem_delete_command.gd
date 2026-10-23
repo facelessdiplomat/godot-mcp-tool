@@ -60,7 +60,7 @@ func _global(relative_path: String) -> String:
 
 func test_moves_an_unused_file_and_its_companions_to_the_trash() -> void:
 	_project.write_text("notes.gd", "extends Node\n")
-	_project.write_text("notes.gd.uid", "uid://bmcpnotes\n")
+	_project.write_text("notes.gd.uid", "%s\n" % ResourceUID.id_to_text(ResourceUID.create_id()))
 	var result: Dictionary = await _delete([_project.path("notes.gd")])
 	assert_eq(result["deleted"], [_project.path("notes.gd")])
 	assert_eq(result["blocked"], false)

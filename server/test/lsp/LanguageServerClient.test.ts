@@ -69,6 +69,21 @@ describe('LanguageServerClient', () => {
     expect(results.get('/projects/arena/broken.gd')).toEqual([{ line: 5, column: 3, severity: 'error', message: 'Expected end of statement after expression.' }]);
   });
 
+  it('reads the warning name that language servers before Godot 4.8 put in the message, and ignores their number codes', async () => {
+    server.diagnose = () => [
+      { line: 4, character: 1, severity: 2, message: '(UNUSED_VARIABLE): The local variable "x" is declared but never used.', code: 0 },
+      { line: 6, character: 9, severity: 1, message: 'Expected end of statement after variable declaration, found "Literal" instead.', code: -1 },
+    ];
+    const connected = await connect();
+
+    const results = await connected.diagnose([{ path: '/projects/arena/older.gd', text: 'extends Node\n' }]);
+
+    expect(results.get('/projects/arena/older.gd')).toEqual([
+      { line: 5, column: 2, severity: 'warning', code: 'UNUSED_VARIABLE', message: 'The local variable "x" is declared but never used.' },
+      { line: 7, column: 10, severity: 'error', message: 'Expected end of statement after variable declaration, found "Literal" instead.' },
+    ]);
+  });
+
   it('refuses a language server that belongs to another project', async () => {
     server.otherWorkspace = '/projects/other';
 

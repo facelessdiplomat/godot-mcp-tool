@@ -38,6 +38,7 @@ interface PendingRequest {
 const languageServerHost = '127.0.0.1';
 const defaultTimeoutMs = 10_000;
 const severities: readonly DiagnosticSeverity[] = ['error', 'warning', 'information', 'hint'];
+const warningNameBeforeMessage = /^\((?<name>[A-Z][A-Z0-9_]*)\): /;
 
 const responseSchema = z.object({ id: z.number(), result: z.unknown().optional(), error: z.object({ message: z.string() }).optional() });
 const notificationSchema = z.object({ method: z.string(), params: z.unknown().optional() });
@@ -250,13 +251,14 @@ function openSocket(port: number, timeoutMs: number): Promise<Socket> {
 }
 
 function toDiagnostic(published: z.infer<typeof publishedDiagnosticsSchema>['diagnostics'][number]): Diagnostic {
-  const code = published.code === undefined ? '' : String(published.code);
+  const warningNameInMessage = warningNameBeforeMessage.exec(published.message);
+  const code = typeof published.code === 'string' && published.code !== '' ? published.code : warningNameInMessage?.groups?.['name'];
   return {
     line: published.range.start.line + 1,
     column: published.range.start.character + 1,
     severity: severities[(published.severity ?? 1) - 1] ?? 'error',
-    ...(code === '' ? {} : { code }),
-    message: published.message,
+    ...(code === undefined ? {} : { code }),
+    message: warningNameInMessage === null ? published.message : published.message.slice(warningNameInMessage[0].length),
   };
 }
 

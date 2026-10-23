@@ -92,6 +92,14 @@ func test_moves_a_node_to_another_place_among_its_siblings() -> void:
 	assert_eq(_crate.get_index(), 1)
 
 
+func test_keeps_node_paths_that_move_along_with_their_target() -> void:
+	var mount := _add_owned(_crate, RemoteTransform3D.new(), "Mount") as RemoteTransform3D
+	mount.remote_path = NodePath("..")
+	var result: Dictionary = await _reparent({"path": "Crate", "parent": "Player"})
+	assert_eq(result["updated_references"], [])
+	assert_eq(mount.remote_path, NodePath(".."))
+
+
 func test_updates_node_paths_that_point_at_the_moved_node() -> void:
 	var follower := _add_owned(_root, RemoteTransform3D.new(), "Follower") as RemoteTransform3D
 	follower.remote_path = NodePath("../Crate")
