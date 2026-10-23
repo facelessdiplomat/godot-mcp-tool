@@ -3,12 +3,12 @@ import * as z from 'zod/v4';
 export const sceneToChange = z
   .string()
   .optional()
-  .describe('The scene to change, as a res:// path; it is opened in the editor if it is not open yet. Default: the scene currently open in the editor.');
+  .describe('The scene to change, as a res:// path or "main" for the main scene of the project; it is opened in the editor if it is not open yet. Default: the scene currently open in the editor.');
 
 export const sceneToRead = z
   .string()
   .optional()
-  .describe('The scene to read, as a res:// path; a scene that is not open is read from disk. Default: the scene currently open in the editor.');
+  .describe('The scene to read, as a res:// path or "main" for the main scene of the project; a scene that is not open is read from disk. Default: the scene currently open in the editor.');
 
 export const nodePath = z.string().min(1).describe('Path of the node relative to the scene root, such as "Player/Camera"; "." is the root itself.');
 

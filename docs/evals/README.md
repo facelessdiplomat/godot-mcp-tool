@@ -123,3 +123,25 @@ holds and waits of `game_input`, `game_wait` and `game_step`:
 
 Each agent checked the jump in one or two `game_input` calls with `read` steps; in `playtest-without-a-window` it
 paused the game first and did not start an editor.
+
+### The small fixes, 2026-10-23
+
+After the plugin began to check scripts written with `Write`, the project tools began to read the project without
+the editor, `scene_batch_edit` began to keep values that the engine adjusts, `anchors_preset` became settable and the
+scene tools began to take `"main"`:
+
+| Scenario | Checks | Failed tool calls | Tool calls | Cost, $ | Time, s |
+|---|---|---|---|---|---|
+| health-bar-hud | 3/3 | 1 → 0 | 23 → 23 | 0.35 → 0.60 | 45 → 44 |
+| pause-menu | 4/4 | 1 → 0 | 30 → 26 | 0.50 → 0.41 | 82 → 47 |
+| stop-the-slowdown | 4/4 | 1 → 0 | 18 → 19 | 0.26 → 0.27 | 66 → 40 |
+| playtest-without-a-window | 6/6 | 3 → 1 | 46 → 15 | 0.69 → 0.26 | 172 → 35 |
+
+The numbers before the arrows are from the first full run.
+
+- In `pause-menu` the agent placed the shade and the centered buttons with `anchors_preset`, which the first run
+  could not set.
+- In `playtest-without-a-window` `project_info` and `input_map_get` answered without the editor; the one failed call
+  was `scene_get_tree`, which still needs the editor.
+- The agents of `health-bar-hud` and `stop-the-slowdown` did not need the batch or the `"main"` fixes this time.
+- In each run the plugin checked the scripts that the agent wrote with `Write`, which it never did in the first run.

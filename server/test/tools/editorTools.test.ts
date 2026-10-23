@@ -4,7 +4,7 @@ import { createEditorTools } from '../../src/tools/editorTools.js';
 import { FakeEditorGateway } from '../support/FakeEditorGateway.js';
 
 describe('createEditorTools', () => {
-  const tools = createEditorTools(new FakeEditorGateway(), () => Buffer.alloc(0));
+  const tools = createEditorTools(new FakeEditorGateway(), new FakeEditorGateway(), () => Buffer.alloc(0));
 
   it('offers the editor tools', () => {
     expect(tools.map((tool) => tool.name)).toEqual([

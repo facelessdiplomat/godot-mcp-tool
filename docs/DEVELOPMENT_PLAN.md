@@ -295,9 +295,13 @@ against one of them.
 
 **Godot CLI (headless)** works without an open editor: import, script checks, docs, running the game and tests,
 export. A headless editor (`--headless --editor`, spike 6) runs the same addon and gives the full toolset without a
-window: `editor_launch` starts one with `headless: true`. With `GODOT_MCP_HEADLESS=1` the whole server works without
-windows: `editor_launch` starts the editor headless by default, games started without the editor run with
-`--headless`, and `godot_status` says so; only screenshots need a window.
+window: `editor_launch` starts one with `headless: true`, with the language server and debug adapter ports of the
+server (`--lsp-port`, `--dap-port`) when `GODOT_LSP_PORT` or `GODOT_DAP_PORT` sets them. With `GODOT_MCP_HEADLESS=1`
+the whole server works without windows: `editor_launch` starts the editor headless by default, games started without
+the editor run with `--headless`, and `godot_status` says so; only screenshots need a window. Without an editor,
+`project_info`, `project_settings_get` and `input_map_get` run the same commands in a headless Godot with the
+addon's `project/project_query.gd`, which prints the answer on one marked line; the indentation then comes from the
+project's scripts, since the editor settings are not there.
 
 ### 6.3 Key flows
 
@@ -453,6 +457,8 @@ dock's delete does. Neither is recorded for Undo; the trash and a move back are 
 | `scene_save` | Save the current scene, a given scene, or all scenes | 1 | W | E |
 | `scene_get_tree` | Node tree: types, scripts, instances, groups; depth limit, filter; compact text | 1 | R | E (C — M4) |
 | `scene_batch_edit` | A list of operations as one Undo action: each is a node or signal tool (`node_add`, `node_delete`, `node_set_properties`, `node_reparent`, `node_duplicate`, `signal_connect`, `signal_disconnect`) with its parameters; later operations see the results of earlier ones. On the first error or rejected property everything rolls back and the response names the failed operation | 2 | W | E |
+
+Every tool that takes a scene takes `"main"` for the main scene of the project, as `game_run` does.
 
 ### 8.4 Nodes and signals
 
@@ -690,6 +696,9 @@ Connected to Godot <version>, project "<name>" (3D). Indentation: <tabs | N spac
 - No tool profiles for other clients (§3).
 - Installed as the Claude Code plugin `godot`, the server's tools are named `mcp__plugin_godot_godot__<tool>`, so
   permission rules and hook matchers use these names; its skill is `/godot:godot`.
+- The `if` condition of a hook names one tool: `Edit(*.gd)` does not match `Write`, and `Write(*.gd)|Edit(*.gd)`
+  matches nothing (seen in the first evaluation run and checked with `claude -p`), so the plugin has one script check
+  for `Write` and one for `Edit`.
 - Claude Code runs the tool calls of one message at the same time only when all of them only read; otherwise it runs
   them one after another, in the order sent. The debug logs of the first evaluation run show it: a `game_wait` sent
   with a `game_input` ended before the input began, so it never saw the jump. And a later call comes seconds after a
@@ -753,7 +762,13 @@ the engine recomputes.
 
 **Errors** are reported per property: "no such property" plus similar names; "expected `Mesh`, got `Texture2D`", and
 so on. In regular tools one failure doesn't cancel the other properties; in `scene_batch_edit` it rolls back the
-whole batch.
+whole batch. A value that the engine adjusts, such as the size of a `ProgressBar` raised to the 27 px its font needs,
+is not a failure anywhere: it is kept and reported with the value the engine kept.
+
+Properties that the inspector shows are settable even when the engine marks them `PROPERTY_USAGE_INTERNAL`, which
+only keeps them out of the class reference: `layout_mode` and `anchors_preset` of controls, the frames of
+`AnimatedTexture`, the ranges of `ParticleProcessMaterial`. As in the editor's anchor menu, an `anchors_preset` for a
+control that positions itself switches its `layout_mode` to anchors first, in the same Undo step.
 
 ### 9.2 `owner`, Undo/Redo, custom classes, saving
 
@@ -1435,7 +1450,8 @@ the next call showed a ⚠.
       default with `GODOT_MCP_HEADLESS=1`); a game started without the editor connects to the server over TCP (the
       port after `--`, the token in the environment), so `game_get_tree`, `game_get_properties`, `game_set_properties`,
       `game_wait`, `game_input`, `game_pause`, `game_step`, `game_performance` and `game_screenshot` work for it too, and
-      `game_eval` checks the project's Allow Unsafe Tools switch itself; scenario
+      `game_eval` checks the project's Allow Unsafe Tools switch itself; `project_info`, `project_settings_get` and
+      `input_map_get` read the project through a headless Godot (§6.2); scenario
       `docs/evals/playtest-without-a-window.md`.
 - [x] Debugging through DAP: `debug_breakpoints`, `debug_state`, `debug_continue` — the editor's breakpoints, the
       stack, the code and the variables where the game stopped, and stepping, through the editor's debug adapter
@@ -1538,8 +1554,10 @@ The whole integration suite, run next to that editor, found two more problems:
       harness and three wrong checks (done); watching the running game (done: reading the game inside `game_input`,
       input while `game_pause` holds the game, the frame numbers of `game_pause` and `game_step`, `game_input` at a
       breakpoint, and what the instructions say about tool calls sent in one message; the four jump scenarios went
-      from 237 tool calls to 74); the smaller tool fixes; the tools that are loaded from the start; joypad input;
-      then a second full run.
+      from 237 tool calls to 74); the smaller tool fixes (done: the hook after `Write`, reading the project without
+      the editor, the ports of `editor_launch`, values that the engine adjusts in `scene_batch_edit`,
+      `anchors_preset`, and "main" as a scene); the tools that are loaded from the start; joypad input; then a second
+      full run.
 - [ ] CI: lint, unit tests, integration tests with headless Godot (matrix 4.5 / 4.7 / the pinned `master` commit).
 - [ ] Publication to npm and the Godot Asset Store (it replaced the Asset Library in 4.7).
 

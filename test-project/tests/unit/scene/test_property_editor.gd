@@ -149,3 +149,27 @@ func test_lists_only_inspector_properties_by_default() -> void:
 	var entries := _editor.describe(node, PackedStringArray(), false)
 	assert_false(_entry_named(entries, "rotation").is_empty())
 	assert_true(_entry_named(entries, "rotation_degrees").is_empty())
+
+
+func test_sets_the_anchors_preset_of_a_control_on_a_canvas_layer() -> void:
+	var layer: CanvasLayer = autofree(CanvasLayer.new())
+	var shade := ColorRect.new()
+	layer.add_child(shade)
+	add_child(layer)
+	var report := _editor.apply(shade, {"anchors_preset": "Full Rect"}, _history, "MCP: Set properties", shade)
+	assert_eq(report["applied"], ["anchors_preset"])
+	assert_eq([shade.anchor_right, shade.anchor_bottom], [1.0, 1.0])
+
+
+func test_switches_a_control_inside_another_control_to_anchors_for_an_anchors_preset() -> void:
+	var screen: Control = autofree(Control.new())
+	var bar := ProgressBar.new()
+	screen.add_child(bar)
+	add_child(screen)
+	var report := _editor.apply(bar, {"anchors_preset": 10}, _history, "MCP: Set properties", bar)
+	assert_eq(report["applied"], ["anchors_preset"])
+	assert_eq(bar.get("layout_mode"), 1)
+	assert_eq(bar.anchor_right, 1.0)
+	_history.undo()
+	assert_eq(bar.get("layout_mode"), 0)
+	assert_eq(bar.anchor_right, 0.0)

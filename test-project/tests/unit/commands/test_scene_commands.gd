@@ -15,12 +15,14 @@ const ScratchFolder := preload("res://tests/support/scratch_folder.gd")
 const VariantCodec := preload("res://addons/godot_mcp_tool/codec/variant_codec.gd")
 
 const CRATE_SCENE := "res://tests/fixtures/crate.tscn"
+const MAIN_SCENE_SETTING := "application/run/main_scene"
 
 var _scenes: FakeSceneAccess
 var _scripts: FakeScriptEditorAccess
 var _history: PlainUndoHistory
 var _context: EditingContext
 var _scratch_directory := ""
+var _main_scene: Variant
 
 
 func before_each() -> void:
@@ -29,9 +31,11 @@ func before_each() -> void:
 	_scripts = FakeScriptEditorAccess.new()
 	_context = EditingContext.new(_scenes, _history, VariantCodec.new(), _scripts)
 	_scratch_directory = "res://.godot/mcp_test_scratch/%d" % Time.get_ticks_usec()
+	_main_scene = ProjectSettings.get_setting(MAIN_SCENE_SETTING)
 
 
 func after_each() -> void:
+	ProjectSettings.set_setting(MAIN_SCENE_SETTING, _main_scene)
 	_history.dispose()
 	_scenes.release()
 	ScratchFolder.remove(ProjectSettings.globalize_path(_scratch_directory))
@@ -82,6 +86,26 @@ func test_reads_a_scene_from_disk_without_opening_it() -> void:
 	assert_eq(result["root"]["name"], "Crate")
 	assert_eq((result["root"]["children"][0] as Dictionary)["type"], "MeshInstance3D")
 	assert_eq(_scenes.opened_paths.size(), 0)
+
+
+func test_reads_the_main_scene_by_the_name_main() -> void:
+	ProjectSettings.set_setting(MAIN_SCENE_SETTING, CRATE_SCENE)
+	var result: Dictionary = await SceneGetTreeCommand.new(_context).execute({"scene": "main"})
+	assert_eq(result["scene"], CRATE_SCENE)
+	assert_eq(result["root"]["name"], "Crate")
+
+
+func test_opens_the_main_scene_by_the_name_main() -> void:
+	ProjectSettings.set_setting(MAIN_SCENE_SETTING, CRATE_SCENE)
+	var result: Dictionary = await SceneOpenCommand.new(_context).execute({"path": "main"})
+	assert_eq(result["scene"], CRATE_SCENE)
+	assert_eq(_scenes.opened_paths, PackedStringArray([CRATE_SCENE]))
+
+
+func test_explains_main_in_a_project_without_a_main_scene() -> void:
+	ProjectSettings.set_setting(MAIN_SCENE_SETTING, "")
+	var error: Variant = await SceneGetTreeCommand.new(_context).execute({"scene": "main"})
+	assert_eq((error as CommandError).message, "The project has no main scene")
 
 
 func test_marks_instanced_scenes_and_scripts() -> void:

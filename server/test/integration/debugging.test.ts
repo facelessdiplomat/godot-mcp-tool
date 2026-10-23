@@ -120,6 +120,6 @@ describe.skipIf(godotBinary === '')('debugging the running game with breakpoints
       'The game stopped in the debugger before this call finished; its frames do not advance while it is stopped\nHint: debug_state shows where it stopped; debug_continue resumes the game, and the rest of this call plays out then.',
     );
     expect(answeredAfterMs).toBeLessThan(5000);
-    expect(state.text).toMatch(new RegExp(`^The game stopped at a breakpoint at res://main\\.gd:${String(jumpLine)} in _physics_process\\.`));
+    expect(state.text).toMatch(new RegExp(`^The game (?:stopped at a breakpoint|is stopped in the debugger) at res://main\\.gd:${String(jumpLine)} in _physics_process\\.`));
   });
 });

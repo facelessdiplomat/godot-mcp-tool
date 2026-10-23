@@ -13,7 +13,10 @@ func _init(context: EditingContext) -> void:
 
 
 func execute(params: Dictionary) -> Variant:
-	var scene_path: Variant = Params.required_text(params, "path", "\"res://levels/arena.tscn\"")
+	var requested_scene: Variant = Params.required_text(params, "path", "\"res://levels/arena.tscn\"")
+	if requested_scene is CommandError:
+		return requested_scene
+	var scene_path: Variant = SceneResolver.with_main_scene(requested_scene)
 	if scene_path is CommandError:
 		return scene_path
 	var path_error := SceneResolver.validate_scene_path(scene_path)

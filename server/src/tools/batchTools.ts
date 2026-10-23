@@ -2,7 +2,7 @@ import * as z from 'zod/v4';
 import type { EditorGateway } from '../editor/EditorGateway.js';
 import { changingAnnotations } from './annotations.js';
 import { BridgeTool } from './bridge/BridgeTool.js';
-import { formatNodePath } from './formatting/propertyReports.js';
+import { type ApplyReport, formatNodePath, formatValue } from './formatting/propertyReports.js';
 import { duplicatedNodeSchema, movedNodeSchema, nodeDuplicateInput, nodeReparentInput, summarizeDuplication, summarizeMove } from './nodeStructureTools.js';
 import {
   addedNodeSchema,
@@ -72,7 +72,7 @@ export function createSceneBatchEditTool(editor: EditorGateway): BridgeTool<type
     definition: {
       title: 'Edit scene in one step',
       description:
-        'Apply many scene changes in one call and as one Undo step: add, delete, change, move and duplicate nodes, set their groups, connect and disconnect signals. Later operations can use the nodes that earlier ones added or renamed. If any operation fails or any property is rejected, nothing is changed and the error names the operation. Use it to build or rework a scene.',
+        'Apply many scene changes in one call and as one Undo step: add, delete, change, move and duplicate nodes, set their groups, connect and disconnect signals. Later operations can use the nodes that earlier ones added or renamed. If any operation fails or any property is rejected, nothing is changed and the error names the operation; a value that the engine adjusts, such as a size raised to the minimum of a control, is kept and reported. Use it to build or rework a scene.',
       inputSchema: sceneBatchEditInput,
       annotations: changingAnnotations({ destructive: true, idempotent: false }),
       alwaysLoad: false,
@@ -95,17 +95,17 @@ function describeBatch(batch: BatchResult, operations: readonly Operation[]): st
 function summarizeOperation(result: OperationResult, operation: Operation | undefined): string {
   switch (result.op) {
     case 'node_add':
-      return withSetProperties(`Added ${result.path} (${result.type})`, result.applied);
+      return withEngineAdjustments(withSetProperties(`Added ${result.path} (${result.type})`, result.applied), result);
     case 'node_delete':
       return `Deleted ${result.deleted.join(', ')}`;
     case 'node_set_properties':
-      return `Set ${result.applied.join(', ')} of ${formatNodePath(result.path)}`;
+      return withEngineAdjustments(`Set ${result.applied.join(', ')} of ${formatNodePath(result.path)}`, result);
     case 'node_set_groups':
       return summarizeGroupChange(result);
     case 'node_reparent':
       return summarizeMove(result, operation?.op === 'node_reparent' ? operation : {});
     case 'node_duplicate':
-      return withSetProperties(summarizeDuplication(result), result.applied);
+      return withEngineAdjustments(withSetProperties(summarizeDuplication(result), result.applied), result);
     case 'signal_connect':
       return summarizeConnection(result);
     case 'signal_disconnect':
@@ -115,4 +115,9 @@ function summarizeOperation(result: OperationResult, operation: Operation | unde
 
 function withSetProperties(summary: string, applied: readonly string[]): string {
   return applied.length === 0 ? summary : `${summary}; set ${applied.join(', ')}`;
+}
+
+function withEngineAdjustments(summary: string, report: ApplyReport): string {
+  const adjustments = report.not_applied.map((mismatch) => `${mismatch.name} at ${formatValue(mismatch.actual)} instead of ${formatValue(mismatch.expected)}`);
+  return adjustments.length === 0 ? summary : `${summary}; the engine kept ${adjustments.join(', ')}`;
 }

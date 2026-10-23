@@ -96,6 +96,17 @@ func test_fails_when_a_property_is_rejected() -> void:
 	assert_null(_root.get_node_or_null("Player"))
 
 
+func test_keeps_a_value_that_the_engine_adjusted_and_reports_it() -> void:
+	var result: Dictionary = await _batch([
+		{"op": "node_add", "type": "Control", "name": "Box", "properties": {"custom_minimum_size": [100, 50], "size": [10, 10]}},
+		{"op": "node_add", "type": "Label", "name": "Title"},
+	])
+	var added: Dictionary = (result["results"] as Array)[0]
+	assert_eq((result["results"] as Array).size(), 2)
+	assert_eq(added["not_applied"], [{"name": "size", "expected": "Vector2(10, 10)", "actual": "Vector2(100, 50)"}])
+	assert_eq((_root.get_node("Box") as Control).size, Vector2(100, 50))
+
+
 func test_connects_signals_of_nodes_added_in_the_same_batch() -> void:
 	await _batch([
 		{"op": "node_add", "type": "Button", "name": "Start"},

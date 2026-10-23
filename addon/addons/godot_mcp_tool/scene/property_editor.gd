@@ -8,9 +8,12 @@ const ValueComparison := preload("../codec/value_comparison.gd")
 const VariantCodec := preload("../codec/variant_codec.gd")
 
 const LAYOUT_USAGE := PROPERTY_USAGE_CATEGORY | PROPERTY_USAGE_GROUP | PROPERTY_USAGE_SUBGROUP
-const HIDDEN_USAGE := LAYOUT_USAGE | PROPERTY_USAGE_INTERNAL
 const SCRIPT_PROPERTY := "script"
 const BINDING_PROPERTIES := ["owner", "scene_file_path", "resource_path"]
+const ANCHORS_PRESET_PROPERTY := "anchors_preset"
+const LAYOUT_MODE_PROPERTY := "layout_mode"
+const POSITION_LAYOUT_MODE := 0
+const ANCHORS_LAYOUT_MODE := 1
 
 var _codec: VariantCodec
 
@@ -25,7 +28,7 @@ func editable_properties(object: Object) -> Dictionary:
 		var usage: int = property["usage"]
 		if property["name"] in BINDING_PROPERTIES:
 			continue
-		if property["name"] == SCRIPT_PROPERTY or (usage & PROPERTY_USAGE_EDITOR and not usage & HIDDEN_USAGE):
+		if property["name"] == SCRIPT_PROPERTY or (usage & PROPERTY_USAGE_EDITOR and not usage & LAYOUT_USAGE):
 			properties[property["name"]] = property
 	return properties
 
@@ -33,9 +36,13 @@ func editable_properties(object: Object) -> Dictionary:
 func settable_properties(object: Object) -> Dictionary:
 	var properties := editable_properties(object)
 	var owner_class := object.get_class()
+	var inspector_properties := _properties_registered_for_the_inspector(owner_class)
 	for property in object.get_property_list():
 		var property_name: String = property["name"]
-		if properties.has(property_name) or property_name in BINDING_PROPERTIES or int(property["usage"]) & HIDDEN_USAGE:
+		var usage := int(property["usage"])
+		if properties.has(property_name) or property_name in BINDING_PROPERTIES or usage & LAYOUT_USAGE:
+			continue
+		if usage & PROPERTY_USAGE_INTERNAL and not inspector_properties.has(property_name):
 			continue
 		if not ClassDB.class_get_property_setter(owner_class, property_name).is_empty():
 			properties[property_name] = property
@@ -69,9 +76,14 @@ func describe(object: Object, requested_names: PackedStringArray, include_defaul
 func plan(object: Object, values: Dictionary) -> Dictionary:
 	var decoding := _decode_all(object, values)
 	var decoded: Dictionary = decoding["decoded"]
+	var implied := _layout_implied_by(object, decoded)
 	var changes := ChangeSet.new()
+	for property_name in implied:
+		changes.add_do_property(object, property_name, implied[property_name])
 	for property_name in decoded:
 		changes.add_do_property(object, property_name, decoded[property_name])
+		changes.add_undo_property(object, property_name, object.get(property_name))
+	for property_name in implied:
 		changes.add_undo_property(object, property_name, object.get(property_name))
 	return {"changes": changes, "decoded": decoded, "rejected": decoding["rejected"]}
 
@@ -87,6 +99,9 @@ func apply(object: Object, values: Dictionary, history: UndoHistory, action_name
 func assign(object: Object, values: Dictionary) -> Dictionary:
 	var decoding := _decode_all(object, values)
 	var decoded: Dictionary = decoding["decoded"]
+	var implied := _layout_implied_by(object, decoded)
+	for property_name in implied:
+		object.set(property_name, implied[property_name])
 	for property_name in decoded:
 		object.set(property_name, decoded[property_name])
 	return report(object, decoded, decoding["rejected"])
@@ -127,6 +142,21 @@ func _entry(property: Dictionary, value: Variant) -> Dictionary:
 	if property["type"] == TYPE_INT and property["hint"] == PROPERTY_HINT_ENUM:
 		entry["options"] = EnumOptions.parse(str(property["hint_string"]))
 	return entry
+
+
+static func _layout_implied_by(object: Object, decoded: Dictionary) -> Dictionary:
+	var positions_itself := object is Control and int(object.get(LAYOUT_MODE_PROPERTY)) == POSITION_LAYOUT_MODE
+	if positions_itself and decoded.has(ANCHORS_PRESET_PROPERTY) and not decoded.has(LAYOUT_MODE_PROPERTY):
+		return {LAYOUT_MODE_PROPERTY: ANCHORS_LAYOUT_MODE}
+	return {}
+
+
+static func _properties_registered_for_the_inspector(owner_class: String) -> Dictionary:
+	var names := {}
+	for property in ClassDB.class_get_property_list(owner_class):
+		if int(property["usage"]) & PROPERTY_USAGE_EDITOR:
+			names[property["name"]] = true
+	return names
 
 
 static func _ordered_names(names: Array) -> Array:

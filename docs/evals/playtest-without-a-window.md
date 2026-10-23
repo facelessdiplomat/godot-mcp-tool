@@ -21,8 +21,8 @@ with Space when it is on the floor and counts its jumps in `jumps`.
 **Notes**
 
 - A good run checks with numbers and conditions instead of screenshots, which need a window; `godot_status` says
-  that the server runs without windows.
-- It waits for the landing with a condition instead of a fixed time, and reads the state in a later message than
-  the `game_input` it depends on.
+  that the server runs without windows, and `project_info` and `input_map_get` read the project without the editor.
+- It reads the jump inside `game_input` with `read` steps, or pauses the game with `game_pause` first, since a later
+  call comes after the jump is over; it waits for the landing with a condition instead of a fixed time.
 - Automated test: `server/test/integration/windowlessPlaytest.test.ts`.
 - Evaluation run: `server/test/evals/scenarios/playtestWithoutAWindow.ts`.

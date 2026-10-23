@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import type { McpServer } from '@modelcontextprotocol/server';
 import { DocsSource } from './docs/DocsSource.js';
 import { EditorLauncher, systemClock } from './editor/EditorLauncher.js';
+import { EditorOrHeadlessGateway } from './editor/EditorOrHeadlessGateway.js';
 import { DebugAdapterClient } from './debug/DebugAdapterClient.js';
 import { GameDebugger } from './debug/GameDebugger.js';
 import { ProjectExporter } from './export/ProjectExporter.js';
@@ -11,6 +12,7 @@ import { NodeProcessLauncher } from './process/ProcessLauncher.js';
 import { NodeProcessRunner } from './process/ProcessRunner.js';
 import { FixLastRunPrompt } from './prompts/FixLastRunPrompt.js';
 import { PlaytestPrompt } from './prompts/PlaytestPrompt.js';
+import { HeadlessProjectQuery } from './project/HeadlessProjectQuery.js';
 import { fileChangedAfter, listScenes } from './project/ProjectFiles.js';
 import { readScriptLines } from './project/ScriptLines.js';
 import { createGodotResources } from './resources/godotResources.js';
@@ -62,6 +64,7 @@ export function createApplication(environment: ApplicationEnvironment): Applicat
     locateBinary: () => binaryLocator.locate(),
     launcher: new NodeDetachedLauncher(),
     clock: systemClock,
+    ports: { languageServer: parsePort(environment.variables['GODOT_LSP_PORT']), debugAdapter: parsePort(environment.variables['GODOT_DAP_PORT']) },
   });
   const docsSource = new DocsSource({
     projectRoot: project.found ? project.root : undefined,
@@ -89,6 +92,10 @@ export function createApplication(environment: ApplicationEnvironment): Applicat
     connect: (port) => DebugAdapterClient.connect(port),
   });
   const readScript = (file: string): string[] | undefined => (project.found ? readScriptLines(project.root, file) : undefined);
+  const projectReader = new EditorOrHeadlessGateway(
+    editor,
+    new HeadlessProjectQuery({ projectRoot: project.found ? project.root : undefined, locateGodot, processRunner }),
+  );
   const plainTools: Tool[] = [
     new GodotStatusTool({
       project,
@@ -98,7 +105,7 @@ export function createApplication(environment: ApplicationEnvironment): Applicat
       toolNotes,
     }),
     new EditorLaunchTool(editorLauncher, { headlessByDefault: windowless }),
-    ...createEditorTools(editor, readFileSync),
+    ...createEditorTools(editor, projectReader, readFileSync),
     new ScriptValidateTool(
       createScriptValidator({
         projectRoot: project.found ? project.root : undefined,
@@ -138,7 +145,7 @@ export function createApplication(environment: ApplicationEnvironment): Applicat
   }
   const tools = selection.tools.map((tool) => new ErrorReportingTool(tool, errorSummary));
   const resources = createGodotResources({
-    projectInfo: createProjectInfoTool(editor),
+    projectInfo: createProjectInfoTool(projectReader),
     sceneTree: createSceneGetTreeTool(editor),
     classDocs: new DocsClassTool(docsSource),
     lastRunOutput: createGameGetOutputTool(gameGateway, new GameOutputCursor()),

@@ -49,11 +49,14 @@ func execute(params: Dictionary) -> Variant:
 	}
 
 
-func _open_scene_root(scene_path: String) -> Variant:
+func _open_scene_root(requested_scene: String) -> Variant:
 	var access := _context.scenes.access
-	if scene_path.is_empty():
+	if requested_scene.is_empty():
 		var edited_root := access.edited_scene_root()
 		return edited_root if edited_root != null else SceneResolver.no_scene_error()
+	var scene_path: Variant = SceneResolver.with_main_scene(requested_scene)
+	if scene_path is CommandError:
+		return scene_path
 	var path_error := SceneResolver.validate_scene_path(scene_path)
 	if path_error != null:
 		return path_error

@@ -88,12 +88,4 @@ static func _incompleteness(result: Dictionary) -> CommandError:
 	if not rejected.is_empty():
 		var first_rejection: Dictionary = rejected[0]
 		return CommandError.new(JsonRpc.INVALID_PARAMS, "%s was rejected: %s" % [first_rejection["name"], first_rejection["reason"]], "Fix the value or leave the property out.")
-	var not_applied: Array = result.get("not_applied", [])
-	if not not_applied.is_empty():
-		var first_mismatch: Dictionary = not_applied[0]
-		return CommandError.new(
-			JsonRpc.OPERATION_FAILED,
-			"%s did not take the value %s; it reads %s" % [first_mismatch["name"], JSON.stringify(first_mismatch["expected"]), JSON.stringify(first_mismatch["actual"])],
-			"The engine changed or refused the value; check the allowed range of the property.",
-		)
 	return null

@@ -16,6 +16,11 @@ export const systemClock: Clock = {
   sleep: (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds)),
 };
 
+export interface EditorPorts {
+  readonly languageServer: number | undefined;
+  readonly debugAdapter: number | undefined;
+}
+
 export interface EditorLaunchDependencies {
   readonly projectRoot: string | undefined;
   readonly editor: EditorStatusProvider;
@@ -23,6 +28,7 @@ export interface EditorLaunchDependencies {
   readonly locateBinary: () => BinaryLookup;
   readonly launcher: DetachedLauncher;
   readonly clock: Clock;
+  readonly ports?: EditorPorts | undefined;
 }
 
 export interface EditorLaunchOptions {
@@ -67,7 +73,11 @@ export class EditorLauncher {
     const logPath = join(projectRoot, editorLogPath);
     mkdirSync(dirname(logPath), { recursive: true });
     const startedAt = clock.now();
-    const editorProcess = this.dependencies.launcher.start(binary.path, ['--editor', '--path', projectRoot, ...(options.headless ? ['--headless'] : [])], logPath);
+    const editorProcess = this.dependencies.launcher.start(
+      binary.path,
+      ['--editor', '--path', projectRoot, ...(options.headless ? ['--headless'] : []), ...portArguments(this.dependencies.ports)],
+      logPath,
+    );
     for (;;) {
       const status = await editor.status();
       if (status.connected) {
@@ -92,4 +102,11 @@ function logTail(logPath: string): string {
   }
   const lines = readFileSync(logPath, 'utf8').trimEnd().split(/\r?\n/);
   return lines.slice(-logLinesShown).join('\n') || '(no output)';
+}
+
+function portArguments(ports: EditorPorts | undefined): string[] {
+  return [
+    ...(ports?.languageServer === undefined ? [] : ['--lsp-port', String(ports.languageServer)]),
+    ...(ports?.debugAdapter === undefined ? [] : ['--dap-port', String(ports.debugAdapter)]),
+  ];
 }

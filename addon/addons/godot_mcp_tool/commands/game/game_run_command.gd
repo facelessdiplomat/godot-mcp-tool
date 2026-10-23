@@ -8,7 +8,6 @@ const RuntimeContext := preload("../../runtime/runtime_context.gd")
 const SceneResolver := preload("../../scene/scene_resolver.gd")
 const Waiting := preload("../../util/waiting.gd")
 
-const MAIN_SCENE_SETTING := "application/run/main_scene"
 const MAIN_TARGET := "main"
 const CURRENT_TARGET := "current"
 const DEFAULT_WATCH_MSEC := 1000
@@ -104,13 +103,7 @@ func _play(target: String, scene_path: String) -> void:
 
 func _resolve_target(target: String) -> Variant:
 	if target == MAIN_TARGET:
-		var main_scene := str(ProjectSettings.get_setting(MAIN_SCENE_SETTING, ""))
-		if main_scene.is_empty():
-			return CommandError.new(JsonRpc.INVALID_PARAMS, "The project has no main scene", "Set application/run/main_scene with project_settings_set, or pass the scene to run.")
-		var main_scene_path := ResourceUID.ensure_path(main_scene)
-		if not ResourceLoader.exists(main_scene_path):
-			return CommandError.new(JsonRpc.NOT_FOUND, "The main scene %s does not exist" % main_scene_path, "Point application/run/main_scene at an existing scene with project_settings_set.")
-		return main_scene_path
+		return SceneResolver.main_scene_path()
 	if target == CURRENT_TARGET:
 		var edited_root := _context.scenes.access.edited_scene_root()
 		if edited_root == null or edited_root.scene_file_path.is_empty():

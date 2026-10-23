@@ -94,6 +94,14 @@ describe('EditorLauncher', () => {
     expect(launcher.starts[0]?.args).toEqual(['--editor', '--path', projectRoot, '--headless']);
   });
 
+  it('passes the ports of the language server and the debug adapter that the server uses', async () => {
+    statuses = [notRunning, connected];
+
+    await editorLauncher({ ports: { languageServer: 6105, debugAdapter: 6106 } }).launch({ headless: true });
+
+    expect(launcher.starts[0]?.args).toEqual(['--editor', '--path', projectRoot, '--headless', '--lsp-port', '6105', '--dap-port', '6106']);
+  });
+
   it('does nothing when the editor is already connected', async () => {
     statuses = [connected];
 

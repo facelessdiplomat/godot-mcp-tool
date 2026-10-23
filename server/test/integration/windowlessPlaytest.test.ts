@@ -44,6 +44,17 @@ const mainScene = [
   '',
 ].join('\n');
 
+const jumpAction = [
+  '[input]',
+  '',
+  'jump={',
+  '"deadzone": 0.2,',
+  '"events": [Object(InputEventKey,"resource_local_to_scene":false,"resource_name":"","device":-1,"window_id":0,"alt_pressed":false,"shift_pressed":false,"ctrl_pressed":false,"meta_pressed":false,"pressed":false,"keycode":0,"physical_keycode":32,"key_label":0,"unicode":32,"location":0,"echo":false,"script":null)',
+  ']',
+  '}',
+  '',
+].join('\n');
+
 describe.skipIf(godotBinary === '')('playtesting without the editor or a window', () => {
   let project: TemporaryProject | undefined;
   let session: McpSession | undefined;
@@ -59,6 +70,7 @@ describe.skipIf(godotBinary === '')('playtesting without the editor or a window'
     project = new TemporaryProject('MCP windowless playtest', { mainScene: 'res://main.tscn', withRuntimeAutoload: true });
     project.write('player.gd', playerScript);
     project.write('main.tscn', mainScene);
+    project.write('project.godot', `${project.read('project.godot')}\n${jumpAction}`);
     session = await McpSession.connect(project.root, { GODOT_BIN: godotBinary, GODOT_MCP_HEADLESS: '1' });
   });
 
@@ -66,6 +78,17 @@ describe.skipIf(godotBinary === '')('playtesting without the editor or a window'
     await session?.call('game_stop');
     await session?.close();
     project?.remove();
+  });
+
+  it('reads the project and its input actions without the editor', async () => {
+    const info = await tools().call('project_info');
+    const actions = await tools().call('input_map_get');
+
+    expect(info.isError).toBe(false);
+    expect(info.text).toContain('Project: MCP windowless playtest');
+    expect(info.text).toContain('Main scene: res://main.tscn');
+    expect(info.text).toContain('Indentation in .gd files: tabs');
+    expect(actions.text).toBe('jump: Space');
   });
 
   it('runs the game as a process without a window and waits for the player to land', async () => {

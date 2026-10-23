@@ -30,14 +30,14 @@ import { createSceneCloseTool, createSceneCreateTool, createSceneGetTreeTool, cr
 import { createSignalConnectTool, createSignalDisconnectTool, createSignalListTool } from './signalTools.js';
 import type { Tool } from './Tool.js';
 
-export function createEditorTools(editor: EditorGateway, readCapture: CaptureReader): Tool[] {
+export function createEditorTools(editor: EditorGateway, projectReader: EditorGateway, readCapture: CaptureReader): Tool[] {
   return [
-    createProjectInfoTool(editor),
-    createProjectSettingsGetTool(editor),
+    createProjectInfoTool(projectReader),
+    createProjectSettingsGetTool(projectReader),
     createProjectSettingsSetTool(editor),
     createEditorRescanTool(editor),
     createEditorScreenshotTool(editor, readCapture),
-    createInputMapGetTool(editor),
+    createInputMapGetTool(projectReader),
     createInputMapSetTool(editor),
     createSceneCreateTool(editor),
     createSceneOpenTool(editor),

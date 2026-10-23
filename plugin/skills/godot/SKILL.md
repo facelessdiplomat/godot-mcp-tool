@@ -11,7 +11,7 @@ are described in the files linked at the end.
 ## Start of a session
 
 1. `godot_status`: is the editor connected? If not, `editor_launch` starts it, also without a window
-   (`headless: true`). `game_run` and the game tools work without the editor too.
+   (`headless: true`). `project_info`, `input_map_get`, `game_run` and the game tools work without the editor too.
 2. `project_info`: main scene, autoloads, `class_name` classes and the indentation of `.gd` files. Use that
    indentation in every script; never mix tabs and spaces. `input_map_get` lists the input actions.
 3. Read before you change: `scene_get_tree` or `node_find` for node paths, `node_get_properties` for values,

@@ -56,6 +56,32 @@ describe('scene_batch_edit', () => {
     );
   });
 
+  it('says which values the engine adjusted', async () => {
+    const adjustedSize = { name: 'size', expected: 'Vector2(240, 24)', actual: 'Vector2(240, 27)' };
+    const editor = new FakeEditorGateway().respondTo('scene.batch_edit', {
+      scene: 'res://ui/hud.tscn',
+      results: [
+        { op: 'node_add', path: 'Health', type: 'ProgressBar', ...emptyReport, applied: ['size'], not_applied: [adjustedSize] },
+        { op: 'node_set_properties', path: 'Health', ...emptyReport, applied: ['size'], not_applied: [adjustedSize] },
+      ],
+    });
+
+    const result = await createSceneBatchEditTool(editor).execute({
+      operations: [
+        { op: 'node_add', type: 'ProgressBar', name: 'Health', properties: { size: [240, 24] } },
+        { op: 'node_set_properties', path: 'Health', properties: { size: [240, 24] } },
+      ],
+    });
+
+    expect(textOf(result)).toBe(
+      [
+        'Applied 2 operations to res://ui/hud.tscn as one Undo step. The scene has unsaved changes.',
+        '1. Added Health (ProgressBar); set size; the engine kept size at "Vector2(240, 27)" instead of "Vector2(240, 24)"',
+        '2. Set size of Health; the engine kept size at "Vector2(240, 27)" instead of "Vector2(240, 24)"',
+      ].join('\n'),
+    );
+  });
+
   it('summarizes group changes', async () => {
     const editor = new FakeEditorGateway().respondTo('scene.batch_edit', {
       scene: 'res://levels/arena.tscn',

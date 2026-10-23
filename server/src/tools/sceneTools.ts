@@ -67,7 +67,7 @@ export function createSceneCreateTool(editor: EditorGateway): BridgeTool<typeof 
 }
 
 const sceneOpenInput = z.object({
-  path: z.string().describe('The scene to open, such as "res://levels/arena.tscn".'),
+  path: z.string().describe('The scene to open, such as "res://levels/arena.tscn", or "main" for the main scene of the project.'),
 });
 
 export function createSceneOpenTool(editor: EditorGateway): BridgeTool<typeof sceneOpenInput, OpenedScene> {
@@ -88,7 +88,7 @@ export function createSceneOpenTool(editor: EditorGateway): BridgeTool<typeof sc
 }
 
 const sceneSaveInput = z.object({
-  scene: z.string().optional().describe('The scene to save, as a res:// path. Default: the scene currently open in the editor.'),
+  scene: z.string().optional().describe('The scene to save, as a res:// path or "main" for the main scene of the project. Default: the scene currently open in the editor.'),
   all: z.boolean().default(false).describe('Save every open scene instead of one.'),
 });
 
@@ -132,7 +132,7 @@ const closedSceneSchema = z.object({ closed: z.string(), saved: z.boolean(), dis
 type ClosedScene = z.infer<typeof closedSceneSchema>;
 
 const sceneCloseInput = z.object({
-  scene: z.string().optional().describe('The scene to close, as a res:// path. Default: the scene currently open in the editor.'),
+  scene: z.string().optional().describe('The scene to close, as a res:// path or "main" for the main scene of the project. Default: the scene currently open in the editor.'),
   unsaved: z
     .enum(['save', 'discard'])
     .optional()
