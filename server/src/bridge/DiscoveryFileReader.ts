@@ -5,6 +5,8 @@ import { describeError, isErrnoException } from '../util/errors.js';
 
 export const discoveryFileRelativePath = join('.godot', 'godot_mcp_tool', 'bridge.json');
 
+const defaultDebugAdapterPort = 6006;
+
 const discoveryFileSchema = z.object({
   protocol: z.number().int(),
   port: z.number().int().min(1).max(65_535),
@@ -15,6 +17,7 @@ const discoveryFileSchema = z.object({
   project_path: z.string(),
   executable_path: z.string(),
   lsp_port: z.number().int(),
+  dap_port: z.number().int().optional(),
   started_at: z.string(),
 });
 
@@ -28,6 +31,7 @@ export interface BridgeEndpoint {
   readonly projectPath: string;
   readonly executablePath: string;
   readonly lspPort: number;
+  readonly dapPort: number;
   readonly startedAt: string;
 }
 
@@ -91,6 +95,7 @@ export class DiscoveryFileReader implements DiscoverySource {
         projectPath: discovery.project_path,
         executablePath: discovery.executable_path,
         lspPort: discovery.lsp_port,
+        dapPort: discovery.dap_port ?? defaultDebugAdapterPort,
         startedAt: discovery.started_at,
       },
     };

@@ -37,8 +37,16 @@ export async function waitFor(condition: () => boolean, timeoutMs: number): Prom
   }
 }
 
-export function startHeadlessEditor(projectRoot: string, languageServerPort?: number): Promise<ChildProcess> {
-  const portArguments = languageServerPort === undefined ? [] : ['--lsp-port', String(languageServerPort)];
+export interface EditorPorts {
+  readonly languageServer?: number;
+  readonly debugAdapter?: number;
+}
+
+export function startHeadlessEditor(projectRoot: string, ports: EditorPorts = {}): Promise<ChildProcess> {
+  const portArguments = [
+    ...(ports.languageServer === undefined ? [] : ['--lsp-port', String(ports.languageServer)]),
+    ...(ports.debugAdapter === undefined ? [] : ['--dap-port', String(ports.debugAdapter)]),
+  ];
   return startEditor(projectRoot, ['--headless', ...portArguments]);
 }
 

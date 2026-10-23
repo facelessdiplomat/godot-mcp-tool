@@ -5,6 +5,8 @@ import { DiscoveryFileReader, isProcessAlive } from './bridge/DiscoveryFileReade
 import { DocsSource } from './docs/DocsSource.js';
 import { EditorLauncher, systemClock } from './editor/EditorLauncher.js';
 import { EditorConnection, type EditorSession, UnavailableEditor } from './bridge/EditorConnection.js';
+import { DebugAdapterClient } from './debug/DebugAdapterClient.js';
+import { GameDebugger } from './debug/GameDebugger.js';
 import { ProjectExporter } from './export/ProjectExporter.js';
 import { type BinaryLookup, GodotBinaryLocator } from './godot/GodotBinaryLocator.js';
 import { GodotCli } from './godot/GodotCli.js';
@@ -17,6 +19,7 @@ import { PlaytestPrompt } from './prompts/PlaytestPrompt.js';
 import { readAutoloadNames } from './project/ProjectFile.js';
 import { listScenes } from './project/ProjectFiles.js';
 import { ProjectLocator } from './project/ProjectLocator.js';
+import { readScriptLines } from './project/ScriptLines.js';
 import { createGodotResources } from './resources/godotResources.js';
 import { ErrorSummary } from './runtime/ErrorSummary.js';
 import { GameGatewayRouter } from './runtime/GameGatewayRouter.js';
@@ -36,6 +39,7 @@ import { ExportProjectTool } from './tools/ExportProjectTool.js';
 import { createGameGetOutputTool, createGameTools } from './tools/gameTools.js';
 import { GodotStatusTool } from './tools/GodotStatusTool.js';
 import { createProjectInfoTool } from './tools/projectTools.js';
+import { createDebugBreakpointsTool, createDebugContinueTool, createDebugStateTool } from './tools/debugTools.js';
 import { createSceneGetTreeTool } from './tools/sceneTools.js';
 import { ScriptValidateTool } from './tools/scriptTools.js';
 import { TestRunTool } from './tools/TestRunTool.js';
@@ -111,6 +115,16 @@ export function createApplication(environment: ApplicationEnvironment): Applicat
     headless: environment.variables['GODOT_MCP_HEADLESS'] === '1',
   });
   const gameGateway = new GameGatewayRouter(editor, localGame);
+  const debugAdapterPort = parsePort(environment.variables['GODOT_DAP_PORT']);
+  const gameDebugger = new GameDebugger({
+    editor,
+    debugAdapter: async () => {
+      const address = await editor.debugAdapter();
+      return address === undefined || debugAdapterPort === undefined ? address : { ...address, port: debugAdapterPort };
+    },
+    connect: (port) => DebugAdapterClient.connect(port),
+  });
+  const readScript = (file: string): string[] | undefined => (project.found ? readScriptLines(project.root, file) : undefined);
   const plainTools: Tool[] = [
     new GodotStatusTool({
       project,
@@ -148,6 +162,9 @@ export function createApplication(environment: ApplicationEnvironment): Applicat
     new DocsClassTool(docsSource),
     new DocsSearchTool(docsSource),
     ...createGameTools(gameGateway, new GameOutputCursor(), readFileSync),
+    createDebugBreakpointsTool(gameDebugger, readScript, errorSummary),
+    createDebugStateTool(gameDebugger, readScript),
+    createDebugContinueTool(gameDebugger, readScript),
     ...(policy.unsafe ? [createEditorRunScriptTool(editor), createNodeCallMethodTool(editor), createGameEvalTool(gameGateway), createFilesystemDeleteTool(editor)] : []),
   ];
   const selection = applyToolPolicy(plainTools, policy);
@@ -172,6 +189,7 @@ export function createApplication(environment: ApplicationEnvironment): Applicat
       createMcpServer({ name: SERVER_NAME, version: SERVER_VERSION, instructions, tools, resources, prompts }),
     shutdown: () => {
       localGame.shutdown();
+      gameDebugger.close();
       editor.close();
     },
   };

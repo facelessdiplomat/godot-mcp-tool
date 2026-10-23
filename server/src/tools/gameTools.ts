@@ -33,7 +33,7 @@ const runAllowanceMs = 45_000;
 
 const gameRunSchema = z.object({
   scene: z.string(),
-  outcome: z.enum(['ready', 'stopped', 'timeout']),
+  outcome: z.enum(['ready', 'stopped', 'timeout', 'paused']),
   state: z.string(),
   startup_ms: z.number(),
   output: z.array(logEntrySchema),
@@ -135,6 +135,8 @@ function describeOutcome(run: GameRun, durationMs: number | undefined): string {
   switch (run.outcome) {
     case 'stopped':
       return `The game stopped before it was ready (${run.scene}).`;
+    case 'paused':
+      return `The game stopped in the debugger before it was ready (${run.scene}), at a breakpoint or on an error: debug_state shows where and why.`;
     case 'timeout':
       return `The game did not report that it was ready within 30 s (${run.scene}); it may still be loading. Check it with game_get_output.`;
     case 'ready':
@@ -145,7 +147,7 @@ function describeOutcome(run: GameRun, durationMs: number | undefined): string {
         return `The game started ${run.scene} and quit on its own soon after it was ready.`;
       }
       if (run.state === 'paused') {
-        return `The game is paused on an error in ${run.scene}.`;
+        return `The game is stopped in the debugger in ${run.scene}, at a breakpoint or on an error: debug_state shows where and why.`;
       }
       return `The game is running ${run.scene}; it was ready after ${String(run.startup_ms)} ms.`;
   }
@@ -220,7 +222,7 @@ function describeGameState(state: string): string {
     case 'starting':
       return 'The game is starting.';
     case 'paused':
-      return 'The game is paused on an error.';
+      return 'The game is stopped in the debugger; debug_state shows where and why.';
     default:
       return 'The game is not running.';
   }

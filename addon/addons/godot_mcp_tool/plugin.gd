@@ -28,6 +28,7 @@ const UnsafeToolsSwitch := preload("editor/unsafe_tools_switch.gd")
 const VariantCodec := preload("codec/variant_codec.gd")
 
 const LANGUAGE_SERVER_PORT_SETTING := "network/language_server/remote_port"
+const DEBUG_ADAPTER_PORT_SETTING := "network/debug_adapter/remote_port"
 const INDENT_TYPE_SETTING := "text_editor/behavior/indent/type"
 const INDENT_SIZE_SETTING := "text_editor/behavior/indent/size"
 const SPACES_INDENT_TYPE := 1
@@ -168,6 +169,7 @@ func _build_discovery_record() -> Dictionary:
 		"project_path": _project_path(),
 		"executable_path": OS.get_executable_path(),
 		"lsp_port": int(EditorInterface.get_editor_settings().get_setting(LANGUAGE_SERVER_PORT_SETTING)),
+		"dap_port": int(EditorInterface.get_editor_settings().get_setting(DEBUG_ADAPTER_PORT_SETTING)),
 		"started_at": Time.get_datetime_string_from_system(true) + "Z",
 	}
 

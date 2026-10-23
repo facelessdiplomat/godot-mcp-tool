@@ -14,6 +14,7 @@ const endpoint: BridgeEndpoint = {
   projectPath: '/projects/game',
   executablePath: '/opt/godot/godot',
   lspPort: 6005,
+  dapPort: 6006,
   startedAt: '2026-10-21T18:00:00Z',
 };
 
@@ -196,6 +197,21 @@ describe('EditorConnection language server', () => {
     const { connection } = connectionWith({ kind: 'missing', path: '/projects/game/.godot/godot_mcp_tool/bridge.json' }, []);
 
     await expect(connection.languageServer()).resolves.toBeUndefined();
+  });
+});
+
+describe('EditorConnection debug adapter', () => {
+  it('gives the port from the discovery file and the project path of the editor', async () => {
+    const { connection } = connectionWith({ kind: 'found', endpoint: { ...endpoint, dapPort: 6016 } }, [new FakeBridge(hello)]);
+
+    await expect(connection.debugAdapter()).resolves.toEqual({ port: 6016, projectPath: '/projects/game' });
+  });
+
+  it('gives nothing while the editor is not connected', async () => {
+    const { connection } = connectionWith({ kind: 'missing', path: '/projects/game/.godot/godot_mcp_tool/bridge.json' }, []);
+
+    await expect(connection.debugAdapter()).resolves.toBeUndefined();
+    await expect(new UnavailableEditor('No Godot project was found.').debugAdapter()).resolves.toBeUndefined();
   });
 });
 

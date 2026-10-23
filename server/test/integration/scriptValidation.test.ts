@@ -29,7 +29,7 @@ describe.skipIf(godotBinary === '')('checking scripts with the editor', () => {
     project = new TemporaryProject('MCP scripts');
     writeScripts(project);
     const languageServerPort = await findFreePort();
-    editorProcess = await startHeadlessEditor(project.root, languageServerPort);
+    editorProcess = await startHeadlessEditor(project.root, { languageServer: languageServerPort });
     session = await McpSession.connect(project.root, { GODOT_LSP_PORT: String(languageServerPort) });
   }, editorStartupTimeoutMs + 30_000);
 

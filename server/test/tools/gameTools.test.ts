@@ -77,6 +77,20 @@ describe('game tools', () => {
     );
   });
 
+  it('game_run says when the game stopped in the debugger, before or after it was ready', async () => {
+    const editor = new FakeEditorGateway()
+      .respondTo('game.run', { ...quietRun, outcome: 'paused', state: 'paused' })
+      .respondTo('game.run', { ...quietRun, state: 'paused' });
+
+    const beforeReady = textOf(await createGameRunTool(editor, new GameOutputCursor()).execute({}));
+    const afterReady = textOf(await createGameRunTool(editor, new GameOutputCursor()).execute({}));
+
+    expect(beforeReady).toBe(
+      'The game stopped in the debugger before it was ready (res://levels/arena.tscn), at a breakpoint or on an error: debug_state shows where and why.\nNo output yet.',
+    );
+    expect(afterReady).toBe('The game is stopped in the debugger in res://levels/arena.tscn, at a breakpoint or on an error: debug_state shows where and why.\nNo output yet.');
+  });
+
   it('game_run tells what running saved and when there is more output', async () => {
     const editor = new FakeEditorGateway().respondTo('game.run', {
       ...quietRun,
@@ -132,6 +146,14 @@ describe('game tools', () => {
     expect(text).toBe(
       ['The game is not running.', '4 older entries no longer fit in the buffer.', 'No new output.', 'More output follows; call game_get_output again.'].join('\n'),
     );
+  });
+
+  it('game_get_output says when the game is stopped in the debugger', async () => {
+    const editor = new FakeEditorGateway().respondTo('game.get_output', { entries: [], more: false, next_after: 3, skipped: 0, last_seq: 3, state: 'paused' });
+
+    const result = await createGameGetOutputTool(editor, new GameOutputCursor()).execute({});
+
+    expect(textOf(result)).toBe('The game is stopped in the debugger; debug_state shows where and why.\nNo new output.');
   });
 
   it('game_stop reports what it did', async () => {

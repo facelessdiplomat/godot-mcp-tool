@@ -1,6 +1,7 @@
 extends "../command.gd"
 
 const EditingContext := preload("../../scene/editing_context.gd")
+const GameState := preload("../../runtime/game_state.gd")
 const Params := preload("../params.gd")
 const RunRequest := preload("../../runtime/run_request.gd")
 const RuntimeContext := preload("../../runtime/runtime_context.gd")
@@ -59,7 +60,7 @@ func execute(params: Dictionary) -> Variant:
 	var started_msec := Time.get_ticks_msec()
 	game.request_agent_run(RunRequest.new(fixed_fps))
 	_play(target, scene_path)
-	await Waiting.until(func() -> bool: return game.ready_count != ready_count or game.stop_count != stop_count, startup_timeout_msec)
+	await Waiting.until(func() -> bool: return game.ready_count != ready_count or game.stop_count != stop_count or game.state == GameState.PAUSED, startup_timeout_msec)
 	var outcome := _outcome(ready_count, stop_count)
 	var startup_msec := Time.get_ticks_msec() - started_msec
 	if outcome == "ready":
@@ -86,6 +87,8 @@ func _outcome(ready_count: int, stop_count: int) -> String:
 		return "ready"
 	if _runtime.game.stop_count != stop_count:
 		return "stopped"
+	if _runtime.game.state == GameState.PAUSED:
+		return "paused"
 	return "timeout"
 
 

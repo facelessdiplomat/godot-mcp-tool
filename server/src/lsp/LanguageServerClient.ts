@@ -3,7 +3,7 @@ import { normalize } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import * as z from 'zod/v4';
 import { describeError } from '../util/errors.js';
-import { encodeLspMessage, LspMessageReader } from './LspMessageReader.js';
+import { ContentLengthMessageReader, encodeContentLengthMessage } from '../protocol/ContentLengthMessages.js';
 
 export type DiagnosticSeverity = 'error' | 'warning' | 'information' | 'hint';
 
@@ -55,7 +55,7 @@ const publishedDiagnosticsSchema = z.object({
 });
 
 export class LanguageServerClient {
-  private readonly reader = new LspMessageReader();
+  private readonly reader = new ContentLengthMessageReader();
   private readonly pendingRequests = new Map<number, PendingRequest>();
   private readonly diagnosticsListeners = new Map<string, (diagnostics: Diagnostic[]) => void>();
   private nextRequestId = 1;
@@ -153,7 +153,7 @@ export class LanguageServerClient {
 
   private send(message: unknown): void {
     if (this.closedReason === undefined) {
-      this.socket.write(encodeLspMessage(message));
+      this.socket.write(encodeContentLengthMessage(message));
     }
   }
 

@@ -36,6 +36,8 @@ are described in the files linked at the end.
    `is_on_floor()`; `game_get_properties` for values, getters included; `node_get_bounds` for placement and scale;
    `game_screenshot`, with `views` for 3D; `game_pause` and `game_step` for frame-exact checks; `game_performance`.
 7. **Test** with GUT tests in `res://test` and `test_run`.
+   To find why code misbehaves, stop the game on a line with `debug_breakpoints`, read the stack and the variables
+   with `debug_state`, step with `debug_continue`, and remove the breakpoints when done.
 8. **Export** with `export_project` and a preset from Project → Export, after saving; `mode: "pack"` writes only the
    game data and needs no export templates.
 

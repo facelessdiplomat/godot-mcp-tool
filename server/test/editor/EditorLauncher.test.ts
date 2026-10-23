@@ -106,7 +106,7 @@ describe('EditorLauncher', () => {
   it('does not start a second editor next to one that does not answer', async () => {
     discovery = {
       kind: 'found',
-      endpoint: { protocol: 1, port: 5000, token: 't', pid: 777, godotVersion: '4.8', addonVersion: '0.1.0', projectPath: projectRoot, executablePath: '/opt/godot', lspPort: 6005, startedAt: '' },
+      endpoint: { protocol: 1, port: 5000, token: 't', pid: 777, godotVersion: '4.8', addonVersion: '0.1.0', projectPath: projectRoot, executablePath: '/opt/godot', lspPort: 6005, dapPort: 6006, startedAt: '' },
     };
 
     await expect(editorLauncher().launch({ headless: false })).rejects.toThrow('process 777');

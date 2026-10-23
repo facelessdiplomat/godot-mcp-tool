@@ -510,7 +510,6 @@ doesn't carry.
 | `game_get_tree` | The runtime node tree | 2 | R | G |
 | `game_get_properties` / `game_set_properties` | Like the remote inspector | 2 | R/W | G |
 | `game_pause` / `game_step` | Freeze the game and advance it by N physics frames (§9.10) | 3 | W | G |
-| `game_continue` | Resume a game paused on an error (§9.7) | 2 | W | G |
 | `game_eval` | Evaluate an `Expression` in a node's context — disabled by default | 3 | D | G |
 | `game_performance` | FPS, frame and physics time, memory, objects, draw calls, primitives; sampled over N frames | 3 | R | G |
 
@@ -538,7 +537,9 @@ window coordinates (§9.9). `mouse_motion` is a relative movement, e.g. for mous
 |---|---|---|---|---|
 | `test_run` | GUT or gdUnit4 tests (detected in `addons/`): folders, scripts, tests by name (GUT); JUnit report → summary, failed tests with `file:line`, test scripts that failed to load | 3 | W (runs project code) | C |
 | `export_project` | Export with a preset of the project (`--export-release` / `--export-debug` / `--export-pack`) into a folder of its own inside the project; lists the written files, the warnings, the unsaved changes the build misses, and how to get missing export templates | 4 | W | C |
-| `debug_*` | Breakpoints, stack, variables — via the editor's DAP server (port 6006) | 4 | W | E |
+| `debug_breakpoints` | Add, remove, clear and list the editor's breakpoints in `.gd` files, with the line of code of each | 4 | W | E |
+| `debug_state` | Where and why the game stopped in the debugger: the stack, the code around the line, the locals and members of a frame; optionally waits for a stop | 4 | R | E |
+| `debug_continue` | Resume a stopped game until the next breakpoint, or step over or into the current line | 4 | W | E |
 
 `test_run` brings the project up to date first: the connected editor rescans it, otherwise
 `godot --headless --import` runs, so the classes of new scripts are known. It then runs the framework's command line
@@ -569,6 +570,18 @@ templates are missing, the result names the expected file and, for a custom buil
 connected, its unsaved scenes and scripts are listed as not in the build, because the export reads the files on disk.
 Export presets are created by the user in Project → Export: the editor keeps its own list of presets and writes it
 back when they change there, so a preset written to the file while the editor runs would be lost (Appendix B).
+
+The `debug_*` tools talk to the editor's own debug adapter (DAP, `127.0.0.1:6006` by default) from the server, so
+the breakpoints are the editor's: the user sees them in the script editor, and they apply to every run from the
+editor. The addon writes the adapter's port into the discovery file; `GODOT_DAP_PORT` overrides it for an editor
+started with `--dap-port`, which scripts cannot see. Before using a connection, the server checks that it belongs to
+this project: an empty `setBreakpoints` for `project.godot` is refused with `wrong_path` by an editor that has another
+project open. The server never sends `initialize`, because the editor clears all its breakpoints on `initialize`
+unless `network/debug_adapter/sync_breakpoints` is on; the price is that variables come without their types.
+Lines are counted from 1 in the tools and converted for the adapter (Appendix B). While the game is stopped,
+`game_get_properties` and `game_get_tree` still answer, and `game_wait`, `game_input`, `game_step`, `game_screenshot`
+and `game_performance` refuse at once instead of waiting for frames that do not come; `game_run` and `game_get_output`
+say that the game is stopped in the debugger.
 
 ### 8.9 3D tools
 
@@ -852,7 +865,8 @@ On a script error the editor's debugger pauses the game by default — to the ag
   called for every way of running from the editor); configurable;
 - `godot_status` and `game_run` report the `paused_on_error` state with the error and its stack
   (the `EditorDebuggerSession.breaked` signal);
-- `game_stop` always works, and `game_continue` resumes a paused game: `EditorDebuggerSession` has no `continue`
+- `game_stop` always works, and `debug_continue` resumes a paused game through the debug adapter (§8.8); the raw
+  debugger message works too: `EditorDebuggerSession` has no `continue`
   method, but sending the raw debugger message `continue` works (spike 5). Custom captures keep working while the
   game is paused, so the runtime agent can still report the error, the stack and node state.
 
@@ -1371,7 +1385,10 @@ the next call showed a ⚠.
 - [ ] Windowless mode: scene operations through the headless editor or `--headless --script` (based on spike 6);
       a TCP transport for the runtime agent when the game runs as a process (port and token passed as user
       arguments after `--`).
-- [ ] Debugging through DAP: breakpoints, stack, variables.
+- [x] Debugging through DAP: `debug_breakpoints`, `debug_state`, `debug_continue` — the editor's breakpoints, the
+      stack, the code and the variables where the game stopped, and stepping, through the editor's debug adapter
+      without clearing the user's breakpoints; game tools that need running frames refuse while the game is stopped;
+      scenario `docs/evals/find-a-bug-with-breakpoints.md`.
 - [x] `export_project`: release, debug and data-only (`.pck`) exports with a preset of the project, in a separate
       Godot process, only into a folder of its own inside the project that gets a `.gdignore` file; the result lists
       the written files and warnings, the unsaved changes the build misses, and how to get missing export templates,
@@ -1727,6 +1744,8 @@ Checked against the sources in `~/Software/godot` (`master`, 4.8-beta, commit `6
 | Command-line exports (`--export-release`, `--export-debug`, `--export-pack` with a preset name) run an editor that exports after the first scan and exits with 1 on failure and 0 otherwise, also after warnings; the output path may be left out to use the preset's export path, and its folder must exist, or the export fails with "Can't open file for writing". Export messages are printed as `ERROR:` or `WARNING:` with `<category>: <text>` on stderr, and `--quiet` silences stdout, the progress of every packed file included. A pack export (`.pck`, or `.zip` by the extension) needs no export templates and runs with `godot --main-pack` | `main/main.cpp`, `editor/editor_node.cpp` (`_fs_changed`), `editor/export/editor_export_platform.h`, observed on 4.8 |
 | Export templates are looked up in the editor's data folder under `export_templates/<GODOT_VERSION_FULL_CONFIG>/` (`4.8.beta` for this build, without the build name), with a file per platform and kind, such as `macos.zip` or `linux_release.x86_64`; missing ones are reported as configuration errors, "No export template found at the expected path:" with the path, or "Custom release template not found." | `editor/export/editor_export_platform.cpp`, `core/version.h`, observed on 4.8 |
 | An export preset that lacks keys the editor writes (`include_filter`, `exclude_filter`, the `preset.N.options` section) still exports, with an error printed for every missing key. The editor reads `export_presets.cfg` when it starts and again only when an export platform is added or removed, and writes its own list back when presets change in the Export dialog | `editor/export/editor_export.cpp`, observed on 4.8 |
+| The editor's debug adapter (DAP) listens on `127.0.0.1` at `network/debug_adapter/remote_port` (6006), in every editor, headless ones included, except in recovery mode; `--dap-port` overrides the port and is not visible to scripts. It answers requests without `initialize`; `initialize` clears every breakpoint of the editor unless `network/debug_adapter/sync_breakpoints` is on, and only a client that announced `supportsVariableType` there gets the types of variables. Without `initialize`, lines are counted from 0 in the `setBreakpoints` arguments and in `stackTrace`, while `setBreakpoints` responses and `breakpoint` events count from 1. A `source` without `name` and `checksums` makes the editor log "Dictionary::operator[] used when there was no value"; a path outside its project is refused with `wrong_path` and the editor's project path. There is no `stepOut`; `evaluate` sees the locals of the frame | `editor/debugger/debug_adapter/`, observed on 4.8 |
+| Breakpoints set through the debug adapter go into the script editor, and `ScriptEditor.get_breakpoints()` lists them as `res://path:line` counted from 1; one in a script that was never opened logs "Couldn't find the given section … and key "state"" once. `variables` right after `scopes` fails with "unknown" until the game has sent the variables of the frame. The adapter answers `continue` without a `continued` event to the client that asked, and sends one once the game has resumed, after `EditorDebuggerSession.continued`. While the game is stopped at a breakpoint, `EditorDebuggerPlugin` captures still answer | `editor/script/script_editor_plugin.cpp`, `editor/debugger/debug_adapter/`, observed on 4.8 |
 | `JSON.stringify` sorts the keys of dictionaries by default, so the bridge does not keep their order; ordered data travels as arrays | `core/io/json.h` (`sort_keys = true`) |
 | `InputMap` matches an event of an action against an incoming event only when the action's event has the device `ALL_DEVICES` (-1, not exposed to scripts) or the same device; new `InputEventKey` and mouse events get `DEVICE_ID_KEYBOARD` (16) and `DEVICE_ID_MOUSE` (32), joypad events default to device 0, the first gamepad, and the editor's Input Map dialog stores "All Devices" | `core/input/input_map.cpp`, `core/input/input_event.cpp`, `editor/settings/input_event_configuration_dialog.cpp` |
 | The analyzer reports a member that a class lacks when it is read through the class (`Player.SPEEDD` is a parse error), but a method or property that the type of a variable lacks (`player.dashh()` on a `Player` or a `CharacterBody3D` variable) compiles: only the `unsafe_method_access` and `unsafe_property_access` warnings report it, and both are off by default. `:=` cannot infer the type of a member that the static type lacks, so it works on a variable typed with the `class_name` of its script and fails on one typed with the native base | observed on 4.8 with `--check-only` |

@@ -1,6 +1,6 @@
 const headerSeparator = Buffer.from('\r\n\r\n');
 
-export class LspMessageReader {
+export class ContentLengthMessageReader {
   private buffered = Buffer.alloc(0);
 
   read(chunk: Buffer): unknown[] {
@@ -23,7 +23,7 @@ export class LspMessageReader {
   }
 }
 
-export function encodeLspMessage(message: unknown): Buffer {
+export function encodeContentLengthMessage(message: unknown): Buffer {
   const body = Buffer.from(JSON.stringify(message), 'utf8');
   return Buffer.concat([Buffer.from(`Content-Length: ${String(body.length)}\r\n\r\n`, 'ascii'), body]);
 }
@@ -31,7 +31,7 @@ export function encodeLspMessage(message: unknown): Buffer {
 function parseContentLength(header: string): number {
   const match = /content-length:\s*(\d+)/i.exec(header);
   if (match?.[1] === undefined) {
-    throw new Error(`The language server sent a message without Content-Length: ${header}`);
+    throw new Error(`A message arrived without Content-Length: ${header}`);
   }
   return Number(match[1]);
 }

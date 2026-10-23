@@ -14,6 +14,7 @@ const validDiscovery = {
   project_path: '/projects/game',
   executable_path: '/opt/godot/godot',
   lsp_port: 6005,
+  dap_port: 6016,
   started_at: '2026-10-21T18:00:00Z',
 };
 
@@ -61,9 +62,18 @@ describe('DiscoveryFileReader', () => {
         projectPath: '/projects/game',
         executablePath: '/opt/godot/godot',
         lspPort: 6005,
+        dapPort: 6016,
         startedAt: '2026-10-21T18:00:00Z',
       },
     });
+  });
+
+  it('takes the default debug adapter port from files of addons that did not write it', () => {
+    writeDiscovery(JSON.stringify(Object.fromEntries(Object.entries(validDiscovery).filter(([key]) => key !== 'dap_port'))));
+
+    const result = new DiscoveryFileReader(projectRoot, () => true).read();
+
+    expect(result).toMatchObject({ kind: 'found', endpoint: { dapPort: 6006 } });
   });
 
   it('reports a file left behind by an editor that is no longer running', () => {

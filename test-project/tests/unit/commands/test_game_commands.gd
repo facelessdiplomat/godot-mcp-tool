@@ -112,6 +112,13 @@ func test_reports_a_game_that_stops_before_it_is_ready() -> void:
 	assert_eq(((result["output"] as Array)[0] as Dictionary)["level"], "error")
 
 
+func test_returns_when_the_game_stops_in_the_debugger_before_it_is_ready() -> void:
+	_launcher.simulate_game = func(_target: String) -> void: _game.mark_paused()
+	var result: Dictionary = await _run({"watch_ms": 0, "startup_timeout_ms": 5000})
+	assert_eq(result["outcome"], "paused")
+	assert_eq(result["state"], GameState.PAUSED)
+
+
 func test_gives_up_waiting_for_a_game_that_never_gets_ready() -> void:
 	var result: Dictionary = await _run({"watch_ms": 0, "startup_timeout_ms": 50})
 	assert_eq(result["outcome"], "timeout")
@@ -235,12 +242,23 @@ func test_asks_the_running_game_and_returns_its_answer() -> void:
 	assert_eq((_game_requests[0] as Dictionary)["params"], {"path": "."})
 
 
-func test_asks_a_game_that_is_paused_on_an_error() -> void:
+func test_asks_a_game_that_is_stopped_in_the_debugger() -> void:
 	_game.mark_started(1)
 	_game.mark_ready("res://main.tscn")
 	_game.mark_paused()
 	var result: Variant = await GameRequestCommand.new(_runtime, "properties.get", 1000).execute({"path": "Player"})
 	assert_eq(result, {"asked": "properties.get"})
+
+
+func test_refuses_to_wait_on_a_game_that_is_stopped_in_the_debugger() -> void:
+	_game.mark_started(1)
+	_game.mark_ready("res://main.tscn")
+	_game.mark_paused()
+	var error: Variant = await GameRequestCommand.new(_runtime, "wait", 1000, true).execute({"physics_frames": 10})
+	assert_true(error is CommandError)
+	assert_eq((error as CommandError).code, JsonRpc.CONFLICT)
+	assert_string_contains((error as CommandError).hint, "debug_continue")
+	assert_eq(_game_requests, [])
 
 
 func test_refuses_to_ask_a_game_that_is_not_running() -> void:

@@ -7,6 +7,10 @@ func unsaved_files() -> PackedStringArray:
 	return EditorInterface.get_script_editor().get_unsaved_files()
 
 
+func breakpoints() -> PackedStringArray:
+	return EditorInterface.get_script_editor().get_breakpoints()
+
+
 func open_script_paths() -> PackedStringArray:
 	var paths := PackedStringArray()
 	for script in EditorInterface.get_script_editor().get_open_scripts():

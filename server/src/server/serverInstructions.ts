@@ -12,6 +12,7 @@ export const serverInstructions = [
   '- To check how the running game behaves, play input with game_input (actions come from input_map_set), wait for a state with game_wait and read nodes with game_get_properties; getters such as is_on_floor() work there; game_pause freezes the game and game_step advances it by exact physics frames. Tool calls sent in one message run at the same time, so read the state in a later message than the game_input or game_wait it depends on.',
   '- Check 3D placement and scale with numbers first (node_get_bounds), then look: game_screenshot shows the game window or views of its 3D world, editor_screenshot renders the open scene. One picture of a 3D scene can mislead, so use views from several angles, such as ["front", "top", "iso"].',
   '- Imported models often arrive in centimeters: read their size with asset_import_settings_get and fix it with nodes/root_scale in asset_import_settings_set rather than by scaling nodes.',
+  '- To find out why game code misbehaves, stop it on a line with debug_breakpoints and game_run, then read the stack and the variables with debug_state and step with debug_continue; remove the breakpoints when done.',
   '- When a result reports new errors (⚠), read them with game_get_output before you continue.',
 ].join('\n');
 

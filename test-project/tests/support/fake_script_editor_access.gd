@@ -4,6 +4,7 @@ var unsaved := PackedStringArray()
 var open_scripts := PackedStringArray()
 var changed_outside := PackedStringArray()
 var reload_count := 0
+var breakpoint_lines := PackedStringArray()
 
 
 func unsaved_files() -> PackedStringArray:
@@ -20,3 +21,7 @@ func reload_open_files() -> void:
 
 func files_changed_outside() -> PackedStringArray:
 	return changed_outside
+
+
+func breakpoints() -> PackedStringArray:
+	return breakpoint_lines

@@ -15,3 +15,7 @@ func reload_open_files() -> void:
 
 func files_changed_outside() -> PackedStringArray:
 	return PackedStringArray()
+
+
+func breakpoints() -> PackedStringArray:
+	return PackedStringArray()

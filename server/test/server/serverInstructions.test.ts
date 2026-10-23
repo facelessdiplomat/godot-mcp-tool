@@ -18,9 +18,13 @@ describe('serverInstructions', () => {
     expect(serverInstructions).toContain('Move or rename project files with filesystem_move');
   });
 
+  it('points to breakpoints for finding bugs in game code', () => {
+    expect(serverInstructions).toContain('debug_breakpoints');
+  });
+
   it('names only tools that exist', async () => {
     const toolNames = await registeredToolNames();
-    const mentionedTools = serverInstructions.match(/\b(?:godot|project|editor|scene|node|game|docs|signal|script|input|asset|filesystem|resource|test)_[a-z_]+\b/g) ?? [];
+    const mentionedTools = serverInstructions.match(/\b(?:godot|project|editor|scene|node|game|docs|signal|script|input|asset|filesystem|resource|test|debug)_[a-z_]+\b/g) ?? [];
 
     expect(mentionedTools.length).toBeGreaterThan(5);
     for (const toolName of mentionedTools) {

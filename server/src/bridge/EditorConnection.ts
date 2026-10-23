@@ -18,9 +18,15 @@ export interface LanguageServerAddress {
   readonly projectPath: string;
 }
 
+export interface DebugAdapterAddress {
+  readonly port: number;
+  readonly projectPath: string;
+}
+
 export interface EditorSession extends EditorStatusProvider, EditorGateway {
   onNotification(listener: ConnectionNotificationListener): void;
   languageServer(): Promise<LanguageServerAddress | undefined>;
+  debugAdapter(): Promise<DebugAdapterAddress | undefined>;
   close(): void;
 }
 
@@ -73,6 +79,14 @@ export class EditorConnection implements EditorSession {
       return undefined;
     }
     return { port: this.endpoint.lspPort, projectPath: editorStatus.hello.projectPath };
+  }
+
+  async debugAdapter(): Promise<DebugAdapterAddress | undefined> {
+    const editorStatus = await this.status();
+    if (!editorStatus.connected || this.endpoint === undefined) {
+      return undefined;
+    }
+    return { port: this.endpoint.dapPort, projectPath: editorStatus.hello.projectPath };
   }
 
   close(): void {
@@ -142,6 +156,10 @@ export class UnavailableEditor implements EditorSession {
   onNotification(): void {}
 
   languageServer(): Promise<LanguageServerAddress | undefined> {
+    return Promise.resolve(undefined);
+  }
+
+  debugAdapter(): Promise<DebugAdapterAddress | undefined> {
     return Promise.resolve(undefined);
   }
 

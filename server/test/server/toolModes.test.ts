@@ -44,6 +44,7 @@ describe('tool modes', () => {
     expect(names).toContain('node_add');
     expect(names).toContain('filesystem_move');
     expect(names).toContain('export_project');
+    expect(names).toEqual(expect.arrayContaining(['debug_breakpoints', 'debug_state', 'debug_continue']));
     expect(names).not.toContain('editor_run_script');
     expect(names).not.toContain('game_eval');
     expect(names).not.toContain('node_call_method');
@@ -73,6 +74,9 @@ describe('tool modes', () => {
     expect(names).not.toContain('filesystem_move');
     expect(names).not.toContain('filesystem_delete');
     expect(names).not.toContain('export_project');
+    expect(names).toContain('debug_state');
+    expect(names).not.toContain('debug_breakpoints');
+    expect(names).not.toContain('debug_continue');
     expect(names).not.toContain('game_run');
     expect(names).not.toContain('game_eval');
     expect(instructions).toContain('read-only mode');
