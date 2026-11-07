@@ -1587,7 +1587,7 @@ The whole integration suite, run next to that editor, found two more problems:
       of the guides on a fresh project, described below, is still to do.
 - [x] `CONTRIBUTING.md`, `SECURITY.md`: how the project fits together, its checks and rules, how to change a tool;
       the security model of §10 in plain words and private reports through GitHub's "Report a vulnerability", which
-      needs private vulnerability reporting switched on once the repository exists.
+      is switched on in the repository.
 - [x] Evaluation tasks (§13) and tool description tuning based on their results: the 20 scenarios of `docs/evals/`
       run as code with `npm run eval`, each with a reference solution and checks through the MCP tools. The first
       full run passed 16 of 20 ([results](evals/README.md#results)); its findings are fixed in this order: the
@@ -1609,7 +1609,9 @@ The whole integration suite, run next to that editor, found two more problems:
       `zstandard`; with that fixed, every job passes on Linux: the build of `master` in 24 minutes, then cached by its
       commit, the checks without Godot in under a minute, and the addon and integration tests in about 4.5 minutes
       for each of 4.7.2 and `master`.
-- [ ] Publication to npm and the Godot Asset Store (it replaced the Asset Library in 4.7).
+- [x] Publication to npm: version 0.1.0 went out on 2026-11-07, after the addon and integration tests had also passed
+      on Godot 4.8 beta 2, and `npx -y godot-mcp-tool@0.1.0` now starts the server that the plugin asks for.
+- [ ] Publication to the Godot Asset Store (it replaced the Asset Library in 4.7).
 
 **Done when** the package is published, CI is green and the user documentation passes its check (below).
 
@@ -1618,8 +1620,8 @@ first, since the plugin, the documentation and the publication build on it; then
 validation hook; the editor dock; the evaluation tasks and the tuning of tool descriptions, which change the texts
 that the tool reference is generated from; CI with the version matrix, after a compatibility pass on Godot 4.5 and
 4.7 (done); the user documentation, `CONTRIBUTING.md` and `SECURITY.md`, and the check of the documentation on a
-fresh project; the publication last. The public GitHub repository and the publication itself wait for your
-go-ahead.
+fresh project; the publication last. The public GitHub repository and the publication to npm are done; the Asset
+Store waits for your go-ahead.
 
 ### User documentation
 
@@ -1795,9 +1797,8 @@ in the Claude Code CLI — `claude --debug=mcp` (the server's stderr ends up in 
 
 ## 16. Next steps
 
-1. Milestone 0: `git init`, MIT license, the `server/` and `addon/` skeletons, `test-project/`, spikes 1–11.
-2. Create the public GitHub repository — when you say so.
-3. After the spikes, adjust this plan and record the decisions in Appendix A.
+1. Check the user guides on a fresh project (Milestone 5).
+2. Publish the addon to the Godot Asset Store — when you say so.
 
 ---
 
