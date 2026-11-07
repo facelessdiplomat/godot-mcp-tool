@@ -1,39 +1,39 @@
 extends "../command.gd"
 
-const EditingContext := preload("../../scene/editing_context.gd")
-const IndefiniteArticle := preload("../../util/indefinite_article.gd")
-const NodeFactory := preload("../../scene/node_factory.gd")
-const NodeLocator := preload("../../scene/node_locator.gd")
-const Params := preload("../params.gd")
-const SceneSnapshot := preload("../../scene/scene_snapshot.gd")
-const StateMachineReport := preload("../../animation/state_machine_report.gd")
+const GodotMcpEditingContext := preload("../../scene/editing_context.gd")
+const GodotMcpIndefiniteArticle := preload("../../util/indefinite_article.gd")
+const GodotMcpNodeFactory := preload("../../scene/node_factory.gd")
+const GodotMcpNodeLocator := preload("../../scene/node_locator.gd")
+const GodotMcpParams := preload("../params.gd")
+const GodotMcpSceneSnapshot := preload("../../scene/scene_snapshot.gd")
+const GodotMcpStateMachineReport := preload("../../animation/state_machine_report.gd")
 
-var _context: EditingContext
+var _context: GodotMcpEditingContext
 
 
-func _init(context: EditingContext) -> void:
+func _init(context: GodotMcpEditingContext) -> void:
 	_context = context
 
 
 func execute(params: Dictionary) -> Variant:
-	var scene_path: Variant = Params.text(params, "scene")
-	var tree_path: Variant = Params.required_text(params, "tree", "\"AnimationTree\"")
+	var scene_path: Variant = GodotMcpParams.text(params, "scene")
+	var tree_path: Variant = GodotMcpParams.required_text(params, "tree", "\"AnimationTree\"")
 	for value in [scene_path, tree_path]:
-		if value is CommandError:
+		if value is GodotMcpCommandError:
 			return value
 	var resolved: Variant = _context.scenes.resolve_for_reading(scene_path)
-	if resolved is CommandError:
+	if resolved is GodotMcpCommandError:
 		return resolved
-	var snapshot := resolved as SceneSnapshot
+	var snapshot := resolved as GodotMcpSceneSnapshot
 	var result: Variant = _describe(snapshot, tree_path)
 	snapshot.release()
 	return result
 
 
-static func _describe(snapshot: SceneSnapshot, tree_path: String) -> Variant:
-	var node := NodeLocator.find(snapshot.root, tree_path)
+static func _describe(snapshot: GodotMcpSceneSnapshot, tree_path: String) -> Variant:
+	var node := GodotMcpNodeLocator.find(snapshot.root, tree_path)
 	if node == null:
-		return CommandError.new(JsonRpc.NOT_FOUND, "Node \"%s\" not found" % tree_path, NodeLocator.not_found_hint(snapshot.root, tree_path))
+		return GodotMcpCommandError.new(GodotMcpJsonRpc.NOT_FOUND, "Node \"%s\" not found" % tree_path, GodotMcpNodeLocator.not_found_hint(snapshot.root, tree_path))
 	if not node is AnimationTree:
-		return CommandError.new(JsonRpc.INVALID_PARAMS, "%s is %s, not an AnimationTree" % [tree_path, IndefiniteArticle.before(NodeFactory.display_class(node))])
-	return StateMachineReport.describe(node as AnimationTree, snapshot.root, snapshot.scene_path)
+		return GodotMcpCommandError.new(GodotMcpJsonRpc.INVALID_PARAMS, "%s is %s, not an AnimationTree" % [tree_path, GodotMcpIndefiniteArticle.before(GodotMcpNodeFactory.display_class(node))])
+	return GodotMcpStateMachineReport.describe(node as AnimationTree, snapshot.root, snapshot.scene_path)

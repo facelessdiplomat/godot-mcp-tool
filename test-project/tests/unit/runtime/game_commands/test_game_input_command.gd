@@ -1,14 +1,14 @@
 extends GutTest
 
-const CommandError := preload("res://addons/godot_mcp_tool/commands/command_error.gd")
-const GameInputCommand := preload("res://addons/godot_mcp_tool/runtime/game_commands/game_input_command.gd")
-const GamePropertiesGetCommand := preload("res://addons/godot_mcp_tool/runtime/game_commands/game_properties_get_command.gd")
-const GameScene := preload("res://addons/godot_mcp_tool/runtime/game_commands/game_scene.gd")
-const GameStepCommand := preload("res://addons/godot_mcp_tool/runtime/game_commands/game_step_command.gd")
-const GameTime := preload("res://addons/godot_mcp_tool/runtime/game_time.gd")
-const JsonRpc := preload("res://addons/godot_mcp_tool/bridge/json_rpc.gd")
-const PropertyEditor := preload("res://addons/godot_mcp_tool/scene/property_editor.gd")
-const VariantCodec := preload("res://addons/godot_mcp_tool/codec/variant_codec.gd")
+const GodotMcpCommandError := preload("res://addons/godot_mcp_tool/commands/command_error.gd")
+const GodotMcpGameInputCommand := preload("res://addons/godot_mcp_tool/runtime/game_commands/game_input_command.gd")
+const GodotMcpGamePropertiesGetCommand := preload("res://addons/godot_mcp_tool/runtime/game_commands/game_properties_get_command.gd")
+const GodotMcpGameScene := preload("res://addons/godot_mcp_tool/runtime/game_commands/game_scene.gd")
+const GodotMcpGameStepCommand := preload("res://addons/godot_mcp_tool/runtime/game_commands/game_step_command.gd")
+const GodotMcpGameTime := preload("res://addons/godot_mcp_tool/runtime/game_time.gd")
+const GodotMcpJsonRpc := preload("res://addons/godot_mcp_tool/bridge/json_rpc.gd")
+const GodotMcpPropertyEditor := preload("res://addons/godot_mcp_tool/scene/property_editor.gd")
+const GodotMcpVariantCodec := preload("res://addons/godot_mcp_tool/codec/variant_codec.gd")
 
 const JUMP_ACTION := "mcp_test_jump"
 const WATCHER := """extends Node
@@ -53,8 +53,8 @@ class FixedCapture:
 var _recorder: InputRecorder
 var _arena: Node
 var _watcher: Node
-var _time: GameTime
-var _command: GameInputCommand
+var _time: GodotMcpGameTime
+var _command: GodotMcpGameInputCommand
 
 
 func before_each() -> void:
@@ -79,7 +79,7 @@ func before_each() -> void:
 	_watcher.process_mode = Node.PROCESS_MODE_PAUSABLE
 	_arena.add_child(_watcher)
 	add_child_autofree(_arena)
-	_time = GameTime.new()
+	_time = GodotMcpGameTime.new()
 	add_child_autoqfree(_time)
 	_command = _command_with(FixedCapture.new({}))
 
@@ -90,10 +90,10 @@ func after_each() -> void:
 	InputMap.erase_action(JUMP_ACTION)
 
 
-func _command_with(capture: FixedCapture) -> GameInputCommand:
-	var codec := VariantCodec.new()
-	var reader := GamePropertiesGetCommand.new(GameScene.new(func() -> Node: return _arena), PropertyEditor.new(codec), codec)
-	return GameInputCommand.new(capture, _time, reader)
+func _command_with(capture: FixedCapture) -> GodotMcpGameInputCommand:
+	var codec := GodotMcpVariantCodec.new()
+	var reader := GodotMcpGamePropertiesGetCommand.new(GodotMcpGameScene.new(func() -> Node: return _arena), GodotMcpPropertyEditor.new(codec), codec)
+	return GodotMcpGameInputCommand.new(capture, _time, reader)
 
 
 func _watched(property: String) -> int:
@@ -146,8 +146,8 @@ func test_reports_a_node_it_cannot_read_and_plays_the_rest() -> void:
 
 func test_refuses_a_read_without_names() -> void:
 	var error: Variant = await _command.execute({"steps": [{"read": "Watcher"}]})
-	assert_true(error is CommandError)
-	assert_string_contains((error as CommandError).message, "Step 1")
+	assert_true(error is GodotMcpCommandError)
+	assert_string_contains((error as GodotMcpCommandError).message, "Step 1")
 
 
 func test_plays_input_into_a_held_game_only_while_it_waits() -> void:
@@ -170,7 +170,7 @@ func test_keeps_input_for_a_held_game_until_it_advances() -> void:
 	var result: Dictionary = await _command.execute({"steps": [{"action": JUMP_ACTION, "state": "down"}], "release_at_end": false})
 	assert_eq(result["physics_frames"], 0)
 	assert_false(Input.is_action_pressed(JUMP_ACTION))
-	await GameStepCommand.new(_time).execute({"physics_frames": 1})
+	await GodotMcpGameStepCommand.new(_time).execute({"physics_frames": 1})
 	assert_true(Input.is_action_pressed(JUMP_ACTION))
 	assert_eq(_watched("just_pressed_frames") - just_pressed_frames, 1)
 
@@ -220,14 +220,14 @@ func test_tilts_a_stick_and_centers_it_again() -> void:
 
 func test_explains_a_stick_without_a_value() -> void:
 	var error: Variant = await _command.execute({"steps": [{"joypad_motion": "left_x"}]})
-	assert_true(error is CommandError)
-	assert_string_contains((error as CommandError).message, "Step 1")
-	assert_string_contains((error as CommandError).message, "value")
+	assert_true(error is GodotMcpCommandError)
+	assert_string_contains((error as GodotMcpCommandError).message, "Step 1")
+	assert_string_contains((error as GodotMcpCommandError).message, "value")
 
 
 func test_explains_an_unknown_joypad_button() -> void:
 	var error: Variant = await _command.execute({"steps": [{"joypad_button": "z"}]})
-	assert_string_contains((error as CommandError).message, "Unknown joypad button \"z\"")
+	assert_string_contains((error as GodotMcpCommandError).message, "Unknown joypad button \"z\"")
 
 
 func test_moves_the_mouse_and_clicks_in_viewport_coordinates() -> void:
@@ -253,21 +253,21 @@ func test_waits_between_steps() -> void:
 
 func test_checks_every_step_before_sending_anything() -> void:
 	var error: Variant = await _command.execute({"steps": [{"action": JUMP_ACTION}, {"action": "mcp_test_jmp"}]})
-	assert_true(error is CommandError)
-	assert_eq((error as CommandError).code, JsonRpc.INVALID_PARAMS)
-	assert_string_contains((error as CommandError).message, "Step 2")
-	assert_string_contains((error as CommandError).message, JUMP_ACTION)
+	assert_true(error is GodotMcpCommandError)
+	assert_eq((error as GodotMcpCommandError).code, GodotMcpJsonRpc.INVALID_PARAMS)
+	assert_string_contains((error as GodotMcpCommandError).message, "Step 2")
+	assert_string_contains((error as GodotMcpCommandError).message, JUMP_ACTION)
 	assert_eq(_recorder.events, [])
 
 
 func test_explains_a_step_it_does_not_know() -> void:
 	var error: Variant = await _command.execute({"steps": [{"fly": true}]})
-	assert_string_contains((error as CommandError).message, "Step 1")
-	assert_string_contains((error as CommandError).hint, "mouse_motion")
+	assert_string_contains((error as GodotMcpCommandError).message, "Step 1")
+	assert_string_contains((error as GodotMcpCommandError).hint, "mouse_motion")
 
 
 func test_requires_steps() -> void:
-	assert_true(await _command.execute({"steps": []}) is CommandError)
+	assert_true(await _command.execute({"steps": []}) is GodotMcpCommandError)
 
 
 func test_takes_a_screenshot_after_the_last_step() -> void:
@@ -277,7 +277,7 @@ func test_takes_a_screenshot_after_the_last_step() -> void:
 
 
 func test_reports_a_screenshot_that_failed_after_the_input() -> void:
-	var capture := FixedCapture.new(CommandError.new(JsonRpc.OPERATION_FAILED, "The game runs without a window (headless), so it cannot render a screenshot"))
+	var capture := FixedCapture.new(GodotMcpCommandError.new(GodotMcpJsonRpc.OPERATION_FAILED, "The game runs without a window (headless), so it cannot render a screenshot"))
 	var result: Dictionary = await _command_with(capture).execute({"steps": [{"action": JUMP_ACTION}], "screenshot": true})
 	assert_eq(result["steps"], 1)
 	assert_string_contains(result["screenshot_error"], "without a window")

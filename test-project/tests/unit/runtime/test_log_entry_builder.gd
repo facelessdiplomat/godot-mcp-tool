@@ -1,6 +1,6 @@
 extends GutTest
 
-const LogEntryBuilder := preload("res://addons/godot_mcp_tool/runtime/log_entry_builder.gd")
+const GodotMcpLogEntryBuilder := preload("res://addons/godot_mcp_tool/runtime/log_entry_builder.gd")
 
 const THIS_SCRIPT := "res://tests/unit/runtime/test_log_entry_builder.gd"
 
@@ -10,15 +10,15 @@ func _capture_backtraces() -> Array[ScriptBacktrace]:
 
 
 func test_turns_printed_text_into_an_info_entry() -> void:
-	assert_eq(LogEntryBuilder.from_message("Hello\n", false), {"level": "info", "message": "Hello"})
+	assert_eq(GodotMcpLogEntryBuilder.from_message("Hello\n", false), {"level": "info", "message": "Hello"})
 
 
 func test_turns_text_printed_to_stderr_into_an_error_entry() -> void:
-	assert_eq(LogEntryBuilder.from_message("Broken\n", true)["level"], "error")
+	assert_eq(GodotMcpLogEntryBuilder.from_message("Broken\n", true)["level"], "error")
 
 
 func test_uses_the_rationale_and_the_first_script_frame() -> void:
-	var entry := LogEntryBuilder.from_error("get_node", "scene/main/node.cpp", 1800, "Method failed.", "Node not found: \"Player\".", 0, _capture_backtraces())
+	var entry := GodotMcpLogEntryBuilder.from_error("get_node", "scene/main/node.cpp", 1800, "Method failed.", "Node not found: \"Player\".", 0, _capture_backtraces())
 	assert_eq(entry["level"], "error")
 	assert_eq(entry["message"], "Node not found: \"Player\".")
 	assert_string_starts_with(entry["location"], THIS_SCRIPT + ":")
@@ -28,21 +28,21 @@ func test_uses_the_rationale_and_the_first_script_frame() -> void:
 
 
 func test_leaves_out_frames_of_hidden_scripts() -> void:
-	var entry := LogEntryBuilder.from_error("set_fov", "scene/3d/camera_3d.cpp", 797, "Condition is true.", "", 0, _capture_backtraces(), "res://tests/")
+	var entry := GodotMcpLogEntryBuilder.from_error("set_fov", "scene/3d/camera_3d.cpp", 797, "Condition is true.", "", 0, _capture_backtraces(), "res://tests/")
 	assert_string_starts_with(entry["location"], "res://addons/gut/")
 	for frame in entry["stack"]:
 		assert_false((frame as String).begins_with("res://tests/"))
 
 
 func test_uses_the_native_location_when_every_frame_is_hidden() -> void:
-	var entry := LogEntryBuilder.from_error("set_fov", "scene/3d/camera_3d.cpp", 797, "Condition is true.", "", 0, _capture_backtraces(), "res://")
+	var entry := GodotMcpLogEntryBuilder.from_error("set_fov", "scene/3d/camera_3d.cpp", 797, "Condition is true.", "", 0, _capture_backtraces(), "res://")
 	assert_eq(entry["location"], "scene/3d/camera_3d.cpp:797")
 	assert_eq(entry["function"], "set_fov")
 	assert_false(entry.has("stack"))
 
 
 func test_falls_back_to_the_code_and_the_native_location() -> void:
-	var entry := LogEntryBuilder.from_error("get_node", "scene/main/node.cpp", 1800, "Condition \"p_path.is_empty()\" is true.", "", 0, [])
+	var entry := GodotMcpLogEntryBuilder.from_error("get_node", "scene/main/node.cpp", 1800, "Condition \"p_path.is_empty()\" is true.", "", 0, [])
 	assert_eq(entry["message"], "Condition \"p_path.is_empty()\" is true.")
 	assert_eq(entry["location"], "scene/main/node.cpp:1800")
 	assert_eq(entry["function"], "get_node")
@@ -50,15 +50,15 @@ func test_falls_back_to_the_code_and_the_native_location() -> void:
 
 
 func test_writes_engine_source_paths_without_a_leading_dot() -> void:
-	var entry := LogEntryBuilder.from_error("set_fov", "./scene/3d/camera_3d.cpp", 797, "Condition is true.", "", 0, [])
+	var entry := GodotMcpLogEntryBuilder.from_error("set_fov", "./scene/3d/camera_3d.cpp", 797, "Condition is true.", "", 0, [])
 	assert_eq(entry["location"], "scene/3d/camera_3d.cpp:797")
 
 
 func test_marks_warnings() -> void:
-	assert_eq(LogEntryBuilder.from_error("", "", 0, "Careful.", "", 1, [])["level"], "warning")
+	assert_eq(GodotMcpLogEntryBuilder.from_error("", "", 0, "Careful.", "", 1, [])["level"], "warning")
 
 
 func test_shortens_very_long_messages() -> void:
-	var message: String = LogEntryBuilder.from_message("x".repeat(10000), false)["message"]
+	var message: String = GodotMcpLogEntryBuilder.from_message("x".repeat(10000), false)["message"]
 	assert_lt(message.length(), 2100)
 	assert_string_ends_with(message, "characters cut]")

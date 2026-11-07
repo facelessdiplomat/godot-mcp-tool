@@ -1,10 +1,10 @@
 extends "../../commands/command.gd"
 
-const Command := preload("../../commands/command.gd")
-const GameTime := preload("../game_time.gd")
-const InputEventCodec := preload("../../input/input_event_codec.gd")
-const Params := preload("../../commands/params.gd")
-const SimilarNames := preload("../../util/similar_names.gd")
+const GodotMcpCommand := preload("../../commands/command.gd")
+const GodotMcpGameTime := preload("../game_time.gd")
+const GodotMcpInputEventCodec := preload("../../input/input_event_codec.gd")
+const GodotMcpParams := preload("../../commands/params.gd")
+const GodotMcpSimilarNames := preload("../../util/similar_names.gd")
 
 const MAXIMUM_STEPS := 200
 const MAXIMUM_PHYSICS_FRAMES := 3600
@@ -14,13 +14,13 @@ const STATES := ["tap", "down", "up"]
 const STEP_KINDS := "{\"action\": name}, {\"key\": name}, {\"joypad_button\": name}, {\"joypad_motion\": axis, \"value\": v}, {\"mouse_motion\": [dx, dy]}, {\"click\": [x, y]}, {\"text\": text}, {\"wait_ms\": n}, {\"wait_physics_frames\": n} or {\"read\": node, \"names\": [...]}"
 const JOYPAD_DEVICE := 0
 
-var _capture: Command
-var _time: GameTime
-var _reader: Command
+var _capture: GodotMcpCommand
+var _time: GodotMcpGameTime
+var _reader: GodotMcpCommand
 var _held := {}
 
 
-func _init(capture: Command, time: GameTime, reader: Command) -> void:
+func _init(capture: GodotMcpCommand, time: GodotMcpGameTime, reader: GodotMcpCommand) -> void:
 	_capture = capture
 	_time = time
 	_reader = reader
@@ -28,14 +28,14 @@ func _init(capture: Command, time: GameTime, reader: Command) -> void:
 
 func execute(params: Dictionary) -> Variant:
 	var steps: Variant = params.get("steps")
-	var release_at_end: Variant = Params.flag(params, "release_at_end", true)
-	var take_screenshot: Variant = Params.flag(params, "screenshot", false)
+	var release_at_end: Variant = GodotMcpParams.flag(params, "release_at_end", true)
+	var take_screenshot: Variant = GodotMcpParams.flag(params, "screenshot", false)
 	for value in [release_at_end, take_screenshot]:
-		if value is CommandError:
+		if value is GodotMcpCommandError:
 			return value
 	if not steps is Array or (steps as Array).is_empty() or (steps as Array).size() > MAXIMUM_STEPS:
-		return CommandError.new(
-			JsonRpc.INVALID_PARAMS,
+		return GodotMcpCommandError.new(
+			GodotMcpJsonRpc.INVALID_PARAMS,
 			"\"steps\" needs from 1 to %d steps" % MAXIMUM_STEPS,
 			"Example: {\"steps\": [{\"action\": \"move_forward\", \"ms\": 1000}, {\"action\": \"jump\"}]}",
 		)
@@ -43,7 +43,7 @@ func execute(params: Dictionary) -> Variant:
 	for index in (steps as Array).size():
 		var step: Variant = _plan(steps[index])
 		if step is String:
-			return CommandError.new(JsonRpc.INVALID_PARAMS, "Step %d: %s" % [index + 1, step], "Each step is one of %s." % STEP_KINDS)
+			return GodotMcpCommandError.new(GodotMcpJsonRpc.INVALID_PARAMS, "Step %d: %s" % [index + 1, step], "Each step is one of %s." % STEP_KINDS)
 		planned.append(step)
 	var tree := Engine.get_main_loop() as SceneTree
 	var started_msec := Time.get_ticks_msec()
@@ -74,8 +74,8 @@ func execute(params: Dictionary) -> Variant:
 		played["reads"] = reads
 	if take_screenshot:
 		var capture: Variant = await _capture.execute({})
-		if capture is CommandError:
-			played["screenshot_error"] = (capture as CommandError).message
+		if capture is GodotMcpCommandError:
+			played["screenshot_error"] = (capture as GodotMcpCommandError).message
 		else:
 			played["screenshot"] = capture
 	return played
@@ -105,8 +105,8 @@ func _perform(step: Dictionary, tree: SceneTree) -> void:
 func _read(step: Dictionary, step_number: int, physics_frames: int) -> Dictionary:
 	var outcome: Variant = _reader.execute({"path": step["path"], "names": step["names"]})
 	var read := {"step": step_number, "physics_frames": physics_frames, "path": step["path"]}
-	if outcome is CommandError:
-		read["error"] = (outcome as CommandError).message
+	if outcome is GodotMcpCommandError:
+		read["error"] = (outcome as GodotMcpCommandError).message
 	else:
 		read.merge(outcome, true)
 	return read
@@ -165,7 +165,7 @@ static func _plan_button(description: Dictionary, target: Variant) -> Variant:
 static func _action_target(action: String, strength: Variant) -> Variant:
 	if not InputMap.has_action(action):
 		var known_actions := InputMap.get_actions().map(func(known_action: StringName) -> String: return str(known_action))
-		var similar := SimilarNames.hint(action, known_actions)
+		var similar := GodotMcpSimilarNames.hint(action, known_actions)
 		return "there is no input action \"%s\" in the running game. %s" % [action, similar if not similar.is_empty() else "Add it with input_map_set, then run the game again."]
 	if not (strength is int or strength is float):
 		return "strength is a number from 0 to 1"
@@ -178,7 +178,7 @@ static func _action_target(action: String, strength: Variant) -> Variant:
 static func _key_target(description: Dictionary) -> Variant:
 	var key_description := description.duplicate()
 	key_description["type"] = "key"
-	var decoded: Variant = InputEventCodec.decode(key_description)
+	var decoded: Variant = GodotMcpInputEventCodec.decode(key_description)
 	if decoded is String:
 		return decoded
 	var event := decoded as InputEventKey
@@ -187,7 +187,7 @@ static func _key_target(description: Dictionary) -> Variant:
 
 
 static func _joypad_button_target(description: Dictionary) -> Variant:
-	var decoded: Variant = InputEventCodec.decode({"type": "joypad_button", "button": description["joypad_button"]})
+	var decoded: Variant = GodotMcpInputEventCodec.decode({"type": "joypad_button", "button": description["joypad_button"]})
 	if decoded is String:
 		return decoded
 	var event := decoded as InputEventJoypadButton
@@ -200,7 +200,7 @@ static func _joypad_motion_target(description: Dictionary) -> Variant:
 	var centers := str(description.get("state", "tap")) == "up"
 	if not centers and not ((value is int or value is float) and absf(value) <= 1.0):
 		return "joypad_motion needs a value from -1 to 1, such as {\"joypad_motion\": \"left_x\", \"value\": 0.5}"
-	var decoded: Variant = InputEventCodec.decode({"type": "joypad_motion", "axis": description["joypad_motion"], "direction": 1})
+	var decoded: Variant = GodotMcpInputEventCodec.decode({"type": "joypad_motion", "axis": description["joypad_motion"], "direction": 1})
 	if decoded is String:
 		return decoded
 	var event := decoded as InputEventJoypadMotion
@@ -213,7 +213,7 @@ static func _plan_click(description: Dictionary) -> Variant:
 	var position: Variant = _vector_of(description["click"])
 	if not position is Vector2:
 		return "click is [x, y] in pixels of the game view, as in game screenshots"
-	var button: Variant = InputEventCodec.decode({"type": "mouse_button", "button": description.get("button", "left")})
+	var button: Variant = GodotMcpInputEventCodec.decode({"type": "mouse_button", "button": description.get("button", "left")})
 	if button is String:
 		return button
 	return {"kind": "click", "position": position, "button": (button as InputEventMouseButton).button_index, "double": description.get("double", false) == true}

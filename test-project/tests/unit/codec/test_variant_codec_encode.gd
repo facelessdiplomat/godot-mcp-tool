@@ -1,9 +1,9 @@
 extends GutTest
 
-const VariantCodec := preload("res://addons/godot_mcp_tool/codec/variant_codec.gd")
+const GodotMcpVariantCodec := preload("res://addons/godot_mcp_tool/codec/variant_codec.gd")
 const ORANGE_MATERIAL_PATH := "res://tests/fixtures/orange_material.tres"
 
-var _codec := VariantCodec.new()
+var _codec := GodotMcpVariantCodec.new()
 
 
 func test_passes_json_values_through() -> void:
@@ -47,7 +47,7 @@ func test_truncates_long_arrays() -> void:
 	var numbers := PackedInt32Array()
 	numbers.resize(150)
 	var encoded: Array = _codec.encode(numbers)
-	assert_eq(encoded.size(), VariantCodec.MAXIMUM_ENCODED_ITEMS + 1)
+	assert_eq(encoded.size(), GodotMcpVariantCodec.MAXIMUM_ENCODED_ITEMS + 1)
 	assert_eq(encoded[-1], "… 50 more")
 
 

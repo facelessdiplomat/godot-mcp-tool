@@ -1,6 +1,6 @@
 extends RefCounted
 
-const SimilarNames := preload("../util/similar_names.gd")
+const GodotMcpSimilarNames := preload("../util/similar_names.gd")
 
 const EVENT_TYPES := "key, mouse_button, joypad_button or joypad_motion"
 const KEY_MODIFIERS := {"shift": KEY_MASK_SHIFT, "ctrl": KEY_MASK_CTRL, "alt": KEY_MASK_ALT, "meta": KEY_MASK_META}
@@ -93,7 +93,7 @@ static func _key(description: Dictionary) -> Variant:
 	var combined_code := OS.find_keycode_from_string(key_name)
 	var keycode := combined_code & KEY_CODE_MASK
 	if keycode == KEY_NONE:
-		var similar := SimilarNames.hint(key_name, Array(key_names()))
+		var similar := GodotMcpSimilarNames.hint(key_name, Array(key_names()))
 		return "There is no key named \"%s\". %s" % [key_name, similar if not similar.is_empty() else "Use names such as \"W\", \"Space\", \"Up\" or \"F1\"."]
 	var event := InputEventKey.new()
 	event.physical_keycode = keycode

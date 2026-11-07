@@ -1,52 +1,52 @@
 extends "../command.gd"
 
-const AnimationReference := preload("../../animation/animation_reference.gd")
-const ChangeSet := preload("../../scene/change_set.gd")
-const EditingContext := preload("../../scene/editing_context.gd")
-const IndefiniteArticle := preload("../../util/indefinite_article.gd")
-const NodeFactory := preload("../../scene/node_factory.gd")
-const NodeLocator := preload("../../scene/node_locator.gd")
-const Params := preload("../params.gd")
-const StateMachinePlan := preload("../../animation/state_machine_plan.gd")
+const GodotMcpAnimationReference := preload("../../animation/animation_reference.gd")
+const GodotMcpChangeSet := preload("../../scene/change_set.gd")
+const GodotMcpEditingContext := preload("../../scene/editing_context.gd")
+const GodotMcpIndefiniteArticle := preload("../../util/indefinite_article.gd")
+const GodotMcpNodeFactory := preload("../../scene/node_factory.gd")
+const GodotMcpNodeLocator := preload("../../scene/node_locator.gd")
+const GodotMcpParams := preload("../params.gd")
+const GodotMcpStateMachinePlan := preload("../../animation/state_machine_plan.gd")
 
 const STATES_EXAMPLE := "Example: {\"tree\": \"AnimationTree\", \"player\": \"AnimationPlayer\", \"states\": [{\"name\": \"idle\", \"animation\": \"idle\"}, {\"name\": \"walk\", \"animation\": \"walk\"}], \"transitions\": [{\"from\": \"Start\", \"to\": \"idle\"}, {\"from\": \"idle\", \"to\": \"walk\", \"condition\": \"moving\"}]}"
 
-var _context: EditingContext
+var _context: GodotMcpEditingContext
 
 
-func _init(context: EditingContext) -> void:
+func _init(context: GodotMcpEditingContext) -> void:
 	_context = context
 
 
 func execute(params: Dictionary) -> Variant:
-	var scene_path: Variant = Params.text(params, "scene")
-	var tree_path: Variant = Params.required_text(params, "tree", "\"AnimationTree\"")
-	var player_path: Variant = Params.text(params, "player")
+	var scene_path: Variant = GodotMcpParams.text(params, "scene")
+	var tree_path: Variant = GodotMcpParams.required_text(params, "tree", "\"AnimationTree\"")
+	var player_path: Variant = GodotMcpParams.text(params, "player")
 	for value in [scene_path, tree_path, player_path]:
-		if value is CommandError:
+		if value is GodotMcpCommandError:
 			return value
 	var state_descriptions: Variant = params.get("states", [])
 	var transition_descriptions: Variant = params.get("transitions", [])
 	if not state_descriptions is Array or (state_descriptions as Array).is_empty():
-		return CommandError.new(JsonRpc.INVALID_PARAMS, "\"states\" needs at least one state", STATES_EXAMPLE)
+		return GodotMcpCommandError.new(GodotMcpJsonRpc.INVALID_PARAMS, "\"states\" needs at least one state", STATES_EXAMPLE)
 	if not transition_descriptions is Array:
-		return CommandError.new(JsonRpc.INVALID_PARAMS, "\"transitions\" is a list of transitions", STATES_EXAMPLE)
+		return GodotMcpCommandError.new(GodotMcpJsonRpc.INVALID_PARAMS, "\"transitions\" is a list of transitions", STATES_EXAMPLE)
 	var resolved: Variant = _context.scenes.resolve_for_editing(scene_path)
-	if resolved is CommandError:
+	if resolved is GodotMcpCommandError:
 		return resolved
 	var scene_root := resolved as Node
 	var tree: Variant = _find_tree(scene_root, tree_path)
-	if tree is CommandError:
+	if tree is GodotMcpCommandError:
 		return tree
 	var player: Variant = _player_for(scene_root, tree, player_path)
-	if player is CommandError:
+	if player is GodotMcpCommandError:
 		return player
-	var plan := StateMachinePlan.new(player)
+	var plan := GodotMcpStateMachinePlan.new(player)
 	plan.plan(state_descriptions, transition_descriptions)
 	var result := {
 		"scene": scene_root.scene_file_path,
-		"tree": NodeLocator.path_of(scene_root, tree),
-		"player": NodeLocator.path_of(scene_root, player),
+		"tree": GodotMcpNodeLocator.path_of(scene_root, tree),
+		"player": GodotMcpNodeLocator.path_of(scene_root, player),
 		"states": plan.states,
 		"transitions": plan.transitions,
 		"rejected": plan.rejected,
@@ -55,7 +55,7 @@ func execute(params: Dictionary) -> Variant:
 	if plan.states.is_empty():
 		return result
 	var animation_tree := tree as AnimationTree
-	var changes := ChangeSet.new()
+	var changes := GodotMcpChangeSet.new()
 	changes.add_do_property(animation_tree, &"tree_root", plan.build())
 	changes.add_undo_property(animation_tree, &"tree_root", animation_tree.tree_root)
 	var player_reference := animation_tree.get_path_to(player)
@@ -67,13 +67,13 @@ func execute(params: Dictionary) -> Variant:
 
 
 static func _find_tree(scene_root: Node, tree_path: String) -> Variant:
-	var node := NodeLocator.find(scene_root, tree_path)
+	var node := GodotMcpNodeLocator.find(scene_root, tree_path)
 	if node == null:
-		return CommandError.new(JsonRpc.NOT_FOUND, "Node \"%s\" not found" % tree_path, NodeLocator.not_found_hint(scene_root, tree_path))
+		return GodotMcpCommandError.new(GodotMcpJsonRpc.NOT_FOUND, "Node \"%s\" not found" % tree_path, GodotMcpNodeLocator.not_found_hint(scene_root, tree_path))
 	if not node is AnimationTree:
-		return CommandError.new(
-			JsonRpc.INVALID_PARAMS,
-			"%s is %s, not an AnimationTree" % [tree_path, IndefiniteArticle.before(NodeFactory.display_class(node))],
+		return GodotMcpCommandError.new(
+			GodotMcpJsonRpc.INVALID_PARAMS,
+			"%s is %s, not an AnimationTree" % [tree_path, GodotMcpIndefiniteArticle.before(GodotMcpNodeFactory.display_class(node))],
 			"Add an AnimationTree with node_add next to the AnimationPlayer whose animations it blends.",
 		)
 	return node
@@ -81,12 +81,12 @@ static func _find_tree(scene_root: Node, tree_path: String) -> Variant:
 
 static func _player_for(scene_root: Node, tree: AnimationTree, player_path: String) -> Variant:
 	if not player_path.is_empty():
-		return AnimationReference.find_player(scene_root, player_path)
+		return GodotMcpAnimationReference.find_player(scene_root, player_path)
 	var current := tree.get_node_or_null(tree.anim_player) if not tree.anim_player.is_empty() else null
 	if current is AnimationPlayer:
 		return current
-	return CommandError.new(
-		JsonRpc.INVALID_PARAMS,
+	return GodotMcpCommandError.new(
+		GodotMcpJsonRpc.INVALID_PARAMS,
 		"%s has no AnimationPlayer to take its animations from" % tree.name,
 		"Pass player, the path of the AnimationPlayer, such as \"AnimationPlayer\".",
 	)

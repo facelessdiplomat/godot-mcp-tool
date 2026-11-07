@@ -1,18 +1,18 @@
 extends GutTest
 
-const CommandError := preload("res://addons/godot_mcp_tool/commands/command_error.gd")
-const EditingContext := preload("res://addons/godot_mcp_tool/scene/editing_context.gd")
+const GodotMcpCommandError := preload("res://addons/godot_mcp_tool/commands/command_error.gd")
+const GodotMcpEditingContext := preload("res://addons/godot_mcp_tool/scene/editing_context.gd")
 const FakeSceneAccess := preload("res://tests/support/fake_scene_access.gd")
 const FakeScriptEditorAccess := preload("res://tests/support/fake_script_editor_access.gd")
-const JsonRpc := preload("res://addons/godot_mcp_tool/bridge/json_rpc.gd")
-const NodeFindCommand := preload("res://addons/godot_mcp_tool/commands/node/node_find_command.gd")
+const GodotMcpJsonRpc := preload("res://addons/godot_mcp_tool/bridge/json_rpc.gd")
+const GodotMcpNodeFindCommand := preload("res://addons/godot_mcp_tool/commands/node/node_find_command.gd")
 const PatrolPoint := preload("res://tests/fixtures/patrol_point.gd")
-const PlainUndoHistory := preload("res://addons/godot_mcp_tool/scene/plain_undo_history.gd")
-const VariantCodec := preload("res://addons/godot_mcp_tool/codec/variant_codec.gd")
+const GodotMcpPlainUndoHistory := preload("res://addons/godot_mcp_tool/scene/plain_undo_history.gd")
+const GodotMcpVariantCodec := preload("res://addons/godot_mcp_tool/codec/variant_codec.gd")
 
 var _scenes: FakeSceneAccess
-var _history: PlainUndoHistory
-var _context: EditingContext
+var _history: GodotMcpPlainUndoHistory
+var _context: GodotMcpEditingContext
 var _root: Node3D
 
 
@@ -22,8 +22,8 @@ func before_each() -> void:
 	_root.name = "Arena"
 	_root.scene_file_path = "res://levels/arena.tscn"
 	_scenes.edited_root = _root
-	_history = PlainUndoHistory.new()
-	_context = EditingContext.new(_scenes, _history, VariantCodec.new(), FakeScriptEditorAccess.new())
+	_history = GodotMcpPlainUndoHistory.new()
+	_context = GodotMcpEditingContext.new(_scenes, _history, GodotMcpVariantCodec.new(), FakeScriptEditorAccess.new())
 	var enemies := _add_owned(_root, Node3D.new(), "Enemies")
 	var goblin := _add_owned(enemies, CharacterBody3D.new(), "Goblin")
 	goblin.add_to_group("enemies", true)
@@ -49,7 +49,7 @@ func _add_owned(parent: Node, node: Node, node_name: String) -> Node:
 
 
 func _find(params: Dictionary) -> Variant:
-	return await NodeFindCommand.new(_context).execute(params)
+	return await GodotMcpNodeFindCommand.new(_context).execute(params)
 
 
 static func _paths(result: Dictionary) -> Array:
@@ -110,11 +110,11 @@ func test_limits_the_matches_and_counts_them_all() -> void:
 
 func test_suggests_a_known_type_for_a_misspelled_one() -> void:
 	var error: Variant = await _find({"type": "MeshInstance"})
-	assert_true(error is CommandError)
-	assert_eq((error as CommandError).code, JsonRpc.INVALID_PARAMS)
-	assert_string_contains((error as CommandError).hint, "MeshInstance3D")
+	assert_true(error is GodotMcpCommandError)
+	assert_eq((error as GodotMcpCommandError).code, GodotMcpJsonRpc.INVALID_PARAMS)
+	assert_string_contains((error as GodotMcpCommandError).hint, "MeshInstance3D")
 
 
 func test_needs_something_to_search_for() -> void:
 	var error: Variant = await _find({})
-	assert_eq((error as CommandError).code, JsonRpc.INVALID_PARAMS)
+	assert_eq((error as GodotMcpCommandError).code, GodotMcpJsonRpc.INVALID_PARAMS)

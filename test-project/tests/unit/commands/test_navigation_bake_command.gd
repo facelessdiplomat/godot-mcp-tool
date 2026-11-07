@@ -1,26 +1,26 @@
 extends GutTest
 
-const CommandError := preload("res://addons/godot_mcp_tool/commands/command_error.gd")
-const EditingContext := preload("res://addons/godot_mcp_tool/scene/editing_context.gd")
+const GodotMcpCommandError := preload("res://addons/godot_mcp_tool/commands/command_error.gd")
+const GodotMcpEditingContext := preload("res://addons/godot_mcp_tool/scene/editing_context.gd")
 const FakeSceneAccess := preload("res://tests/support/fake_scene_access.gd")
 const FakeScriptEditorAccess := preload("res://tests/support/fake_script_editor_access.gd")
-const JsonRpc := preload("res://addons/godot_mcp_tool/bridge/json_rpc.gd")
-const NavigationBakeCommand := preload("res://addons/godot_mcp_tool/commands/navigation/navigation_bake_command.gd")
-const PlainUndoHistory := preload("res://addons/godot_mcp_tool/scene/plain_undo_history.gd")
-const VariantCodec := preload("res://addons/godot_mcp_tool/codec/variant_codec.gd")
+const GodotMcpJsonRpc := preload("res://addons/godot_mcp_tool/bridge/json_rpc.gd")
+const GodotMcpNavigationBakeCommand := preload("res://addons/godot_mcp_tool/commands/navigation/navigation_bake_command.gd")
+const GodotMcpPlainUndoHistory := preload("res://addons/godot_mcp_tool/scene/plain_undo_history.gd")
+const GodotMcpVariantCodec := preload("res://addons/godot_mcp_tool/codec/variant_codec.gd")
 
 const CELL_SIZE_SETTING := "navigation/3d/default_cell_size"
 
 var _scenes: FakeSceneAccess
-var _history: PlainUndoHistory
-var _context: EditingContext
+var _history: GodotMcpPlainUndoHistory
+var _context: GodotMcpEditingContext
 var _arena: Node3D
 
 
 func before_each() -> void:
 	_scenes = FakeSceneAccess.new()
-	_history = PlainUndoHistory.new()
-	_context = EditingContext.new(_scenes, _history, VariantCodec.new(), FakeScriptEditorAccess.new())
+	_history = GodotMcpPlainUndoHistory.new()
+	_context = GodotMcpEditingContext.new(_scenes, _history, GodotMcpVariantCodec.new(), FakeScriptEditorAccess.new())
 	_arena = Node3D.new()
 	_arena.name = "Arena"
 	_arena.scene_file_path = "res://arena.tscn"
@@ -34,7 +34,7 @@ func after_each() -> void:
 
 
 func _bake(params: Dictionary = {}) -> Variant:
-	return await NavigationBakeCommand.new(_context).execute(params)
+	return await GodotMcpNavigationBakeCommand.new(_context).execute(params)
 
 
 func _add(parent: Node, node: Node) -> Node:
@@ -150,9 +150,9 @@ func test_skips_a_region_without_a_navigation_mesh() -> void:
 
 func test_explains_a_scene_without_regions_and_a_node_that_is_not_a_region() -> void:
 	_add_floor(_arena)
-	var no_regions: CommandError = await _bake()
-	assert_eq(no_regions.code, JsonRpc.NOT_FOUND)
+	var no_regions: GodotMcpCommandError = await _bake()
+	assert_eq(no_regions.code, GodotMcpJsonRpc.NOT_FOUND)
 	assert_eq(no_regions.message, "res://arena.tscn has no NavigationRegion3D")
-	var not_a_region: CommandError = await _bake({"path": "Floor"})
-	assert_eq(not_a_region.code, JsonRpc.INVALID_PARAMS)
+	var not_a_region: GodotMcpCommandError = await _bake({"path": "Floor"})
+	assert_eq(not_a_region.code, GodotMcpJsonRpc.INVALID_PARAMS)
 	assert_eq(not_a_region.message, "Floor is a StaticBody3D, not a NavigationRegion3D")

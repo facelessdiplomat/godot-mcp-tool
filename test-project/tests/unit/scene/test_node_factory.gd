@@ -1,24 +1,24 @@
 extends GutTest
 
-const CommandError := preload("res://addons/godot_mcp_tool/commands/command_error.gd")
-const JsonRpc := preload("res://addons/godot_mcp_tool/bridge/json_rpc.gd")
-const NodeFactory := preload("res://addons/godot_mcp_tool/scene/node_factory.gd")
+const GodotMcpCommandError := preload("res://addons/godot_mcp_tool/commands/command_error.gd")
+const GodotMcpJsonRpc := preload("res://addons/godot_mcp_tool/bridge/json_rpc.gd")
+const GodotMcpNodeFactory := preload("res://addons/godot_mcp_tool/scene/node_factory.gd")
 
-var _factory := NodeFactory.new()
+var _factory := GodotMcpNodeFactory.new()
 
 
 func _created(type_text: String) -> Node:
 	var created: Variant = _factory.create(type_text)
-	assert_true(created is Node, "expected a node for %s, got %s" % [type_text, str(created.message) if created is CommandError else str(created)])
+	assert_true(created is Node, "expected a node for %s, got %s" % [type_text, str(created.message) if created is GodotMcpCommandError else str(created)])
 	return autofree(created) if created is Node else null
 
 
-func _error(type_text: String) -> CommandError:
+func _error(type_text: String) -> GodotMcpCommandError:
 	var created: Variant = _factory.create(type_text)
-	assert_true(created is CommandError, "expected an error for %s" % type_text)
+	assert_true(created is GodotMcpCommandError, "expected an error for %s" % type_text)
 	if created is Node:
 		(created as Node).free()
-	return created as CommandError
+	return created as GodotMcpCommandError
 
 
 func test_creates_an_engine_node_class() -> void:
@@ -39,7 +39,7 @@ func test_instances_a_scene_by_path() -> void:
 
 func test_rejects_a_class_that_is_not_a_node() -> void:
 	var error := _error("BoxMesh")
-	assert_eq(error.code, JsonRpc.INVALID_PARAMS)
+	assert_eq(error.code, GodotMcpJsonRpc.INVALID_PARAMS)
 	assert_string_contains(error.message, "not a node")
 
 
@@ -49,9 +49,9 @@ func test_rejects_an_abstract_class() -> void:
 
 func test_suggests_similar_names_for_an_unknown_type() -> void:
 	var error := _error("MeshInstance")
-	assert_eq(error.code, JsonRpc.NOT_FOUND)
+	assert_eq(error.code, GodotMcpJsonRpc.NOT_FOUND)
 	assert_string_contains(error.hint, "MeshInstance3D")
 
 
 func test_reports_a_missing_scene_file() -> void:
-	assert_eq(_error("res://missing/scene.tscn").code, JsonRpc.NOT_FOUND)
+	assert_eq(_error("res://missing/scene.tscn").code, GodotMcpJsonRpc.NOT_FOUND)

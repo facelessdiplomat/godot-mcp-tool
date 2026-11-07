@@ -1,8 +1,8 @@
 extends RefCounted
 
-const GameRequestResponder := preload("game_request_responder.gd")
-const JsonRpc := preload("../bridge/json_rpc.gd")
-const NdjsonBuffer := preload("../bridge/ndjson_buffer.gd")
+const GodotMcpGameRequestResponder := preload("game_request_responder.gd")
+const GodotMcpJsonRpc := preload("../bridge/json_rpc.gd")
+const GodotMcpNdjsonBuffer := preload("../bridge/ndjson_buffer.gd")
 
 const HOST := "127.0.0.1"
 const PORT_ARGUMENT_PREFIX := "--mcp-port="
@@ -11,8 +11,8 @@ const OPEN_STATUSES := [StreamPeerTCP.STATUS_CONNECTING, StreamPeerTCP.STATUS_CO
 
 var _peer := StreamPeerTCP.new()
 var _token: String
-var _responder: GameRequestResponder
-var _received := NdjsonBuffer.new()
+var _responder: GodotMcpGameRequestResponder
+var _received := GodotMcpNdjsonBuffer.new()
 var _greeted := false
 
 
@@ -27,7 +27,7 @@ static func token_from_environment() -> String:
 	return OS.get_environment(TOKEN_VARIABLE)
 
 
-func _init(port: int, token: String, responder: GameRequestResponder) -> void:
+func _init(port: int, token: String, responder: GodotMcpGameRequestResponder) -> void:
 	_token = token
 	_responder = responder
 	_peer.connect_to_host(HOST, port)
@@ -67,4 +67,4 @@ func _answer(request: Dictionary) -> void:
 
 
 func _send(message: Dictionary) -> void:
-	_peer.put_data(JsonRpc.encode(message))
+	_peer.put_data(GodotMcpJsonRpc.encode(message))

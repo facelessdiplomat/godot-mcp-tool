@@ -1,7 +1,7 @@
 @tool
 extends HSplitContainer
 
-const CommandJournal := preload("command_journal.gd")
+const GodotMcpCommandJournal := preload("command_journal.gd")
 
 const TAB_TITLE := "Godot MCP"
 const REFRESH_INTERVAL_SECONDS := 1.0
@@ -11,7 +11,7 @@ const COMMANDS_TITLE := "Recent agent commands"
 const CLEAR_TEXT := "Clear"
 const STATUS_COLUMN_WIDTH := 380
 
-var _journal: CommandJournal
+var _journal: GodotMcpCommandJournal
 var _read_status: Callable
 var _is_unsafe_allowed: Callable
 var _set_unsafe_allowed: Callable
@@ -22,7 +22,7 @@ var _commands := RichTextLabel.new()
 var _refresh_timer := Timer.new()
 
 
-func _init(journal: CommandJournal, read_status: Callable, is_unsafe_allowed: Callable, set_unsafe_allowed: Callable) -> void:
+func _init(journal: GodotMcpCommandJournal, read_status: Callable, is_unsafe_allowed: Callable, set_unsafe_allowed: Callable) -> void:
 	name = TAB_TITLE
 	_journal = journal
 	_read_status = read_status

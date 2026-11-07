@@ -1,11 +1,11 @@
 extends RefCounted
 
-const ChangeSet := preload("change_set.gd")
-const EnumOptions := preload("../codec/enum_options.gd")
-const SimilarNames := preload("../util/similar_names.gd")
-const UndoHistory := preload("undo_history.gd")
-const ValueComparison := preload("../codec/value_comparison.gd")
-const VariantCodec := preload("../codec/variant_codec.gd")
+const GodotMcpChangeSet := preload("change_set.gd")
+const GodotMcpEnumOptions := preload("../codec/enum_options.gd")
+const GodotMcpSimilarNames := preload("../util/similar_names.gd")
+const GodotMcpUndoHistory := preload("undo_history.gd")
+const GodotMcpValueComparison := preload("../codec/value_comparison.gd")
+const GodotMcpVariantCodec := preload("../codec/variant_codec.gd")
 
 const LAYOUT_USAGE := PROPERTY_USAGE_CATEGORY | PROPERTY_USAGE_GROUP | PROPERTY_USAGE_SUBGROUP
 const SCRIPT_PROPERTY := "script"
@@ -15,10 +15,10 @@ const LAYOUT_MODE_PROPERTY := "layout_mode"
 const POSITION_LAYOUT_MODE := 0
 const ANCHORS_LAYOUT_MODE := 1
 
-var _codec: VariantCodec
+var _codec: GodotMcpVariantCodec
 
 
-func _init(codec: VariantCodec) -> void:
+func _init(codec: GodotMcpVariantCodec) -> void:
 	_codec = codec
 
 
@@ -77,7 +77,7 @@ func plan(object: Object, values: Dictionary) -> Dictionary:
 	var decoding := _decode_all(object, values)
 	var decoded: Dictionary = decoding["decoded"]
 	var implied := _layout_implied_by(object, decoded)
-	var changes := ChangeSet.new()
+	var changes := GodotMcpChangeSet.new()
 	for property_name in implied:
 		changes.add_do_property(object, property_name, implied[property_name])
 	for property_name in decoded:
@@ -88,9 +88,9 @@ func plan(object: Object, values: Dictionary) -> Dictionary:
 	return {"changes": changes, "decoded": decoded, "rejected": decoding["rejected"]}
 
 
-func apply(object: Object, values: Dictionary, history: UndoHistory, action_name: String, context: Object) -> Dictionary:
+func apply(object: Object, values: Dictionary, history: GodotMcpUndoHistory, action_name: String, context: Object) -> Dictionary:
 	var planned := plan(object, values)
-	var changes: ChangeSet = planned["changes"]
+	var changes: GodotMcpChangeSet = planned["changes"]
 	if not changes.is_empty():
 		history.record(action_name, context, [changes])
 	return report(object, planned["decoded"], planned["rejected"])
@@ -112,7 +112,7 @@ func report(object: Object, decoded: Dictionary, rejected: Array) -> Dictionary:
 	var not_applied: Array = []
 	for property_name in decoded:
 		var actual: Variant = object.get(property_name)
-		if ValueComparison.matches(decoded[property_name], actual):
+		if GodotMcpValueComparison.matches(decoded[property_name], actual):
 			applied.append(property_name)
 		else:
 			not_applied.append({"name": property_name, "expected": _codec.encode(decoded[property_name]), "actual": _codec.encode(actual)})
@@ -140,7 +140,7 @@ func _decode_all(object: Object, values: Dictionary) -> Dictionary:
 func _entry(property: Dictionary, value: Variant) -> Dictionary:
 	var entry := {"name": property["name"], "type": _type_name(property), "value": _codec.encode(value)}
 	if property["type"] == TYPE_INT and property["hint"] == PROPERTY_HINT_ENUM:
-		entry["options"] = EnumOptions.parse(str(property["hint_string"]))
+		entry["options"] = GodotMcpEnumOptions.parse(str(property["hint_string"]))
 	return entry
 
 
@@ -184,7 +184,7 @@ static func _is_default(object: Object, property: Dictionary, value: Variant) ->
 		default_value = script.get_property_default_value(property["name"])
 	else:
 		default_value = ClassDB.class_get_property_default_value(object.get_class(), property["name"])
-	return ValueComparison.matches(default_value, value)
+	return GodotMcpValueComparison.matches(default_value, value)
 
 
 static func _type_name(property: Dictionary) -> String:
@@ -207,5 +207,5 @@ static func _type_name(property: Dictionary) -> String:
 
 static func _unknown_property_message(object: Object, property_name: String, properties: Dictionary) -> String:
 	var message := "%s has no property \"%s\"." % [object.get_class(), property_name]
-	var similar := SimilarNames.hint(property_name, properties.keys())
+	var similar := GodotMcpSimilarNames.hint(property_name, properties.keys())
 	return message if similar.is_empty() else "%s %s" % [message, similar]

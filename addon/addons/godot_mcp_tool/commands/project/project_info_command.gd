@@ -1,8 +1,8 @@
 extends "../command.gd"
 
-const AutoloadList := preload("../../project/autoload_list.gd")
-const GlobalClassSummary := preload("../../project/global_class_summary.gd")
-const ResourcePaths := preload("../../util/resource_paths.gd")
+const GodotMcpAutoloadList := preload("../../project/autoload_list.gd")
+const GodotMcpGlobalClassSummary := preload("../../project/global_class_summary.gd")
+const GodotMcpResourcePaths := preload("../../util/resource_paths.gd")
 
 const MAXIMUM_PROJECT_CLASSES := 50
 
@@ -17,7 +17,7 @@ func execute(_params: Dictionary) -> Variant:
 	return {
 		"name": str(ProjectSettings.get_setting("application/config/name", "")),
 		"path": ProjectSettings.globalize_path("res://").trim_suffix("/"),
-		"main_scene": ResourcePaths.resolve(str(ProjectSettings.get_setting("application/run/main_scene", ""))),
+		"main_scene": GodotMcpResourcePaths.resolve(str(ProjectSettings.get_setting("application/run/main_scene", ""))),
 		"features": Array(ProjectSettings.get_setting("application/config/features", PackedStringArray())),
 		"renderer": str(ProjectSettings.get_setting("rendering/renderer/rendering_method", "")),
 		"physics_engine_3d": str(ProjectSettings.get_setting("physics/3d/physics_engine", "")),
@@ -27,9 +27,9 @@ func execute(_params: Dictionary) -> Variant:
 			"stretch_mode": str(ProjectSettings.get_setting("display/window/stretch/mode", "")),
 			"stretch_aspect": str(ProjectSettings.get_setting("display/window/stretch/aspect", "")),
 		},
-		"autoloads": AutoloadList.read(),
+		"autoloads": GodotMcpAutoloadList.read(),
 		"enabled_plugins": Array(ProjectSettings.get_setting("editor_plugins/enabled", PackedStringArray())),
-		"global_classes": GlobalClassSummary.summarize(ProjectSettings.get_global_class_list(), MAXIMUM_PROJECT_CLASSES),
+		"global_classes": GodotMcpGlobalClassSummary.summarize(ProjectSettings.get_global_class_list(), MAXIMUM_PROJECT_CLASSES),
 		"indentation": _read_indentation.call(),
 		"folders": _top_level_folders(),
 	}

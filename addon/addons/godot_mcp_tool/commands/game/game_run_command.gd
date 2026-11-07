@@ -1,12 +1,12 @@
 extends "../command.gd"
 
-const EditingContext := preload("../../scene/editing_context.gd")
-const GameState := preload("../../runtime/game_state.gd")
-const Params := preload("../params.gd")
-const RunRequest := preload("../../runtime/run_request.gd")
-const RuntimeContext := preload("../../runtime/runtime_context.gd")
-const SceneResolver := preload("../../scene/scene_resolver.gd")
-const Waiting := preload("../../util/waiting.gd")
+const GodotMcpEditingContext := preload("../../scene/editing_context.gd")
+const GodotMcpGameState := preload("../../runtime/game_state.gd")
+const GodotMcpParams := preload("../params.gd")
+const GodotMcpRunRequest := preload("../../runtime/run_request.gd")
+const GodotMcpRuntimeContext := preload("../../runtime/runtime_context.gd")
+const GodotMcpSceneResolver := preload("../../scene/scene_resolver.gd")
+const GodotMcpWaiting := preload("../../util/waiting.gd")
 
 const MAIN_TARGET := "main"
 const CURRENT_TARGET := "current"
@@ -16,57 +16,57 @@ const STOP_TIMEOUT_MSEC := 10_000
 const OUTPUT_LIMIT := 60
 const MAXIMUM_FIXED_FPS := 1000
 
-var _context: EditingContext
-var _runtime: RuntimeContext
+var _context: GodotMcpEditingContext
+var _runtime: GodotMcpRuntimeContext
 
 
-func _init(context: EditingContext, runtime: RuntimeContext) -> void:
+func _init(context: GodotMcpEditingContext, runtime: GodotMcpRuntimeContext) -> void:
 	_context = context
 	_runtime = runtime
 
 
 func execute(params: Dictionary) -> Variant:
-	var target: Variant = Params.text(params, "scene", MAIN_TARGET)
-	var watch_msec: Variant = Params.whole_number(params, "watch_ms", DEFAULT_WATCH_MSEC)
-	var startup_timeout_msec: Variant = Params.whole_number(params, "startup_timeout_ms", DEFAULT_STARTUP_TIMEOUT_MSEC)
-	var stop_after: Variant = Params.flag(params, "stop_after", false)
-	var fixed_fps: Variant = Params.whole_number(params, "fixed_fps", 0)
+	var target: Variant = GodotMcpParams.text(params, "scene", MAIN_TARGET)
+	var watch_msec: Variant = GodotMcpParams.whole_number(params, "watch_ms", DEFAULT_WATCH_MSEC)
+	var startup_timeout_msec: Variant = GodotMcpParams.whole_number(params, "startup_timeout_ms", DEFAULT_STARTUP_TIMEOUT_MSEC)
+	var stop_after: Variant = GodotMcpParams.flag(params, "stop_after", false)
+	var fixed_fps: Variant = GodotMcpParams.whole_number(params, "fixed_fps", 0)
 	for value in [target, watch_msec, startup_timeout_msec, stop_after, fixed_fps]:
-		if value is CommandError:
+		if value is GodotMcpCommandError:
 			return value
 	if params.has("fixed_fps") and (fixed_fps < 1 or fixed_fps > MAXIMUM_FIXED_FPS):
-		return CommandError.new(JsonRpc.INVALID_PARAMS, "\"fixed_fps\" must be from 1 to %d" % MAXIMUM_FIXED_FPS, "Example: 60")
+		return GodotMcpCommandError.new(GodotMcpJsonRpc.INVALID_PARAMS, "\"fixed_fps\" must be from 1 to %d" % MAXIMUM_FIXED_FPS, "Example: 60")
 	var scene_path: Variant = _resolve_target(target)
-	if scene_path is CommandError:
+	if scene_path is GodotMcpCommandError:
 		return scene_path
 	var launcher := _runtime.launcher
 	var saved_scenes := PackedStringArray()
 	var saved_scripts: Array = []
 	if launcher.saves_before_running():
 		var written_scripts: Variant = await _context.scripts.prepare_for_saving()
-		if written_scripts is CommandError:
+		if written_scripts is GodotMcpCommandError:
 			return written_scripts
 		saved_scripts = written_scripts
 		saved_scenes = launcher.unsaved_scenes()
 	if launcher.is_playing():
 		launcher.stop()
-		if not await Waiting.until(func() -> bool: return not launcher.is_playing(), STOP_TIMEOUT_MSEC):
-			return CommandError.new(JsonRpc.TIMEOUT, "The running game did not stop within %d ms" % STOP_TIMEOUT_MSEC, "Stop it in the editor, then try again.")
+		if not await GodotMcpWaiting.until(func() -> bool: return not launcher.is_playing(), STOP_TIMEOUT_MSEC):
+			return GodotMcpCommandError.new(GodotMcpJsonRpc.TIMEOUT, "The running game did not stop within %d ms" % STOP_TIMEOUT_MSEC, "Stop it in the editor, then try again.")
 	var game := _runtime.game
 	var ready_count := game.ready_count
 	var stop_count := game.stop_count
 	var first_seq := _runtime.log_store.last_seq + 1
 	var started_msec := Time.get_ticks_msec()
-	game.request_agent_run(RunRequest.new(fixed_fps))
+	game.request_agent_run(GodotMcpRunRequest.new(fixed_fps))
 	_play(target, scene_path)
-	await Waiting.until(func() -> bool: return game.ready_count != ready_count or game.stop_count != stop_count or game.state == GameState.PAUSED, startup_timeout_msec)
+	await GodotMcpWaiting.until(func() -> bool: return game.ready_count != ready_count or game.stop_count != stop_count or game.state == GodotMcpGameState.PAUSED, startup_timeout_msec)
 	var outcome := _outcome(ready_count, stop_count)
 	var startup_msec := Time.get_ticks_msec() - started_msec
 	if outcome == "ready":
-		await Waiting.until(func() -> bool: return game.stop_count != stop_count, watch_msec)
+		await GodotMcpWaiting.until(func() -> bool: return game.stop_count != stop_count, watch_msec)
 		if stop_after and launcher.is_playing():
 			launcher.stop()
-			await Waiting.until(func() -> bool: return not launcher.is_playing() and game.stop_count != stop_count, STOP_TIMEOUT_MSEC)
+			await GodotMcpWaiting.until(func() -> bool: return not launcher.is_playing() and game.stop_count != stop_count, STOP_TIMEOUT_MSEC)
 	var page := _runtime.log_store.entries_after(first_seq - 1, PackedStringArray(), OUTPUT_LIMIT)
 	return {
 		"scene": game.scene if not game.scene.is_empty() else scene_path,
@@ -86,7 +86,7 @@ func _outcome(ready_count: int, stop_count: int) -> String:
 		return "ready"
 	if _runtime.game.stop_count != stop_count:
 		return "stopped"
-	if _runtime.game.state == GameState.PAUSED:
+	if _runtime.game.state == GodotMcpGameState.PAUSED:
 		return "paused"
 	return "timeout"
 
@@ -103,15 +103,15 @@ func _play(target: String, scene_path: String) -> void:
 
 func _resolve_target(target: String) -> Variant:
 	if target == MAIN_TARGET:
-		return SceneResolver.main_scene_path()
+		return GodotMcpSceneResolver.main_scene_path()
 	if target == CURRENT_TARGET:
 		var edited_root := _context.scenes.access.edited_scene_root()
 		if edited_root == null or edited_root.scene_file_path.is_empty():
-			return CommandError.new(JsonRpc.NO_SCENE, "No saved scene is open in the editor", "Open one with scene_open, or run the main scene.")
+			return GodotMcpCommandError.new(GodotMcpJsonRpc.NO_SCENE, "No saved scene is open in the editor", "Open one with scene_open, or run the main scene.")
 		return edited_root.scene_file_path
-	var path_error := SceneResolver.validate_scene_path(target)
+	var path_error := GodotMcpSceneResolver.validate_scene_path(target)
 	if path_error != null:
 		return path_error
 	if not ResourceLoader.exists(target):
-		return SceneResolver.missing_scene_error(target)
+		return GodotMcpSceneResolver.missing_scene_error(target)
 	return target

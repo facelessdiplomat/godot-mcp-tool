@@ -16,7 +16,7 @@ func handles(property: Dictionary) -> bool:
 	return property.get("type") in HANDLED_TYPES
 
 
-func decode(value: Variant, property: Dictionary, _target: Object, _decoder: ValueDecoder) -> DecodeOutcome:
+func decode(value: Variant, property: Dictionary, _target: Object, _decoder: GodotMcpValueDecoder) -> GodotMcpDecodeOutcome:
 	var type: int = property["type"]
 	if value is String:
 		return _decode_godot_syntax(value, type)

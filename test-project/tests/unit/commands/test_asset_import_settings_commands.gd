@@ -1,12 +1,12 @@
 extends GutTest
 
-const AssetImportSettingsGetCommand := preload("res://addons/godot_mcp_tool/commands/asset/asset_import_settings_get_command.gd")
-const AssetImportSettingsSetCommand := preload("res://addons/godot_mcp_tool/commands/asset/asset_import_settings_set_command.gd")
-const CommandError := preload("res://addons/godot_mcp_tool/commands/command_error.gd")
+const GodotMcpAssetImportSettingsGetCommand := preload("res://addons/godot_mcp_tool/commands/asset/asset_import_settings_get_command.gd")
+const GodotMcpAssetImportSettingsSetCommand := preload("res://addons/godot_mcp_tool/commands/asset/asset_import_settings_set_command.gd")
+const GodotMcpCommandError := preload("res://addons/godot_mcp_tool/commands/command_error.gd")
 const FakeFileSystemAccess := preload("res://tests/support/fake_file_system_access.gd")
-const JsonRpc := preload("res://addons/godot_mcp_tool/bridge/json_rpc.gd")
+const GodotMcpJsonRpc := preload("res://addons/godot_mcp_tool/bridge/json_rpc.gd")
 const ScratchFolder := preload("res://tests/support/scratch_folder.gd")
-const VariantCodec := preload("res://addons/godot_mcp_tool/codec/variant_codec.gd")
+const GodotMcpVariantCodec := preload("res://addons/godot_mcp_tool/codec/variant_codec.gd")
 
 const CHARACTER := "res://tests/fixtures/models/character.glb"
 
@@ -37,8 +37,8 @@ func _import_file(asset_path: String) -> ConfigFile:
 	return file
 
 
-func _set_command() -> AssetImportSettingsSetCommand:
-	return AssetImportSettingsSetCommand.new(VariantCodec.new(), _file_system)
+func _set_command() -> GodotMcpAssetImportSettingsSetCommand:
+	return GodotMcpAssetImportSettingsSetCommand.new(GodotMcpVariantCodec.new(), _file_system)
 
 
 func _rejected_names(result: Dictionary) -> Array:
@@ -53,7 +53,7 @@ func _reason_for(result: Dictionary, name: String) -> String:
 
 
 func test_reads_the_options_the_node_settings_and_the_imported_scene() -> void:
-	var result: Dictionary = await AssetImportSettingsGetCommand.new(VariantCodec.new()).execute({"path": CHARACTER})
+	var result: Dictionary = await GodotMcpAssetImportSettingsGetCommand.new(GodotMcpVariantCodec.new()).execute({"path": CHARACTER})
 	assert_eq(result["path"], CHARACTER)
 	assert_eq(result["importer"], "scene")
 	assert_eq(result["type"], "PackedScene")
@@ -108,6 +108,6 @@ func test_changes_nothing_when_every_setting_is_rejected() -> void:
 
 
 func test_requires_a_change() -> void:
-	var error: CommandError = await _set_command().execute({"path": CHARACTER})
-	assert_eq(error.code, JsonRpc.INVALID_PARAMS)
+	var error: GodotMcpCommandError = await _set_command().execute({"path": CHARACTER})
+	assert_eq(error.code, GodotMcpJsonRpc.INVALID_PARAMS)
 	assert_string_contains(error.message, "options")

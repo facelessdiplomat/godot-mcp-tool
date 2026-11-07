@@ -1,8 +1,8 @@
 extends RefCounted
 
-const DecodeOutcome := preload("../decode_outcome.gd")
-const SimilarNames := preload("../../util/similar_names.gd")
-const ValueDecoder := preload("../value_decoder.gd")
+const GodotMcpDecodeOutcome := preload("../decode_outcome.gd")
+const GodotMcpSimilarNames := preload("../../util/similar_names.gd")
+const GodotMcpValueDecoder := preload("../value_decoder.gd")
 
 const SYNTAX_EXAMPLES := {
 	TYPE_VECTOR2: "Vector2(1, 2)",
@@ -23,19 +23,19 @@ func handles(_property: Dictionary) -> bool:
 	return false
 
 
-func decode(_value: Variant, _property: Dictionary, _target: Object, _decoder: ValueDecoder) -> DecodeOutcome:
+func decode(_value: Variant, _property: Dictionary, _target: Object, _decoder: GodotMcpValueDecoder) -> GodotMcpDecodeOutcome:
 	return _failure("this converter does not decode values")
 
 
-func _success(decoded_value: Variant) -> DecodeOutcome:
-	return DecodeOutcome.new(true, decoded_value)
+func _success(decoded_value: Variant) -> GodotMcpDecodeOutcome:
+	return GodotMcpDecodeOutcome.new(true, decoded_value)
 
 
-func _failure(message: String) -> DecodeOutcome:
-	return DecodeOutcome.new(false, null, message)
+func _failure(message: String) -> GodotMcpDecodeOutcome:
+	return GodotMcpDecodeOutcome.new(false, null, message)
 
 
-func _decode_godot_syntax(text: String, expected_type: int) -> DecodeOutcome:
+func _decode_godot_syntax(text: String, expected_type: int) -> GodotMcpDecodeOutcome:
 	var expectation := "expected %s in Godot syntax, such as %s" % [type_string(expected_type), _syntax_example(expected_type)]
 	for marker in OBJECT_SYNTAX_MARKERS:
 		if text.contains(marker):
@@ -79,4 +79,4 @@ static func _display_class(object: Object) -> String:
 
 
 static func _similar_names(name: String, candidates: Array) -> PackedStringArray:
-	return SimilarNames.find(name, candidates)
+	return GodotMcpSimilarNames.find(name, candidates)

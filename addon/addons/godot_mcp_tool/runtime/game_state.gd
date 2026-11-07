@@ -1,6 +1,6 @@
 extends RefCounted
 
-const RunRequest := preload("run_request.gd")
+const GodotMcpRunRequest := preload("run_request.gd")
 
 const STOPPED := "stopped"
 const STARTING := "starting"
@@ -13,14 +13,14 @@ var first_seq := 1
 var ready_count := 0
 var stop_count := 0
 
-var _agent_run_request: RunRequest
+var _agent_run_request: GodotMcpRunRequest
 
 
-func request_agent_run(request: RunRequest) -> void:
+func request_agent_run(request: GodotMcpRunRequest) -> void:
 	_agent_run_request = request
 
 
-func take_agent_run_request() -> RunRequest:
+func take_agent_run_request() -> GodotMcpRunRequest:
 	var request := _agent_run_request
 	_agent_run_request = null
 	return request

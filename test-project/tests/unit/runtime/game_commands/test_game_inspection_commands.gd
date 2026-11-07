@@ -1,19 +1,19 @@
 extends GutTest
 
-const CommandError := preload("res://addons/godot_mcp_tool/commands/command_error.gd")
-const GamePropertiesGetCommand := preload("res://addons/godot_mcp_tool/runtime/game_commands/game_properties_get_command.gd")
-const GamePropertiesSetCommand := preload("res://addons/godot_mcp_tool/runtime/game_commands/game_properties_set_command.gd")
-const GameScene := preload("res://addons/godot_mcp_tool/runtime/game_commands/game_scene.gd")
-const GameTreeCommand := preload("res://addons/godot_mcp_tool/runtime/game_commands/game_tree_command.gd")
-const JsonRpc := preload("res://addons/godot_mcp_tool/bridge/json_rpc.gd")
-const PropertyEditor := preload("res://addons/godot_mcp_tool/scene/property_editor.gd")
-const VariantCodec := preload("res://addons/godot_mcp_tool/codec/variant_codec.gd")
+const GodotMcpCommandError := preload("res://addons/godot_mcp_tool/commands/command_error.gd")
+const GodotMcpGamePropertiesGetCommand := preload("res://addons/godot_mcp_tool/runtime/game_commands/game_properties_get_command.gd")
+const GodotMcpGamePropertiesSetCommand := preload("res://addons/godot_mcp_tool/runtime/game_commands/game_properties_set_command.gd")
+const GodotMcpGameScene := preload("res://addons/godot_mcp_tool/runtime/game_commands/game_scene.gd")
+const GodotMcpGameTreeCommand := preload("res://addons/godot_mcp_tool/runtime/game_commands/game_tree_command.gd")
+const GodotMcpJsonRpc := preload("res://addons/godot_mcp_tool/bridge/json_rpc.gd")
+const GodotMcpPropertyEditor := preload("res://addons/godot_mcp_tool/scene/property_editor.gd")
+const GodotMcpVariantCodec := preload("res://addons/godot_mcp_tool/codec/variant_codec.gd")
 
 var _arena: Node3D
 var _player: CharacterBody3D
-var _scene: GameScene
-var _codec: VariantCodec
-var _properties: PropertyEditor
+var _scene: GodotMcpGameScene
+var _codec: GodotMcpVariantCodec
+var _properties: GodotMcpPropertyEditor
 
 
 func before_each() -> void:
@@ -32,9 +32,9 @@ func before_each() -> void:
 	bullet.name = "Bullet"
 	_arena.add_child(bullet)
 	add_child_autofree(_arena)
-	_scene = GameScene.new(func() -> Node: return _arena)
-	_codec = VariantCodec.new()
-	_properties = PropertyEditor.new(_codec)
+	_scene = GodotMcpGameScene.new(func() -> Node: return _arena)
+	_codec = GodotMcpVariantCodec.new()
+	_properties = GodotMcpPropertyEditor.new(_codec)
 
 
 func _names(nodes: Array) -> Array:
@@ -42,7 +42,7 @@ func _names(nodes: Array) -> Array:
 
 
 func test_describes_the_running_scene_with_nodes_created_at_runtime() -> void:
-	var result: Dictionary = await GameTreeCommand.new(_scene).execute({})
+	var result: Dictionary = await GodotMcpGameTreeCommand.new(_scene).execute({})
 	assert_eq(result["scene"], "res://levels/arena.tscn")
 	assert_eq(_names((result["root"] as Dictionary)["children"]), ["Player", "Bullet"])
 	assert_eq(result["node_count"], 4)
@@ -50,27 +50,27 @@ func test_describes_the_running_scene_with_nodes_created_at_runtime() -> void:
 
 
 func test_describes_a_subtree_by_its_path() -> void:
-	var result: Dictionary = await GameTreeCommand.new(_scene).execute({"path": "Player"})
+	var result: Dictionary = await GodotMcpGameTreeCommand.new(_scene).execute({"path": "Player"})
 	assert_eq((result["root"] as Dictionary)["name"], "Player")
 	assert_eq(_names((result["root"] as Dictionary)["children"]), ["Camera"])
 
 
 func test_describes_the_tree_from_the_root_window() -> void:
-	var result: Dictionary = await GameTreeCommand.new(_scene).execute({"path": "/root", "max_depth": 0})
+	var result: Dictionary = await GodotMcpGameTreeCommand.new(_scene).execute({"path": "/root", "max_depth": 0})
 	assert_eq((result["root"] as Dictionary)["name"], "root")
 	assert_true(result["truncated"])
 
 
 func test_reports_a_missing_node_with_similar_paths() -> void:
-	var error: Variant = await GameTreeCommand.new(_scene).execute({"path": "Playr"})
-	assert_true(error is CommandError)
-	assert_eq((error as CommandError).code, JsonRpc.NOT_FOUND)
-	assert_string_contains((error as CommandError).hint, "Player")
+	var error: Variant = await GodotMcpGameTreeCommand.new(_scene).execute({"path": "Playr"})
+	assert_true(error is GodotMcpCommandError)
+	assert_eq((error as GodotMcpCommandError).code, GodotMcpJsonRpc.NOT_FOUND)
+	assert_string_contains((error as GodotMcpCommandError).hint, "Player")
 
 
 func test_reads_properties_and_getter_methods() -> void:
 	_player.position = Vector3(1, 2, 3)
-	var result: Dictionary = await GamePropertiesGetCommand.new(_scene, _properties, _codec).execute({"path": "Player", "names": ["position", "is_on_floor()"]})
+	var result: Dictionary = await GodotMcpGamePropertiesGetCommand.new(_scene, _properties, _codec).execute({"path": "Player", "names": ["position", "is_on_floor()"]})
 	assert_eq(result["path"], "Player")
 	assert_eq(result["type"], "CharacterBody3D")
 	assert_eq(result["scene"], "res://levels/arena.tscn")
@@ -81,29 +81,29 @@ func test_reads_properties_and_getter_methods() -> void:
 
 
 func test_reads_only_methods_that_look_like_getters() -> void:
-	var result: Dictionary = await GamePropertiesGetCommand.new(_scene, _properties, _codec).execute({"path": "Player", "names": ["queue_free()"]})
+	var result: Dictionary = await GodotMcpGamePropertiesGetCommand.new(_scene, _properties, _codec).execute({"path": "Player", "names": ["queue_free()"]})
 	assert_string_contains(((result["properties"] as Array)[0] as Dictionary)["error"], "is_, get_, has_ or can_")
 	assert_true(is_instance_valid(_player))
 	assert_false(_player.is_queued_for_deletion())
 
 
 func test_explains_a_getter_that_needs_arguments() -> void:
-	var result: Dictionary = await GamePropertiesGetCommand.new(_scene, _properties, _codec).execute({"path": "Player", "names": ["get_node()"]})
+	var result: Dictionary = await GodotMcpGamePropertiesGetCommand.new(_scene, _properties, _codec).execute({"path": "Player", "names": ["get_node()"]})
 	assert_string_contains(((result["properties"] as Array)[0] as Dictionary)["error"], "argument")
 
 
 func test_explains_an_unknown_getter() -> void:
-	var result: Dictionary = await GamePropertiesGetCommand.new(_scene, _properties, _codec).execute({"path": "Player", "names": ["is_on_flor()"]})
+	var result: Dictionary = await GodotMcpGamePropertiesGetCommand.new(_scene, _properties, _codec).execute({"path": "Player", "names": ["is_on_flor()"]})
 	assert_string_contains(((result["properties"] as Array)[0] as Dictionary)["error"], "is_on_floor")
 
 
 func test_reads_nodes_outside_the_scene_by_absolute_path() -> void:
-	var result: Dictionary = await GamePropertiesGetCommand.new(_scene, _properties, _codec).execute({"path": str(_player.get_path()), "names": ["visible"]})
+	var result: Dictionary = await GodotMcpGamePropertiesGetCommand.new(_scene, _properties, _codec).execute({"path": str(_player.get_path()), "names": ["visible"]})
 	assert_eq(result["path"], "Player")
 
 
 func test_sets_properties_of_the_running_game() -> void:
-	var result: Dictionary = await GamePropertiesSetCommand.new(_scene, _properties).execute({"path": "Player", "properties": {"position": [0, 5, 0], "speed": 3}})
+	var result: Dictionary = await GodotMcpGamePropertiesSetCommand.new(_scene, _properties).execute({"path": "Player", "properties": {"position": [0, 5, 0], "speed": 3}})
 	assert_eq(result["applied"], ["position"])
 	assert_eq(((result["rejected"] as Array)[0] as Dictionary)["name"], "speed")
 	assert_eq(_player.position, Vector3(0, 5, 0))

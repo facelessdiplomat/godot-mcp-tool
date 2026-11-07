@@ -1,26 +1,26 @@
 extends "../command.gd"
 
-const Params := preload("../params.gd")
-const SimilarNames := preload("../../util/similar_names.gd")
-const VariantCodec := preload("../../codec/variant_codec.gd")
+const GodotMcpParams := preload("../params.gd")
+const GodotMcpSimilarNames := preload("../../util/similar_names.gd")
+const GodotMcpVariantCodec := preload("../../codec/variant_codec.gd")
 
 const MAXIMUM_SETTINGS := 200
 
-var _codec: VariantCodec
+var _codec: GodotMcpVariantCodec
 
 
-func _init(codec: VariantCodec) -> void:
+func _init(codec: GodotMcpVariantCodec) -> void:
 	_codec = codec
 
 
 func execute(params: Dictionary) -> Variant:
-	var names: Variant = Params.text_list(params, "names")
-	var prefix: Variant = Params.text(params, "prefix")
+	var names: Variant = GodotMcpParams.text_list(params, "names")
+	var prefix: Variant = GodotMcpParams.text(params, "prefix")
 	for value in [names, prefix]:
-		if value is CommandError:
+		if value is GodotMcpCommandError:
 			return value
 	if (names as Array).is_empty() and (prefix as String).is_empty():
-		return CommandError.new(JsonRpc.INVALID_PARAMS, "Pass \"names\" or \"prefix\"", "Example: {\"prefix\": \"display/window/\"} or {\"names\": [\"application/run/main_scene\"]}")
+		return GodotMcpCommandError.new(GodotMcpJsonRpc.INVALID_PARAMS, "Pass \"names\" or \"prefix\"", "Example: {\"prefix\": \"display/window/\"} or {\"names\": [\"application/run/main_scene\"]}")
 	var all_settings := setting_names()
 	var selected: Array = []
 	var unknown: Array = []
@@ -51,5 +51,5 @@ static func setting_names() -> Array:
 
 static func unknown_setting_message(setting_name: String, all_settings: Array) -> String:
 	var message := "There is no project setting \"%s\"." % setting_name
-	var similar := SimilarNames.hint(setting_name, all_settings)
+	var similar := GodotMcpSimilarNames.hint(setting_name, all_settings)
 	return message if similar.is_empty() else "%s %s" % [message, similar]

@@ -1,12 +1,12 @@
 extends GutTest
 
-const CommandJournal := preload("res://addons/godot_mcp_tool/editor/command_journal.gd")
+const GodotMcpCommandJournal := preload("res://addons/godot_mcp_tool/editor/command_journal.gd")
 
-var _journal: CommandJournal
+var _journal: GodotMcpCommandJournal
 
 
 func before_each() -> void:
-	_journal = CommandJournal.new(func() -> String: return "12:03:41")
+	_journal = GodotMcpCommandJournal.new(func() -> String: return "12:03:41")
 
 
 func _tools() -> Array:
@@ -25,9 +25,9 @@ func test_lists_the_newest_command_first() -> void:
 
 
 func test_keeps_only_the_latest_commands() -> void:
-	for index in CommandJournal.CAPACITY + 5:
-		_journal.record("node.add" if index < CommandJournal.CAPACITY + 4 else "scene.save", "", 1)
-	assert_eq(_journal.entries().size(), CommandJournal.CAPACITY)
+	for index in GodotMcpCommandJournal.CAPACITY + 5:
+		_journal.record("node.add" if index < GodotMcpCommandJournal.CAPACITY + 4 else "scene.save", "", 1)
+	assert_eq(_journal.entries().size(), GodotMcpCommandJournal.CAPACITY)
 	assert_eq(_tools()[0], "scene_save")
 
 

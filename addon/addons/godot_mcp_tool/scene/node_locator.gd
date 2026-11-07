@@ -1,6 +1,6 @@
 extends RefCounted
 
-const SimilarNames := preload("../util/similar_names.gd")
+const GodotMcpSimilarNames := preload("../util/similar_names.gd")
 
 const MAXIMUM_SUGGESTION_CANDIDATES := 2000
 
@@ -27,7 +27,7 @@ static func path_of(scene_root: Node, node: Node) -> String:
 static func similar_paths(scene_root: Node, path_text: String) -> PackedStringArray:
 	var paths: Array = []
 	_collect_paths(scene_root, scene_root, paths)
-	return SimilarNames.find(path_text, paths)
+	return GodotMcpSimilarNames.find(path_text, paths)
 
 
 static func not_found_hint(scene_root: Node, path_text: String) -> String:

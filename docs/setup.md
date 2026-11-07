@@ -101,7 +101,7 @@ not both.
 
    ```text
    Project: /Users/you/games/arena (from working directory)
-   Editor: connected. Godot 4.7.2.stable.official.ed1daf0bf, addon 0.1.0, bridge protocol 1
+   Editor: connected. Godot 4.7.2.stable.official.ed1daf0bf, addon 0.1.1, bridge protocol 1
    Godot binary: /Applications/Godot.app/Contents/MacOS/Godot (from running editor), version 4.7.2.stable.official.ed1daf0bf
    ```
 
@@ -112,13 +112,13 @@ npx godot-mcp-tool doctor
 ```
 
 ```text
-Checking the setup of Godot MCP Tool 0.1.0:
+Checking the setup of Godot MCP Tool 0.1.1:
 ok       Node.js 22.12.0
 ok       Project /Users/you/games/arena (from working directory)
 ok       Godot 4.7.2.stable.official.ed1daf0bf at /Applications/Godot.app/Contents/MacOS/Godot (from running editor)
-ok       Addon 0.1.0 in /Users/you/games/arena/addons/godot_mcp_tool
+ok       Addon 0.1.1 in /Users/you/games/arena/addons/godot_mcp_tool
 ok       Plugin enabled in /Users/you/games/arena/project.godot
-ok       Editor connected: Godot 4.7.2.stable.official.ed1daf0bf, addon 0.1.0
+ok       Editor connected: Godot 4.7.2.stable.official.ed1daf0bf, addon 0.1.1
 Everything is set up.
 ```
 

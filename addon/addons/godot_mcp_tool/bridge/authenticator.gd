@@ -1,7 +1,7 @@
 extends RefCounted
 
-const CommandError := preload("../commands/command_error.gd")
-const JsonRpc := preload("json_rpc.gd")
+const GodotMcpCommandError := preload("../commands/command_error.gd")
+const GodotMcpJsonRpc := preload("json_rpc.gd")
 
 var _expected_token: String
 var _protocol: int
@@ -12,17 +12,17 @@ func _init(expected_token: String, protocol: int) -> void:
 	_protocol = protocol
 
 
-func verify(params: Dictionary) -> CommandError:
+func verify(params: Dictionary) -> GodotMcpCommandError:
 	var token: Variant = params.get("token")
 	if not token is String or not _tokens_match(token, _expected_token):
-		return CommandError.new(
-			JsonRpc.UNAUTHORIZED,
+		return GodotMcpCommandError.new(
+			GodotMcpJsonRpc.UNAUTHORIZED,
 			"Invalid token",
 			"Restart the MCP server so it reads the current discovery file of this editor.")
 	var protocol: Variant = params.get("protocol")
 	if not (protocol is int or protocol is float) or int(protocol) != _protocol:
-		return CommandError.new(
-			JsonRpc.PROTOCOL_MISMATCH,
+		return GodotMcpCommandError.new(
+			GodotMcpJsonRpc.PROTOCOL_MISMATCH,
 			"Unsupported bridge protocol %s; this addon speaks protocol %d" % [str(protocol), _protocol],
 			"Install matching versions of the MCP server and the Godot addon.")
 	return null

@@ -1,6 +1,6 @@
 extends RefCounted
 
-const UndoHistory := preload("undo_history.gd")
+const GodotMcpUndoHistory := preload("undo_history.gd")
 
 var _do_steps: Array[Dictionary] = []
 var _undo_steps: Array[Dictionary] = []
@@ -50,7 +50,7 @@ func release_created() -> void:
 			object.free()
 
 
-func write_do_steps(history: UndoHistory) -> void:
+func write_do_steps(history: GodotMcpUndoHistory) -> void:
 	for step in _do_steps:
 		if step.has("method"):
 			history.add_do_call(step["target"], step["method"], step["arguments"])
@@ -60,7 +60,7 @@ func write_do_steps(history: UndoHistory) -> void:
 		history.add_do_reference(object)
 
 
-func write_undo_steps(history: UndoHistory) -> void:
+func write_undo_steps(history: GodotMcpUndoHistory) -> void:
 	for step in _undo_steps:
 		if step.has("method"):
 			history.add_undo_call(step["target"], step["method"], step["arguments"])

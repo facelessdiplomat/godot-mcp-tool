@@ -18,7 +18,7 @@ func handles(property: Dictionary) -> bool:
 	return property.get("hint") == PROPERTY_HINT_FLAGS or property.get("hint") in LAYER_HINTS
 
 
-func decode(value: Variant, property: Dictionary, _target: Object, _decoder: ValueDecoder) -> DecodeOutcome:
+func decode(value: Variant, property: Dictionary, _target: Object, _decoder: GodotMcpValueDecoder) -> GodotMcpDecodeOutcome:
 	if _is_whole_number(value):
 		return _success(int(value))
 	if not value is Array:
@@ -28,7 +28,7 @@ func decode(value: Variant, property: Dictionary, _target: Object, _decoder: Val
 	return _decode_layer_numbers(value)
 
 
-func _decode_flag_names(flag_names: Array, hint_string: String) -> DecodeOutcome:
+func _decode_flag_names(flag_names: Array, hint_string: String) -> GodotMcpDecodeOutcome:
 	var flags := _parse_flags(hint_string)
 	var mask := 0
 	for flag_name in flag_names:
@@ -38,7 +38,7 @@ func _decode_flag_names(flag_names: Array, hint_string: String) -> DecodeOutcome
 	return _success(mask)
 
 
-func _decode_layer_numbers(layers: Array) -> DecodeOutcome:
+func _decode_layer_numbers(layers: Array) -> GodotMcpDecodeOutcome:
 	var mask := 0
 	for layer in layers:
 		if not _is_whole_number(layer) or int(layer) < 1 or int(layer) > HIGHEST_LAYER:

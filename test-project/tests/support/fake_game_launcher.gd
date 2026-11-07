@@ -1,7 +1,7 @@
 extends "res://addons/godot_mcp_tool/runtime/game_launcher.gd"
 
-const GameState := preload("res://addons/godot_mcp_tool/runtime/game_state.gd")
-const LogStore := preload("res://addons/godot_mcp_tool/runtime/log_store.gd")
+const GodotMcpGameState := preload("res://addons/godot_mcp_tool/runtime/game_state.gd")
+const GodotMcpLogStore := preload("res://addons/godot_mcp_tool/runtime/log_store.gd")
 
 var playing := false
 var started_targets: Array = []
@@ -11,11 +11,11 @@ var save_before_running := true
 var unsaved := PackedStringArray()
 var simulate_game: Callable
 
-var _game: GameState
-var _log_store: LogStore
+var _game: GodotMcpGameState
+var _log_store: GodotMcpLogStore
 
 
-func _init(game: GameState, log_store: LogStore) -> void:
+func _init(game: GodotMcpGameState, log_store: GodotMcpLogStore) -> void:
 	_game = game
 	_log_store = log_store
 

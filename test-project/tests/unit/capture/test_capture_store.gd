@@ -1,6 +1,6 @@
 extends GutTest
 
-const CaptureStore := preload("res://addons/godot_mcp_tool/capture/capture_store.gd")
+const GodotMcpCaptureStore := preload("res://addons/godot_mcp_tool/capture/capture_store.gd")
 
 var _directory := ""
 
@@ -24,25 +24,25 @@ func _image() -> Image:
 
 
 func test_saves_a_png_with_a_prefix() -> void:
-	var path: String = CaptureStore.new(_directory).save(_image(), "game", "png")
+	var path: String = GodotMcpCaptureStore.new(_directory).save(_image(), "game", "png")
 	assert_true(path.begins_with(_directory.path_join("game-")))
 	assert_true(path.ends_with(".png"))
 	assert_eq(Image.load_from_file(path).get_size(), Vector2i(64, 32))
 
 
 func test_saves_a_jpeg() -> void:
-	var path: String = CaptureStore.new(_directory).save(_image(), "editor", "jpeg")
+	var path: String = GodotMcpCaptureStore.new(_directory).save(_image(), "editor", "jpeg")
 	assert_true(path.ends_with(".jpg"))
 	assert_true(FileAccess.file_exists(path))
 
 
 func test_keeps_only_the_latest_captures() -> void:
-	var store := CaptureStore.new(_directory, 3)
+	var store := GodotMcpCaptureStore.new(_directory, 3)
 	for index in 5:
 		store.save(_image(), "game", "png")
 	assert_eq(DirAccess.get_files_at(_directory).size(), 3)
 
 
 func test_refuses_an_unknown_format() -> void:
-	var outcome: Variant = CaptureStore.new(_directory).save(_image(), "game", "gif")
+	var outcome: Variant = GodotMcpCaptureStore.new(_directory).save(_image(), "game", "gif")
 	assert_true(outcome is int)

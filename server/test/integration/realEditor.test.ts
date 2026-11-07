@@ -5,6 +5,7 @@ import { promisify } from 'node:util';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { BridgeClient } from '../../src/bridge/BridgeClient.js';
 import { DiscoveryFileReader, isProcessAlive } from '../../src/bridge/DiscoveryFileReader.js';
+import { SERVER_VERSION } from '../../src/serverInfo.js';
 import { editorStartupTimeoutMs, godotBinary, McpSession, startHeadlessEditor, TemporaryProject, waitFor } from './harness.js';
 
 const runProcess = promisify(execFile);
@@ -46,7 +47,7 @@ describe.skipIf(godotBinary === '')('the MCP server with a real headless Godot e
 
     expect(statusText).toContain(`Project: ${project.root} (from GODOT_PROJECT_PATH)`);
     expect(statusText).toContain('Editor: connected. Godot 4.');
-    expect(statusText).toContain('addon 0.1.0, bridge protocol 1');
+    expect(statusText).toContain(`addon ${SERVER_VERSION}, bridge protocol 1`);
     expect(statusText).toMatch(/Godot binary: .+ \(from running editor\), version 4\./);
   });
 

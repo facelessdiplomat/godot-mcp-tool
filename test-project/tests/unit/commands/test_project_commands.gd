@@ -1,11 +1,11 @@
 extends GutTest
 
-const CommandError := preload("res://addons/godot_mcp_tool/commands/command_error.gd")
-const JsonRpc := preload("res://addons/godot_mcp_tool/bridge/json_rpc.gd")
-const ProjectInfoCommand := preload("res://addons/godot_mcp_tool/commands/project/project_info_command.gd")
-const ProjectSettingsGetCommand := preload("res://addons/godot_mcp_tool/commands/project/project_settings_get_command.gd")
-const ProjectSettingsSetCommand := preload("res://addons/godot_mcp_tool/commands/project/project_settings_set_command.gd")
-const VariantCodec := preload("res://addons/godot_mcp_tool/codec/variant_codec.gd")
+const GodotMcpCommandError := preload("res://addons/godot_mcp_tool/commands/command_error.gd")
+const GodotMcpJsonRpc := preload("res://addons/godot_mcp_tool/bridge/json_rpc.gd")
+const GodotMcpProjectInfoCommand := preload("res://addons/godot_mcp_tool/commands/project/project_info_command.gd")
+const GodotMcpProjectSettingsGetCommand := preload("res://addons/godot_mcp_tool/commands/project/project_settings_get_command.gd")
+const GodotMcpProjectSettingsSetCommand := preload("res://addons/godot_mcp_tool/commands/project/project_settings_set_command.gd")
+const GodotMcpVariantCodec := preload("res://addons/godot_mcp_tool/codec/variant_codec.gd")
 
 const DESCRIPTION_SETTING := "application/config/description"
 
@@ -32,7 +32,7 @@ func _fake_save() -> Error:
 
 
 func test_describes_the_project() -> void:
-	var info: Dictionary = await ProjectInfoCommand.new(_fake_indentation).execute({})
+	var info: Dictionary = await GodotMcpProjectInfoCommand.new(_fake_indentation).execute({})
 	assert_eq(info["name"], "godot-mcp-tool test project")
 	assert_eq(info["main_scene"], "res://main.tscn")
 	assert_eq(info["indentation"], {"style": "tabs", "size": 4})
@@ -44,7 +44,7 @@ func test_describes_the_project() -> void:
 
 
 func test_lists_the_project_classes_and_counts_the_classes_of_addons() -> void:
-	var info: Dictionary = await ProjectInfoCommand.new(_fake_indentation).execute({})
+	var info: Dictionary = await GodotMcpProjectInfoCommand.new(_fake_indentation).execute({})
 	var global_classes: Dictionary = info["global_classes"]
 	var project_class_names: Array = (global_classes["project"] as Array).map(func(entry: Dictionary) -> String: return entry["name"])
 	assert_eq(project_class_names, ["EnemyStats", "PatrolPoint"])
@@ -56,28 +56,28 @@ func test_lists_the_project_classes_and_counts_the_classes_of_addons() -> void:
 
 
 func test_gets_settings_by_name() -> void:
-	var result: Dictionary = await ProjectSettingsGetCommand.new(VariantCodec.new()).execute({"names": ["application/config/name"]})
+	var result: Dictionary = await GodotMcpProjectSettingsGetCommand.new(GodotMcpVariantCodec.new()).execute({"names": ["application/config/name"]})
 	assert_eq((result["settings"][0] as Dictionary)["value"], "godot-mcp-tool test project")
 
 
 func test_gets_settings_by_prefix() -> void:
-	var result: Dictionary = await ProjectSettingsGetCommand.new(VariantCodec.new()).execute({"prefix": "display/window/size/"})
+	var result: Dictionary = await GodotMcpProjectSettingsGetCommand.new(GodotMcpVariantCodec.new()).execute({"prefix": "display/window/size/"})
 	var names: Array = (result["settings"] as Array).map(func(entry: Dictionary) -> String: return entry["name"])
 	assert_has(names, "display/window/size/viewport_width")
 
 
 func test_reports_unknown_setting_names_with_suggestions() -> void:
-	var result: Dictionary = await ProjectSettingsGetCommand.new(VariantCodec.new()).execute({"names": ["application/config/nam"]})
+	var result: Dictionary = await GodotMcpProjectSettingsGetCommand.new(GodotMcpVariantCodec.new()).execute({"names": ["application/config/nam"]})
 	assert_string_contains((result["unknown"][0] as Dictionary)["reason"], "application/config/name")
 
 
 func test_requires_names_or_a_prefix() -> void:
-	var error: Variant = await ProjectSettingsGetCommand.new(VariantCodec.new()).execute({})
-	assert_eq((error as CommandError).code, JsonRpc.INVALID_PARAMS)
+	var error: Variant = await GodotMcpProjectSettingsGetCommand.new(GodotMcpVariantCodec.new()).execute({})
+	assert_eq((error as GodotMcpCommandError).code, GodotMcpJsonRpc.INVALID_PARAMS)
 
 
 func test_sets_settings_and_saves_once() -> void:
-	var result: Dictionary = await ProjectSettingsSetCommand.new(VariantCodec.new(), _fake_save).execute({"values": {DESCRIPTION_SETTING: "A small arena"}})
+	var result: Dictionary = await GodotMcpProjectSettingsSetCommand.new(GodotMcpVariantCodec.new(), _fake_save).execute({"values": {DESCRIPTION_SETTING: "A small arena"}})
 	assert_eq(result["applied"], [DESCRIPTION_SETTING])
 	assert_eq(ProjectSettings.get_setting(DESCRIPTION_SETTING), "A small arena")
 	assert_eq(_save_calls, 1)
@@ -85,12 +85,12 @@ func test_sets_settings_and_saves_once() -> void:
 
 
 func test_rejects_unknown_settings_without_saving() -> void:
-	var result: Dictionary = await ProjectSettingsSetCommand.new(VariantCodec.new(), _fake_save).execute({"values": {"application/config/descripton": "x"}})
+	var result: Dictionary = await GodotMcpProjectSettingsSetCommand.new(GodotMcpVariantCodec.new(), _fake_save).execute({"values": {"application/config/descripton": "x"}})
 	assert_eq(result["applied"], [])
 	assert_string_contains((result["rejected"][0] as Dictionary)["reason"], DESCRIPTION_SETTING)
 	assert_eq(_save_calls, 0)
 
 
 func test_decodes_values_by_the_setting_type() -> void:
-	var result: Dictionary = await ProjectSettingsSetCommand.new(VariantCodec.new(), _fake_save).execute({"values": {DESCRIPTION_SETTING: 5}})
+	var result: Dictionary = await GodotMcpProjectSettingsSetCommand.new(GodotMcpVariantCodec.new(), _fake_save).execute({"values": {DESCRIPTION_SETTING: 5}})
 	assert_string_contains((result["rejected"][0] as Dictionary)["reason"], "text")

@@ -1,16 +1,16 @@
 extends GutTest
 
-const PlainUndoHistory := preload("res://addons/godot_mcp_tool/scene/plain_undo_history.gd")
-const PropertyEditor := preload("res://addons/godot_mcp_tool/scene/property_editor.gd")
-const VariantCodec := preload("res://addons/godot_mcp_tool/codec/variant_codec.gd")
+const GodotMcpPlainUndoHistory := preload("res://addons/godot_mcp_tool/scene/plain_undo_history.gd")
+const GodotMcpPropertyEditor := preload("res://addons/godot_mcp_tool/scene/property_editor.gd")
+const GodotMcpVariantCodec := preload("res://addons/godot_mcp_tool/codec/variant_codec.gd")
 
-var _history: PlainUndoHistory
-var _editor: PropertyEditor
+var _history: GodotMcpPlainUndoHistory
+var _editor: GodotMcpPropertyEditor
 
 
 func before_each() -> void:
-	_history = PlainUndoHistory.new()
-	_editor = PropertyEditor.new(VariantCodec.new())
+	_history = GodotMcpPlainUndoHistory.new()
+	_editor = GodotMcpPropertyEditor.new(GodotMcpVariantCodec.new())
 
 
 func after_each() -> void:

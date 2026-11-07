@@ -1,11 +1,11 @@
 extends GutTest
 
-const VariantCodec := preload("res://addons/godot_mcp_tool/codec/variant_codec.gd")
+const GodotMcpVariantCodec := preload("res://addons/godot_mcp_tool/codec/variant_codec.gd")
 const ORANGE_MATERIAL_PATH := "res://tests/fixtures/orange_material.tres"
 const MESH_TYPES := "BoxMesh,SphereMesh,PlaneMesh,Mesh"
 const SHADOW_DISPLAY_NAMES := "Off,On,Double-Sided,Shadows Only"
 
-var _codec := VariantCodec.new()
+var _codec := GodotMcpVariantCodec.new()
 
 
 func _property(type: int, hint: int = PROPERTY_HINT_NONE, hint_string: String = "", property_name: String = "value") -> Dictionary:

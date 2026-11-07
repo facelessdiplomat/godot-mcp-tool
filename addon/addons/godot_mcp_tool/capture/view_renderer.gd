@@ -1,7 +1,7 @@
 extends RefCounted
 
-const ImageFitter := preload("image_fitter.gd")
-const ViewRequests := preload("view_requests.gd")
+const GodotMcpImageFitter := preload("image_fitter.gd")
+const GodotMcpViewRequests := preload("view_requests.gd")
 
 const LABEL_FONT_SHARE := 1.0 / 24.0
 const MINIMUM_LABEL_FONT_SIZE := 14
@@ -17,8 +17,8 @@ func _init(host: Node, draw_frame: Callable) -> void:
 
 
 func render_sheet(world: World3D, views: Array, max_size: int) -> Image:
-	var images: Array = await render(world, views, ViewRequests.cell_size_for(views.size(), max_size), true)
-	return ImageFitter.contact_sheet(images, ViewRequests.columns_for(views.size()), ViewRequests.SHEET_GAP)
+	var images: Array = await render(world, views, GodotMcpViewRequests.cell_size_for(views.size(), max_size), true)
+	return GodotMcpImageFitter.contact_sheet(images, GodotMcpViewRequests.columns_for(views.size()), GodotMcpViewRequests.SHEET_GAP)
 
 
 func render(world: World3D, views: Array, size: Vector2i, labelled: bool) -> Array:

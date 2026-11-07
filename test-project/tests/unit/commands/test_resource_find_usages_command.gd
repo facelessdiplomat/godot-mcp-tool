@@ -1,8 +1,8 @@
 extends GutTest
 
-const CommandError := preload("res://addons/godot_mcp_tool/commands/command_error.gd")
-const JsonRpc := preload("res://addons/godot_mcp_tool/bridge/json_rpc.gd")
-const ResourceFindUsagesCommand := preload("res://addons/godot_mcp_tool/commands/file/resource_find_usages_command.gd")
+const GodotMcpCommandError := preload("res://addons/godot_mcp_tool/commands/command_error.gd")
+const GodotMcpJsonRpc := preload("res://addons/godot_mcp_tool/bridge/json_rpc.gd")
+const GodotMcpResourceFindUsagesCommand := preload("res://addons/godot_mcp_tool/commands/file/resource_find_usages_command.gd")
 const ScratchProject := preload("res://tests/support/scratch_project.gd")
 
 var _project: ScratchProject
@@ -18,7 +18,7 @@ func after_each() -> void:
 
 
 func _find(path: String) -> Variant:
-	return await ResourceFindUsagesCommand.new().execute({"path": path})
+	return await GodotMcpResourceFindUsagesCommand.new().execute({"path": path})
 
 
 func test_reports_the_users_of_a_file_and_the_code_that_names_it() -> void:
@@ -37,12 +37,12 @@ func test_reports_the_users_of_a_folder_from_outside_it() -> void:
 
 
 func test_explains_paths_it_cannot_use() -> void:
-	var missing: CommandError = await _find(_project.path("materials/lava.tres"))
-	assert_eq(missing.code, JsonRpc.NOT_FOUND)
+	var missing: GodotMcpCommandError = await _find(_project.path("materials/lava.tres"))
+	assert_eq(missing.code, GodotMcpJsonRpc.NOT_FOUND)
 	assert_eq(missing.message, "%s not found" % _project.path("materials/lava.tres"))
-	var outside: CommandError = await _find("res://../secrets.tres")
-	assert_eq(outside.code, JsonRpc.INVALID_PARAMS)
-	var cache: CommandError = await _find("res://.godot/editor")
-	assert_eq(cache.code, JsonRpc.INVALID_PARAMS)
-	var whole_project: CommandError = await _find("res://")
-	assert_eq(whole_project.code, JsonRpc.INVALID_PARAMS)
+	var outside: GodotMcpCommandError = await _find("res://../secrets.tres")
+	assert_eq(outside.code, GodotMcpJsonRpc.INVALID_PARAMS)
+	var cache: GodotMcpCommandError = await _find("res://.godot/editor")
+	assert_eq(cache.code, GodotMcpJsonRpc.INVALID_PARAMS)
+	var whole_project: GodotMcpCommandError = await _find("res://")
+	assert_eq(whole_project.code, GodotMcpJsonRpc.INVALID_PARAMS)

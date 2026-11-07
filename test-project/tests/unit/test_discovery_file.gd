@@ -1,6 +1,6 @@
 extends GutTest
 
-const DiscoveryFile := preload("res://addons/godot_mcp_tool/bridge/discovery_file.gd")
+const GodotMcpDiscoveryFile := preload("res://addons/godot_mcp_tool/bridge/discovery_file.gd")
 const ScratchFolder := preload("res://tests/support/scratch_folder.gd")
 
 const GROUP_AND_OTHER_PERMISSIONS := (
@@ -27,8 +27,8 @@ func after_each() -> void:
 	ScratchFolder.remove(_sandbox_directory)
 
 
-func _discovery_file() -> DiscoveryFile:
-	return DiscoveryFile.new(_sandbox_directory.path_join("bridge.json"))
+func _discovery_file() -> GodotMcpDiscoveryFile:
+	return GodotMcpDiscoveryFile.new(_sandbox_directory.path_join("bridge.json"))
 
 
 func _other_editor_record() -> Dictionary:
@@ -40,14 +40,14 @@ func _this_editor_record() -> Dictionary:
 
 
 func test_writes_the_record_as_json_and_creates_missing_folders() -> void:
-	var discovery_file := DiscoveryFile.new(_sandbox_directory.path_join("nested/bridge.json"))
+	var discovery_file := GodotMcpDiscoveryFile.new(_sandbox_directory.path_join("nested/bridge.json"))
 	assert_eq(discovery_file.write({"port": 50731, "token": "secret"}), OK)
 	var content := FileAccess.get_file_as_string(discovery_file.path)
 	assert_eq_deep(JSON.parse_string(content), {"port": 50731.0, "token": "secret"})
 
 
 func test_replaces_an_existing_file() -> void:
-	var discovery_file := DiscoveryFile.new(_sandbox_directory.path_join("bridge.json"))
+	var discovery_file := GodotMcpDiscoveryFile.new(_sandbox_directory.path_join("bridge.json"))
 	discovery_file.write({"port": 1})
 	discovery_file.write({"port": 2})
 	assert_eq_deep(JSON.parse_string(FileAccess.get_file_as_string(discovery_file.path)), {"port": 2.0})
@@ -57,7 +57,7 @@ func test_keeps_the_file_private_to_its_owner() -> void:
 	if OS.get_name() == "Windows":
 		pass_test("Unix permissions do not apply on Windows")
 		return
-	var discovery_file := DiscoveryFile.new(_sandbox_directory.path_join("bridge.json"))
+	var discovery_file := GodotMcpDiscoveryFile.new(_sandbox_directory.path_join("bridge.json"))
 	discovery_file.write({"token": "secret"})
 	assert_eq(FileAccess.get_unix_permissions(discovery_file.path) & GROUP_AND_OTHER_PERMISSIONS, 0)
 
@@ -100,7 +100,7 @@ func test_marks_its_own_file_as_closed_and_keeps_where_the_editor_is() -> void:
 	assert_eq(discovery_file.owner_pid(), THIS_EDITOR_PID)
 	discovery_file.release(THIS_EDITOR_PID)
 	assert_eq_deep(discovery_file.read(), {"closed": true, "executable_path": "/opt/godot/godot"})
-	assert_eq(discovery_file.owner_pid(), DiscoveryFile.NO_OWNER)
+	assert_eq(discovery_file.owner_pid(), GodotMcpDiscoveryFile.NO_OWNER)
 
 
 func test_takes_over_a_closed_file() -> void:

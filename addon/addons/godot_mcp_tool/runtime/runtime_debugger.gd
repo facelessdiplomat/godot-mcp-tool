@@ -1,41 +1,41 @@
 extends EditorDebuggerPlugin
 
-const GameChannel := preload("game_channel.gd")
-const GameState := preload("game_state.gd")
-const LogStore := preload("log_store.gd")
-const RuntimeProtocol := preload("runtime_protocol.gd")
+const GodotMcpGameChannel := preload("game_channel.gd")
+const GodotMcpGameState := preload("game_state.gd")
+const GodotMcpLogStore := preload("log_store.gd")
+const GodotMcpRuntimeProtocol := preload("runtime_protocol.gd")
 
 const GAME_SOURCE := "game"
 
-var channel: GameChannel
+var channel: GodotMcpGameChannel
 
-var _game: GameState
-var _log_store: LogStore
+var _game: GodotMcpGameState
+var _log_store: GodotMcpLogStore
 var _active_session_id := -1
 
 
-func _init(game: GameState, log_store: LogStore) -> void:
+func _init(game: GodotMcpGameState, log_store: GodotMcpLogStore) -> void:
 	_game = game
 	_log_store = log_store
-	channel = GameChannel.new(_send_request)
+	channel = GodotMcpGameChannel.new(_send_request)
 
 
 func _has_capture(capture: String) -> bool:
-	return capture == RuntimeProtocol.CAPTURE
+	return capture == GodotMcpRuntimeProtocol.CAPTURE
 
 
 func _capture(message: String, data: Array, _session_id: int) -> bool:
 	var payload: Variant = data[0] if not data.is_empty() else null
 	match message:
-		RuntimeProtocol.LOG_MESSAGE:
+		GodotMcpRuntimeProtocol.LOG_MESSAGE:
 			for entry in payload if payload is Array else []:
 				if entry is Dictionary:
 					_log_store.append(entry, GAME_SOURCE)
 			return true
-		RuntimeProtocol.READY_MESSAGE:
+		GodotMcpRuntimeProtocol.READY_MESSAGE:
 			_game.mark_ready(str((payload as Dictionary).get("scene", "")) if payload is Dictionary else "")
 			return true
-		RuntimeProtocol.RESPONSE_MESSAGE:
+		GodotMcpRuntimeProtocol.RESPONSE_MESSAGE:
 			channel.receive(payload)
 			return true
 	return false
@@ -61,5 +61,5 @@ func _send_request(payload: Dictionary) -> bool:
 	var session := get_session(_active_session_id)
 	if session == null or not session.is_active():
 		return false
-	session.send_message(RuntimeProtocol.REQUEST_MESSAGE, [payload])
+	session.send_message(GodotMcpRuntimeProtocol.REQUEST_MESSAGE, [payload])
 	return true

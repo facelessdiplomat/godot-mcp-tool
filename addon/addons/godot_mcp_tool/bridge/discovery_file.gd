@@ -1,6 +1,6 @@
 extends RefCounted
 
-const BridgeProbe := preload("bridge_probe.gd")
+const GodotMcpBridgeProbe := preload("bridge_probe.gd")
 
 const OWNER_ONLY_PERMISSIONS := FileAccess.UNIX_READ_OWNER | FileAccess.UNIX_WRITE_OWNER
 const NO_OWNER := -1
@@ -64,4 +64,4 @@ func _is_served_by_another_editor(current: Dictionary, record: Dictionary) -> bo
 	var current_port := int(current["port"])
 	if int(current.get("pid", NO_OWNER)) == int(record.get("pid", NO_OWNER)) or current_port == int(record.get("port", 0)):
 		return false
-	return BridgeProbe.is_listening(current_port)
+	return GodotMcpBridgeProbe.is_listening(current_port)

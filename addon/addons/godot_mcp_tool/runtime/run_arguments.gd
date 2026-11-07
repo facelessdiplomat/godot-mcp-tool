@@ -1,6 +1,6 @@
 extends RefCounted
 
-const RunRequest := preload("run_request.gd")
+const GodotMcpRunRequest := preload("run_request.gd")
 
 const IGNORE_ERROR_BREAKS := "--ignore-error-breaks"
 const HEADLESS := "--headless"
@@ -8,7 +8,7 @@ const USER_ARGUMENTS_SEPARATOR := "--"
 const FIXED_FPS := "--fixed-fps"
 
 
-static func extend(arguments: PackedStringArray, agent_run: RunRequest, is_editor_headless: bool) -> PackedStringArray:
+static func extend(arguments: PackedStringArray, agent_run: GodotMcpRunRequest, is_editor_headless: bool) -> PackedStringArray:
 	var separator_index := arguments.find(USER_ARGUMENTS_SEPARATOR)
 	var engine_arguments := arguments if separator_index == -1 else arguments.slice(0, separator_index)
 	var user_arguments := PackedStringArray() if separator_index == -1 else arguments.slice(separator_index)

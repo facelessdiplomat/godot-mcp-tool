@@ -5,7 +5,7 @@ func handles(property: Dictionary) -> bool:
 	return property.get("type") == TYPE_OBJECT and property.get("hint") == PROPERTY_HINT_NODE_TYPE
 
 
-func decode(value: Variant, property: Dictionary, target: Object, _decoder: ValueDecoder) -> DecodeOutcome:
+func decode(value: Variant, property: Dictionary, target: Object, _decoder: GodotMcpValueDecoder) -> GodotMcpDecodeOutcome:
 	if value == null:
 		return _success(null)
 	if not value is String:

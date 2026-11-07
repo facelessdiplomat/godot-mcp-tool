@@ -1,9 +1,9 @@
 extends RefCounted
 
-const CommandError := preload("../commands/command_error.gd")
-const GlobalClasses := preload("../util/global_classes.gd")
-const JsonRpc := preload("../bridge/json_rpc.gd")
-const SimilarNames := preload("../util/similar_names.gd")
+const GodotMcpCommandError := preload("../commands/command_error.gd")
+const GodotMcpGlobalClasses := preload("../util/global_classes.gd")
+const GodotMcpJsonRpc := preload("../bridge/json_rpc.gd")
+const GodotMcpSimilarNames := preload("../util/similar_names.gd")
 
 const TYPE_EXAMPLES := "Use a node class such as Node3D, MeshInstance3D or CharacterBody3D, a class_name from the project, or a scene path such as res://props/crate.tscn."
 
@@ -13,10 +13,10 @@ func create(type_text: String) -> Variant:
 		return _instantiate_scene(type_text, PackedScene.GEN_EDIT_STATE_INSTANCE)
 	if ClassDB.class_exists(type_text):
 		return _instantiate_engine_class(type_text)
-	var script := GlobalClasses.script_of(type_text)
+	var script := GodotMcpGlobalClasses.script_of(type_text)
 	if script != null:
 		return _instantiate_script(type_text, script)
-	return CommandError.new(JsonRpc.NOT_FOUND, "Unknown node type %s" % type_text, unknown_type_hint(type_text))
+	return GodotMcpCommandError.new(GodotMcpJsonRpc.NOT_FOUND, "Unknown node type %s" % type_text, unknown_type_hint(type_text))
 
 
 static func display_class_of_scene(packed_scene: PackedScene) -> String:
@@ -31,7 +31,7 @@ static func display_class_of_scene(packed_scene: PackedScene) -> String:
 
 
 static func is_known_class(class_text: String) -> bool:
-	return ClassDB.class_exists(class_text) or GlobalClasses.script_of(class_text) != null
+	return ClassDB.class_exists(class_text) or GodotMcpGlobalClasses.script_of(class_text) != null
 
 
 static func display_class(object: Object) -> String:
@@ -42,32 +42,32 @@ static func display_class(object: Object) -> String:
 
 
 static func unknown_type_hint(type_text: String) -> String:
-	var candidates: Array = Array(ClassDB.get_inheriters_from_class("Node")) + GlobalClasses.names()
-	var similar := SimilarNames.hint(type_text, candidates)
+	var candidates: Array = Array(ClassDB.get_inheriters_from_class("Node")) + GodotMcpGlobalClasses.names()
+	var similar := GodotMcpSimilarNames.hint(type_text, candidates)
 	return similar if not similar.is_empty() else TYPE_EXAMPLES
 
 
 func _instantiate_scene(scene_path: String, edit_state: int) -> Variant:
 	if not ResourceLoader.exists(scene_path):
-		return CommandError.new(JsonRpc.NOT_FOUND, "Scene %s not found" % scene_path, "Check the path with scene_get_tree or the file system.")
+		return GodotMcpCommandError.new(GodotMcpJsonRpc.NOT_FOUND, "Scene %s not found" % scene_path, "Check the path with scene_get_tree or the file system.")
 	var packed_scene := load(scene_path) as PackedScene
 	if packed_scene == null or not packed_scene.can_instantiate():
-		return CommandError.new(JsonRpc.INVALID_PARAMS, "%s is not a scene that can be instanced" % scene_path)
+		return GodotMcpCommandError.new(GodotMcpJsonRpc.INVALID_PARAMS, "%s is not a scene that can be instanced" % scene_path)
 	return packed_scene.instantiate(edit_state)
 
 
 func _instantiate_engine_class(class_text: String) -> Variant:
 	if not ClassDB.is_parent_class(class_text, "Node"):
-		return CommandError.new(JsonRpc.INVALID_PARAMS, "%s is not a node class" % class_text, TYPE_EXAMPLES)
+		return GodotMcpCommandError.new(GodotMcpJsonRpc.INVALID_PARAMS, "%s is not a node class" % class_text, TYPE_EXAMPLES)
 	if not ClassDB.can_instantiate(class_text):
-		return CommandError.new(JsonRpc.INVALID_PARAMS, "%s is abstract and cannot be created" % class_text, "Use one of its subclasses: %s." % ", ".join(ClassDB.get_inheriters_from_class(class_text).slice(0, 5)))
+		return GodotMcpCommandError.new(GodotMcpJsonRpc.INVALID_PARAMS, "%s is abstract and cannot be created" % class_text, "Use one of its subclasses: %s." % ", ".join(ClassDB.get_inheriters_from_class(class_text).slice(0, 5)))
 	return ClassDB.instantiate(class_text)
 
 
 func _instantiate_script(type_text: String, script: Script) -> Variant:
 	if not ClassDB.is_parent_class(script.get_instance_base_type(), "Node"):
-		return CommandError.new(JsonRpc.INVALID_PARAMS, "%s is not a node class" % type_text, TYPE_EXAMPLES)
-	var node := GlobalClasses.instantiate(script)
+		return GodotMcpCommandError.new(GodotMcpJsonRpc.INVALID_PARAMS, "%s is not a node class" % type_text, TYPE_EXAMPLES)
+	var node := GodotMcpGlobalClasses.instantiate(script)
 	if node == null:
-		return CommandError.new(JsonRpc.INVALID_PARAMS, "%s cannot be created; check its script for errors" % type_text)
+		return GodotMcpCommandError.new(GodotMcpJsonRpc.INVALID_PARAMS, "%s cannot be created; check its script for errors" % type_text)
 	return node

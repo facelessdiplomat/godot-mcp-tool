@@ -1,17 +1,17 @@
 extends GutTest
 
-const CommandError := preload("res://addons/godot_mcp_tool/commands/command_error.gd")
-const EditingContext := preload("res://addons/godot_mcp_tool/scene/editing_context.gd")
+const GodotMcpCommandError := preload("res://addons/godot_mcp_tool/commands/command_error.gd")
+const GodotMcpEditingContext := preload("res://addons/godot_mcp_tool/scene/editing_context.gd")
 const FakeSceneAccess := preload("res://tests/support/fake_scene_access.gd")
 const FakeScriptEditorAccess := preload("res://tests/support/fake_script_editor_access.gd")
-const JsonRpc := preload("res://addons/godot_mcp_tool/bridge/json_rpc.gd")
-const NodeDuplicateCommand := preload("res://addons/godot_mcp_tool/commands/node/node_duplicate_command.gd")
-const PlainUndoHistory := preload("res://addons/godot_mcp_tool/scene/plain_undo_history.gd")
-const VariantCodec := preload("res://addons/godot_mcp_tool/codec/variant_codec.gd")
+const GodotMcpJsonRpc := preload("res://addons/godot_mcp_tool/bridge/json_rpc.gd")
+const GodotMcpNodeDuplicateCommand := preload("res://addons/godot_mcp_tool/commands/node/node_duplicate_command.gd")
+const GodotMcpPlainUndoHistory := preload("res://addons/godot_mcp_tool/scene/plain_undo_history.gd")
+const GodotMcpVariantCodec := preload("res://addons/godot_mcp_tool/codec/variant_codec.gd")
 
 var _scenes: FakeSceneAccess
-var _history: PlainUndoHistory
-var _context: EditingContext
+var _history: GodotMcpPlainUndoHistory
+var _context: GodotMcpEditingContext
 var _root: Node3D
 var _props: Node3D
 
@@ -23,8 +23,8 @@ func before_each() -> void:
 	_root.scene_file_path = "res://levels/arena.tscn"
 	_scenes.edited_root = _root
 	add_child(_root)
-	_history = PlainUndoHistory.new()
-	_context = EditingContext.new(_scenes, _history, VariantCodec.new(), FakeScriptEditorAccess.new())
+	_history = GodotMcpPlainUndoHistory.new()
+	_context = GodotMcpEditingContext.new(_scenes, _history, GodotMcpVariantCodec.new(), FakeScriptEditorAccess.new())
 	var crate := _add_owned(_root, Node3D.new(), "Crate")
 	crate.add_to_group("props", true)
 	_add_owned(crate, MeshInstance3D.new(), "Mesh")
@@ -44,7 +44,7 @@ func _add_owned(parent: Node, node: Node, node_name: String) -> Node:
 
 
 func _duplicate(params: Dictionary) -> Variant:
-	return await NodeDuplicateCommand.new(_context).execute(params)
+	return await GodotMcpNodeDuplicateCommand.new(_context).execute(params)
 
 
 func test_duplicates_a_node_with_its_children_right_after_it() -> void:
@@ -83,10 +83,10 @@ func test_duplicates_an_instance_as_an_instance() -> void:
 
 func test_refuses_to_duplicate_the_scene_root() -> void:
 	var error: Variant = await _duplicate({"path": "."})
-	assert_eq((error as CommandError).code, JsonRpc.INVALID_PARAMS)
+	assert_eq((error as GodotMcpCommandError).code, GodotMcpJsonRpc.INVALID_PARAMS)
 
 
 func test_refuses_a_name_that_is_taken() -> void:
 	var error: Variant = await _duplicate({"path": "Crate", "name": "Props"})
-	assert_true(error is CommandError)
-	assert_string_contains((error as CommandError).message, "Props")
+	assert_true(error is GodotMcpCommandError)
+	assert_string_contains((error as GodotMcpCommandError).message, "Props")

@@ -1,9 +1,9 @@
 extends RefCounted
 
-const CameraViews := preload("camera_views.gd")
-const CommandError := preload("../commands/command_error.gd")
-const JsonRpc := preload("../bridge/json_rpc.gd")
-const NumberText := preload("../util/number_text.gd")
+const GodotMcpCameraViews := preload("camera_views.gd")
+const GodotMcpCommandError := preload("../commands/command_error.gd")
+const GodotMcpJsonRpc := preload("../bridge/json_rpc.gd")
+const GodotMcpNumberText := preload("../util/number_text.gd")
 
 const DEFAULT_FOV := 50.0
 const MINIMUM_FOV := 1.0
@@ -17,17 +17,17 @@ const VIEW_FORMS := "a preset name such as \"iso\", {\"preset\": \"front\", \"ta
 
 static func parse(requests: Array, bounds_of: Callable) -> Variant:
 	if requests.size() > MAXIMUM_VIEWS:
-		return CommandError.new(JsonRpc.INVALID_PARAMS, "One screenshot holds up to %d views, not %d" % [MAXIMUM_VIEWS, requests.size()], "Take several screenshots for more angles.")
+		return GodotMcpCommandError.new(GodotMcpJsonRpc.INVALID_PARAMS, "One screenshot holds up to %d views, not %d" % [MAXIMUM_VIEWS, requests.size()], "Take several screenshots for more angles.")
 	var views: Array = []
 	for index in requests.size():
 		var view: Variant = _parse_view(requests[index], bounds_of)
-		if view is CommandError:
+		if view is GodotMcpCommandError:
 			return view
 		if view is String:
-			return CommandError.new(
-				JsonRpc.INVALID_PARAMS,
+			return GodotMcpCommandError.new(
+				GodotMcpJsonRpc.INVALID_PARAMS,
 				"View %d: %s" % [index + 1, view],
-				"Presets: %s. Each view is %s." % [", ".join(CameraViews.PRESETS), VIEW_FORMS],
+				"Presets: %s. Each view is %s." % [", ".join(GodotMcpCameraViews.PRESETS), VIEW_FORMS],
 			)
 		views.append(view)
 	return views
@@ -62,7 +62,7 @@ static func _parse_view(request: Variant, bounds_of: Callable) -> Variant:
 
 static func _preset_view(description: Dictionary, bounds_of: Callable) -> Variant:
 	var preset := str(description["preset"])
-	if not preset in CameraViews.PRESETS:
+	if not preset in GodotMcpCameraViews.PRESETS:
 		return "unknown preset \"%s\"" % preset
 	var fov: Variant = _fov_of(description)
 	var target: Variant = description.get("target", "")
@@ -71,10 +71,10 @@ static func _preset_view(description: Dictionary, bounds_of: Callable) -> Varian
 	if not target is String:
 		return "target is a node path such as \"Player\""
 	var bounds: Variant = bounds_of.call(target)
-	if bounds is CommandError:
+	if bounds is GodotMcpCommandError:
 		return bounds
 	var default_label := preset if (target as String).is_empty() else "%s of %s" % [preset, target]
-	return {"label": _label_of(description, default_label), "transform": CameraViews.preset(preset, bounds, fov), "fov": fov}
+	return {"label": _label_of(description, default_label), "transform": GodotMcpCameraViews.preset(preset, bounds, fov), "fov": fov}
 
 
 static func _positioned_view(description: Dictionary, bounds_of: Callable) -> Variant:
@@ -89,7 +89,7 @@ static func _positioned_view(description: Dictionary, bounds_of: Callable) -> Va
 		return target
 	if (target as Vector3).is_equal_approx(position):
 		return "the camera cannot look at its own position"
-	return {"label": _label_of(description, "from %s" % _point_text(position)), "transform": CameraViews.looking(position, target), "fov": fov}
+	return {"label": _label_of(description, "from %s" % _point_text(position)), "transform": GodotMcpCameraViews.looking(position, target), "fov": fov}
 
 
 static func _look_target_of(description: Dictionary, bounds_of: Callable) -> Variant:
@@ -122,4 +122,4 @@ static func _point_of(value: Variant) -> Variant:
 
 
 static func _point_text(point: Vector3) -> String:
-	return "(%s, %s, %s)" % [NumberText.of(point.x, POINT_DECIMALS), NumberText.of(point.y, POINT_DECIMALS), NumberText.of(point.z, POINT_DECIMALS)]
+	return "(%s, %s, %s)" % [GodotMcpNumberText.of(point.x, POINT_DECIMALS), GodotMcpNumberText.of(point.y, POINT_DECIMALS), GodotMcpNumberText.of(point.z, POINT_DECIMALS)]

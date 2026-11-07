@@ -1,7 +1,7 @@
 extends "../scene_edit_command.gd"
 
-const PropertyChange := preload("../../scene/edits/property_change.gd")
+const GodotMcpPropertyChange := preload("../../scene/edits/property_change.gd")
 
 
-func _init(context: EditingContext) -> void:
-	super(context, PropertyChange)
+func _init(context: GodotMcpEditingContext) -> void:
+	super(context, GodotMcpPropertyChange)

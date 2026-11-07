@@ -1,23 +1,23 @@
 extends GutTest
 
-const Authenticator := preload("res://addons/godot_mcp_tool/bridge/authenticator.gd")
-const BridgeSession := preload("res://addons/godot_mcp_tool/bridge/bridge_session.gd")
-const Command := preload("res://addons/godot_mcp_tool/commands/command.gd")
-const CommandError := preload("res://addons/godot_mcp_tool/commands/command_error.gd")
-const CommandRouter := preload("res://addons/godot_mcp_tool/commands/command_router.gd")
-const JsonRpc := preload("res://addons/godot_mcp_tool/bridge/json_rpc.gd")
-const PingCommand := preload("res://addons/godot_mcp_tool/commands/ping_command.gd")
+const GodotMcpAuthenticator := preload("res://addons/godot_mcp_tool/bridge/authenticator.gd")
+const GodotMcpBridgeSession := preload("res://addons/godot_mcp_tool/bridge/bridge_session.gd")
+const GodotMcpCommand := preload("res://addons/godot_mcp_tool/commands/command.gd")
+const GodotMcpCommandError := preload("res://addons/godot_mcp_tool/commands/command_error.gd")
+const GodotMcpCommandRouter := preload("res://addons/godot_mcp_tool/commands/command_router.gd")
+const GodotMcpJsonRpc := preload("res://addons/godot_mcp_tool/bridge/json_rpc.gd")
+const GodotMcpPingCommand := preload("res://addons/godot_mcp_tool/commands/ping_command.gd")
 
 
 class FailingCommand:
-	extends Command
+	extends GodotMcpCommand
 
 	func execute(_params: Dictionary) -> Variant:
-		return CommandError.new(-32004, "Node not found", "Similar: Player/MeshInstance3D")
+		return GodotMcpCommandError.new(-32004, "Node not found", "Similar: Player/MeshInstance3D")
 
 
 class FrameWaitingCommand:
-	extends Command
+	extends GodotMcpCommand
 
 	func execute(_params: Dictionary) -> Variant:
 		await Engine.get_main_loop().process_frame
@@ -25,7 +25,7 @@ class FrameWaitingCommand:
 
 
 class RecordingCommand:
-	extends Command
+	extends GodotMcpCommand
 
 	var executed := false
 
@@ -34,21 +34,21 @@ class RecordingCommand:
 		return {"executed": true}
 
 
-var _session: BridgeSession
+var _session: GodotMcpBridgeSession
 var _first_scan_finished := true
 var _background_response: Dictionary = {}
 
 
 func before_each() -> void:
-	var router := CommandRouter.new()
-	router.register("ping", PingCommand.new())
+	var router := GodotMcpCommandRouter.new()
+	router.register("ping", GodotMcpPingCommand.new())
 	router.register("fail", FailingCommand.new())
 	router.register("wait", FrameWaitingCommand.new())
-	_session = BridgeSession.new(Authenticator.new("secret", 1), router, func() -> Dictionary: return {"protocol": 1, "addon_version": "0.1.0"})
+	_session = GodotMcpBridgeSession.new(GodotMcpAuthenticator.new("secret", 1), router, func() -> Dictionary: return {"protocol": 1, "addon_version": "0.1.0"})
 
 
-func _gated_session(router: CommandRouter, wait_for_first_scan: Callable) -> BridgeSession:
-	return BridgeSession.new(Authenticator.new("secret", 1), router, func() -> Dictionary: return {}, Callable(), wait_for_first_scan)
+func _gated_session(router: GodotMcpCommandRouter, wait_for_first_scan: Callable) -> GodotMcpBridgeSession:
+	return GodotMcpBridgeSession.new(GodotMcpAuthenticator.new("secret", 1), router, func() -> Dictionary: return {}, Callable(), wait_for_first_scan)
 
 
 func _wait_for_first_scan() -> bool:
@@ -57,7 +57,7 @@ func _wait_for_first_scan() -> bool:
 	return true
 
 
-func _send_in_background(session: BridgeSession, line: String) -> void:
+func _send_in_background(session: GodotMcpBridgeSession, line: String) -> void:
 	_background_response = await session.handle_line(line)
 
 
@@ -71,19 +71,19 @@ func _request_line(request_id: int, method: String) -> String:
 
 func test_rejects_text_that_is_not_json_and_closes() -> void:
 	var response: Dictionary = await _session.handle_line("GET / HTTP/1.1")
-	assert_eq((response["error"] as Dictionary)["code"], JsonRpc.PARSE_ERROR)
+	assert_eq((response["error"] as Dictionary)["code"], GodotMcpJsonRpc.PARSE_ERROR)
 	assert_true(_session.should_close)
 
 
 func test_requires_hello_before_other_methods() -> void:
 	var response: Dictionary = await _session.handle_line(_request_line(1, "ping"))
-	assert_eq((response["error"] as Dictionary)["code"], JsonRpc.UNAUTHORIZED)
+	assert_eq((response["error"] as Dictionary)["code"], GodotMcpJsonRpc.UNAUTHORIZED)
 	assert_true(_session.should_close)
 
 
 func test_rejects_a_wrong_token_and_closes() -> void:
 	var response: Dictionary = await _session.handle_line(_hello_line("guess"))
-	assert_eq((response["error"] as Dictionary)["code"], JsonRpc.UNAUTHORIZED)
+	assert_eq((response["error"] as Dictionary)["code"], GodotMcpJsonRpc.UNAUTHORIZED)
 	assert_false(_session.is_authenticated)
 	assert_true(_session.should_close)
 
@@ -111,7 +111,7 @@ func test_reports_an_unknown_method_with_the_available_ones() -> void:
 	await _session.handle_line(_hello_line("secret"))
 	var response: Dictionary = await _session.handle_line(_request_line(4, "teleport"))
 	var error := response["error"] as Dictionary
-	assert_eq(error["code"], JsonRpc.METHOD_NOT_FOUND)
+	assert_eq(error["code"], GodotMcpJsonRpc.METHOD_NOT_FOUND)
 	assert_string_contains((error["data"] as Dictionary)["hint"], "ping")
 
 
@@ -124,13 +124,13 @@ func test_reports_a_command_error_with_its_hint() -> void:
 func test_rejects_params_that_are_not_an_object() -> void:
 	await _session.handle_line(_hello_line("secret"))
 	var response: Dictionary = await _session.handle_line(JSON.stringify({"jsonrpc": "2.0", "id": 6, "method": "ping", "params": [1, 2]}))
-	assert_eq((response["error"] as Dictionary)["code"], JsonRpc.INVALID_PARAMS)
+	assert_eq((response["error"] as Dictionary)["code"], GodotMcpJsonRpc.INVALID_PARAMS)
 
 
-func _session_reporting(status: Dictionary) -> BridgeSession:
-	var router := CommandRouter.new()
-	router.register("ping", PingCommand.new())
-	return BridgeSession.new(Authenticator.new("secret", 1), router, func() -> Dictionary: return {"protocol": 1}, func() -> Dictionary: return status.duplicate())
+func _session_reporting(status: Dictionary) -> GodotMcpBridgeSession:
+	var router := GodotMcpCommandRouter.new()
+	router.register("ping", GodotMcpPingCommand.new())
+	return GodotMcpBridgeSession.new(GodotMcpAuthenticator.new("secret", 1), router, func() -> Dictionary: return {"protocol": 1}, func() -> Dictionary: return status.duplicate())
 
 
 func test_sends_the_log_status_along_with_the_hello_answer() -> void:
@@ -162,8 +162,8 @@ func test_sends_no_status_before_authentication() -> void:
 
 func test_holds_commands_until_the_first_scan_ends_but_answers_ping_at_once() -> void:
 	var recording := RecordingCommand.new()
-	var router := CommandRouter.new()
-	router.register("ping", PingCommand.new())
+	var router := GodotMcpCommandRouter.new()
+	router.register("ping", GodotMcpPingCommand.new())
 	router.register("record", recording)
 	_first_scan_finished = false
 	_background_response = {}
@@ -181,23 +181,23 @@ func test_holds_commands_until_the_first_scan_ends_but_answers_ping_at_once() ->
 
 func test_answers_that_the_editor_is_busy_when_its_first_scan_does_not_end_in_time() -> void:
 	var recording := RecordingCommand.new()
-	var router := CommandRouter.new()
+	var router := GodotMcpCommandRouter.new()
 	router.register("record", recording)
 	var session := _gated_session(router, func() -> bool: return false)
 	await session.handle_line(_hello_line("secret"))
 	var response: Dictionary = await session.handle_line(_request_line(2, "record"))
-	assert_eq((response["error"] as Dictionary)["code"], JsonRpc.EDITOR_BUSY)
+	assert_eq((response["error"] as Dictionary)["code"], GodotMcpJsonRpc.EDITOR_BUSY)
 	assert_false(recording.executed)
 
 
 func test_records_the_commands_it_answers_but_not_the_keepalive() -> void:
 	var recorded: Array = []
-	var router := CommandRouter.new()
-	router.register("ping", PingCommand.new())
+	var router := GodotMcpCommandRouter.new()
+	router.register("ping", GodotMcpPingCommand.new())
 	router.register("fail", FailingCommand.new())
 	router.register("record", RecordingCommand.new())
-	var session := BridgeSession.new(
-		Authenticator.new("secret", 1),
+	var session := GodotMcpBridgeSession.new(
+		GodotMcpAuthenticator.new("secret", 1),
 		router,
 		func() -> Dictionary: return {},
 		Callable(),

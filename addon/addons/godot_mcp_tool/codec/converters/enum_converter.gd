@@ -1,14 +1,14 @@
 extends "converter.gd"
 
-const EnumOptions := preload("../enum_options.gd")
+const GodotMcpEnumOptions := preload("../enum_options.gd")
 
 
 func handles(property: Dictionary) -> bool:
 	return property.get("type") == TYPE_INT and property.get("hint") == PROPERTY_HINT_ENUM
 
 
-func decode(value: Variant, property: Dictionary, target: Object, _decoder: ValueDecoder) -> DecodeOutcome:
-	var options := EnumOptions.parse(property.get("hint_string", ""))
+func decode(value: Variant, property: Dictionary, target: Object, _decoder: GodotMcpValueDecoder) -> GodotMcpDecodeOutcome:
+	var options := GodotMcpEnumOptions.parse(property.get("hint_string", ""))
 	var option_list := ", ".join(PackedStringArray(options.map(func(option: Dictionary) -> String: return option["name"])))
 	if _is_whole_number(value):
 		return _success(int(value))

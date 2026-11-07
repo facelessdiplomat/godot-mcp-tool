@@ -1,9 +1,9 @@
 extends RefCounted
 
-const NodeFactory := preload("node_factory.gd")
-const NodeLocator := preload("node_locator.gd")
-const SimilarNames := preload("../util/similar_names.gd")
-const VariantCodec := preload("../codec/variant_codec.gd")
+const GodotMcpNodeFactory := preload("node_factory.gd")
+const GodotMcpNodeLocator := preload("node_locator.gd")
+const GodotMcpSimilarNames := preload("../util/similar_names.gd")
+const GodotMcpVariantCodec := preload("../codec/variant_codec.gd")
 
 const FLAG_NAMES := {CONNECT_DEFERRED: "deferred", CONNECT_ONE_SHOT: "one_shot"}
 
@@ -17,7 +17,7 @@ static func find_signal(object: Object, signal_name: String) -> Dictionary:
 
 static func unknown_signal_hint(object: Object, signal_name: String) -> String:
 	var names: Array = object.get_signal_list().map(func(description: Dictionary) -> String: return description["name"])
-	var similar := SimilarNames.hint(signal_name, names)
+	var similar := GodotMcpSimilarNames.hint(signal_name, names)
 	return similar if not similar.is_empty() else "signal_list with the node's path shows its signals."
 
 
@@ -72,10 +72,10 @@ static func saved_connections(node: Node, signal_name: String = "") -> Array[Dic
 	return connections
 
 
-static func describe_connection(scene_root: Node, source: Node, connection: Dictionary, codec: VariantCodec) -> Dictionary:
+static func describe_connection(scene_root: Node, source: Node, connection: Dictionary, codec: GodotMcpVariantCodec) -> Dictionary:
 	var callable: Callable = connection["callable"]
 	return {
-		"from": NodeLocator.path_of(scene_root, source),
+		"from": GodotMcpNodeLocator.path_of(scene_root, source),
 		"signal": str((connection["signal"] as Signal).get_name()),
 		"to": target_text(scene_root, callable.get_object()),
 		"method": str(callable.get_method()),
@@ -86,8 +86,8 @@ static func describe_connection(scene_root: Node, source: Node, connection: Dict
 
 static func target_text(scene_root: Node, target: Object) -> String:
 	if target is Node and (target == scene_root or scene_root.is_ancestor_of(target)):
-		return NodeLocator.path_of(scene_root, target)
-	return NodeFactory.display_class(target) if target != null else "a freed object"
+		return GodotMcpNodeLocator.path_of(scene_root, target)
+	return GodotMcpNodeFactory.display_class(target) if target != null else "a freed object"
 
 
 static func flag_names(flags: int) -> Array:

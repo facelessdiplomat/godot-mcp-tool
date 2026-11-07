@@ -1,24 +1,24 @@
 extends GutTest
 
-const Authenticator := preload("res://addons/godot_mcp_tool/bridge/authenticator.gd")
-const BridgeServer := preload("res://addons/godot_mcp_tool/bridge/bridge_server.gd")
-const BridgeSession := preload("res://addons/godot_mcp_tool/bridge/bridge_session.gd")
-const CommandRouter := preload("res://addons/godot_mcp_tool/commands/command_router.gd")
-const PingCommand := preload("res://addons/godot_mcp_tool/commands/ping_command.gd")
+const GodotMcpAuthenticator := preload("res://addons/godot_mcp_tool/bridge/authenticator.gd")
+const GodotMcpBridgeServer := preload("res://addons/godot_mcp_tool/bridge/bridge_server.gd")
+const GodotMcpBridgeSession := preload("res://addons/godot_mcp_tool/bridge/bridge_session.gd")
+const GodotMcpCommandRouter := preload("res://addons/godot_mcp_tool/commands/command_router.gd")
+const GodotMcpPingCommand := preload("res://addons/godot_mcp_tool/commands/ping_command.gd")
 
 const LOOPBACK_ADDRESS := "127.0.0.1"
 const MAXIMUM_POLL_ATTEMPTS := 400
 const RECEIVE_ONLY_POLL_ATTEMPTS := 100
 
-var _server: BridgeServer
+var _server: GodotMcpBridgeServer
 var _client: StreamPeerTCP
 
 
 func before_each() -> void:
-	var router := CommandRouter.new()
-	router.register("ping", PingCommand.new())
-	_server = BridgeServer.new(func() -> BridgeSession:
-		return BridgeSession.new(Authenticator.new("secret", 1), router, func() -> Dictionary: return {"protocol": 1}))
+	var router := GodotMcpCommandRouter.new()
+	router.register("ping", GodotMcpPingCommand.new())
+	_server = GodotMcpBridgeServer.new(func() -> GodotMcpBridgeSession:
+		return GodotMcpBridgeSession.new(GodotMcpAuthenticator.new("secret", 1), router, func() -> Dictionary: return {"protocol": 1}))
 	assert_eq(_server.listen(LOOPBACK_ADDRESS, 0), OK)
 	_client = StreamPeerTCP.new()
 	_client.connect_to_host(LOOPBACK_ADDRESS, _server.get_port())
@@ -119,10 +119,10 @@ func test_does_not_broadcast_to_clients_that_did_not_authenticate() -> void:
 
 
 func test_sends_status_notifications_before_the_answer() -> void:
-	var router := CommandRouter.new()
+	var router := GodotMcpCommandRouter.new()
 	_server.stop()
-	_server = BridgeServer.new(func() -> BridgeSession:
-		return BridgeSession.new(Authenticator.new("secret", 1), router, func() -> Dictionary: return {"protocol": 1}, func() -> Dictionary: return {"errors": 0}))
+	_server = GodotMcpBridgeServer.new(func() -> GodotMcpBridgeSession:
+		return GodotMcpBridgeSession.new(GodotMcpAuthenticator.new("secret", 1), router, func() -> Dictionary: return {"protocol": 1}, func() -> Dictionary: return {"errors": 0}))
 	assert_eq(_server.listen(LOOPBACK_ADDRESS, 0), OK)
 	_client = StreamPeerTCP.new()
 	_client.connect_to_host(LOOPBACK_ADDRESS, _server.get_port())

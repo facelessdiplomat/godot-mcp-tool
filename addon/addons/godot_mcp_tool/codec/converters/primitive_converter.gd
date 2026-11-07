@@ -7,7 +7,7 @@ func handles(property: Dictionary) -> bool:
 	return property.get("type") in HANDLED_TYPES
 
 
-func decode(value: Variant, property: Dictionary, _target: Object, _decoder: ValueDecoder) -> DecodeOutcome:
+func decode(value: Variant, property: Dictionary, _target: Object, _decoder: GodotMcpValueDecoder) -> GodotMcpDecodeOutcome:
 	match property["type"]:
 		TYPE_BOOL:
 			return _success(value) if value is bool else _failure("expected a boolean (true or false)")

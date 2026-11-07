@@ -1,35 +1,35 @@
 extends "../../commands/command.gd"
 
-const GameScene := preload("game_scene.gd")
-const NodeFactory := preload("../../scene/node_factory.gd")
-const Params := preload("../../commands/params.gd")
-const PropertyEditor := preload("../../scene/property_editor.gd")
-const SimilarNames := preload("../../util/similar_names.gd")
-const VariantCodec := preload("../../codec/variant_codec.gd")
+const GodotMcpGameScene := preload("game_scene.gd")
+const GodotMcpNodeFactory := preload("../../scene/node_factory.gd")
+const GodotMcpParams := preload("../../commands/params.gd")
+const GodotMcpPropertyEditor := preload("../../scene/property_editor.gd")
+const GodotMcpSimilarNames := preload("../../util/similar_names.gd")
+const GodotMcpVariantCodec := preload("../../codec/variant_codec.gd")
 
 const CALL_SUFFIX := "()"
 const GETTER_PREFIXES := ["is_", "get_", "has_", "can_"]
 
-var _scene: GameScene
-var _properties: PropertyEditor
-var _codec: VariantCodec
+var _scene: GodotMcpGameScene
+var _properties: GodotMcpPropertyEditor
+var _codec: GodotMcpVariantCodec
 
 
-func _init(scene: GameScene, properties: PropertyEditor, codec: VariantCodec) -> void:
+func _init(scene: GodotMcpGameScene, properties: GodotMcpPropertyEditor, codec: GodotMcpVariantCodec) -> void:
 	_scene = scene
 	_properties = properties
 	_codec = codec
 
 
 func execute(params: Dictionary) -> Variant:
-	var path: Variant = Params.required_text(params, "path", "\"Player\", \".\" for the current scene, or \"/root/GameState\"")
-	var names: Variant = Params.text_list(params, "names")
-	var include_defaults: Variant = Params.flag(params, "include_defaults", false)
+	var path: Variant = GodotMcpParams.required_text(params, "path", "\"Player\", \".\" for the current scene, or \"/root/GameState\"")
+	var names: Variant = GodotMcpParams.text_list(params, "names")
+	var include_defaults: Variant = GodotMcpParams.flag(params, "include_defaults", false)
 	for value in [path, names, include_defaults]:
-		if value is CommandError:
+		if value is GodotMcpCommandError:
 			return value
 	var resolved: Variant = _scene.resolve(path)
-	if resolved is CommandError:
+	if resolved is GodotMcpCommandError:
 		return resolved
 	var node := resolved as Node
 	var entries: Array = []
@@ -40,7 +40,7 @@ func execute(params: Dictionary) -> Variant:
 			entries.append(_call_getter(node, requested_name))
 		else:
 			entries.append_array(_properties.describe(node, PackedStringArray([requested_name]), false))
-	return {"scene": _scene.scene_path(), "path": _scene.path_of(node), "type": NodeFactory.display_class(node), "properties": entries}
+	return {"scene": _scene.scene_path(), "path": _scene.path_of(node), "type": GodotMcpNodeFactory.display_class(node), "properties": entries}
 
 
 func _call_getter(node: Node, call_text: String) -> Dictionary:
@@ -74,5 +74,5 @@ static func _unknown_method_message(object: Object, method_name: String) -> Stri
 		if _is_getter_name(str(method["name"])):
 			getter_names.append(str(method["name"]))
 	var message := "%s has no method %s()." % [object.get_class(), method_name]
-	var similar := SimilarNames.hint(method_name, getter_names)
+	var similar := GodotMcpSimilarNames.hint(method_name, getter_names)
 	return message if similar.is_empty() else "%s %s" % [message, similar]

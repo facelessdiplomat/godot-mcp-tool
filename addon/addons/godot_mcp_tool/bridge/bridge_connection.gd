@@ -1,18 +1,18 @@
 extends RefCounted
 
-const BridgeSession := preload("bridge_session.gd")
-const JsonRpc := preload("json_rpc.gd")
-const NdjsonBuffer := preload("ndjson_buffer.gd")
+const GodotMcpBridgeSession := preload("bridge_session.gd")
+const GodotMcpJsonRpc := preload("json_rpc.gd")
+const GodotMcpNdjsonBuffer := preload("ndjson_buffer.gd")
 
 var is_closed := false
-var session: BridgeSession
+var session: GodotMcpBridgeSession
 
 var _peer: StreamPeerTCP
-var _incoming := NdjsonBuffer.new()
+var _incoming := GodotMcpNdjsonBuffer.new()
 var _outgoing := PackedByteArray()
 
 
-func _init(peer: StreamPeerTCP, bridge_session: BridgeSession) -> void:
+func _init(peer: StreamPeerTCP, bridge_session: GodotMcpBridgeSession) -> void:
 	_peer = peer
 	session = bridge_session
 	_peer.set_no_delay(true)
@@ -37,7 +37,7 @@ func poll() -> int:
 
 func send(message: Dictionary) -> void:
 	if not is_closed:
-		_outgoing.append_array(JsonRpc.encode(message))
+		_outgoing.append_array(GodotMcpJsonRpc.encode(message))
 
 
 func close() -> void:

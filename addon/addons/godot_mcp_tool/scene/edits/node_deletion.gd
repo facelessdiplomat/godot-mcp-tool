@@ -3,24 +3,24 @@ extends "scene_edit.gd"
 var _deleted_paths: Array = []
 
 
-func prepare(scene_root: Node, params: Dictionary) -> CommandError:
-	var paths: Variant = Params.text_list(params, "paths")
-	if paths is CommandError:
+func prepare(scene_root: Node, params: Dictionary) -> GodotMcpCommandError:
+	var paths: Variant = GodotMcpParams.text_list(params, "paths")
+	if paths is GodotMcpCommandError:
 		return paths
 	if (paths as Array).is_empty():
-		return CommandError.new(JsonRpc.INVALID_PARAMS, "\"paths\" needs at least one node path", "Example: [\"Player/Camera\"]")
+		return GodotMcpCommandError.new(GodotMcpJsonRpc.INVALID_PARAMS, "\"paths\" needs at least one node path", "Example: [\"Player/Camera\"]")
 	var nodes: Array[Node] = []
 	for path_text in paths:
-		var node := NodeLocator.find(scene_root, path_text)
+		var node := GodotMcpNodeLocator.find(scene_root, path_text)
 		if node == null:
-			return CommandError.new(JsonRpc.NOT_FOUND, "Node \"%s\" not found; nothing was deleted" % path_text, NodeLocator.not_found_hint(scene_root, path_text))
+			return GodotMcpCommandError.new(GodotMcpJsonRpc.NOT_FOUND, "Node \"%s\" not found; nothing was deleted" % path_text, GodotMcpNodeLocator.not_found_hint(scene_root, path_text))
 		if node == scene_root:
-			return CommandError.new(JsonRpc.INVALID_PARAMS, "The scene root cannot be deleted", "Create another scene with scene_create instead.")
+			return GodotMcpCommandError.new(GodotMcpJsonRpc.INVALID_PARAMS, "The scene root cannot be deleted", "Create another scene with scene_create instead.")
 		if is_inside_instance(node, scene_root):
-			return CommandError.new(JsonRpc.INVALID_PARAMS, "\"%s\" belongs to an instanced scene and cannot be deleted here" % path_text, "Delete the instance itself, or edit the instanced scene.")
+			return GodotMcpCommandError.new(GodotMcpJsonRpc.INVALID_PARAMS, "\"%s\" belongs to an instanced scene and cannot be deleted here" % path_text, "Delete the instance itself, or edit the instanced scene.")
 		nodes.append(node)
 	var top_level_nodes := _without_descendants(nodes)
-	_deleted_paths = top_level_nodes.map(func(node: Node) -> String: return NodeLocator.path_of(scene_root, node))
+	_deleted_paths = top_level_nodes.map(func(node: Node) -> String: return GodotMcpNodeLocator.path_of(scene_root, node))
 	var names := PackedStringArray(top_level_nodes.map(func(node: Node) -> String: return str(node.name)))
 	action_name = "MCP: Delete %s" % ", ".join(names)
 	for node in top_level_nodes:

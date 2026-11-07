@@ -1,6 +1,6 @@
 extends "converter.gd"
 
-const ResourceFactory := preload("../../resources/resource_factory.gd")
+const GodotMcpResourceFactory := preload("../../resources/resource_factory.gd")
 
 const CLASS_KEY := "new"
 const NESTED_PROPERTIES_KEY := "properties"
@@ -10,7 +10,7 @@ func handles(property: Dictionary) -> bool:
 	return property.get("type") == TYPE_OBJECT and property.get("hint") == PROPERTY_HINT_RESOURCE_TYPE
 
 
-func decode(value: Variant, property: Dictionary, _target: Object, decoder: ValueDecoder) -> DecodeOutcome:
+func decode(value: Variant, property: Dictionary, _target: Object, decoder: GodotMcpValueDecoder) -> GodotMcpDecodeOutcome:
 	var allowed_types := str(property.get("hint_string", "Resource")).split(",", false)
 	if value == null:
 		return _success(null)
@@ -21,7 +21,7 @@ func decode(value: Variant, property: Dictionary, _target: Object, decoder: Valu
 	return _failure("expected a resource path such as \"res://materials/stone.tres\", {\"new\": \"%s\", …properties}, or null" % allowed_types[-1])
 
 
-func _load_resource(path: String, allowed_types: PackedStringArray) -> DecodeOutcome:
+func _load_resource(path: String, allowed_types: PackedStringArray) -> GodotMcpDecodeOutcome:
 	if not (path.begins_with("res://") or path.begins_with("uid://")):
 		return _failure("resource paths start with res:// or uid://, got \"%s\"" % path)
 	if not ResourceLoader.exists(path):
@@ -34,11 +34,11 @@ func _load_resource(path: String, allowed_types: PackedStringArray) -> DecodeOut
 	return _success(resource)
 
 
-func _create_resource(specification: Dictionary, allowed_types: PackedStringArray, decoder: ValueDecoder) -> DecodeOutcome:
+func _create_resource(specification: Dictionary, allowed_types: PackedStringArray, decoder: GodotMcpValueDecoder) -> GodotMcpDecodeOutcome:
 	var type_name: Variant = specification["new"]
 	if not type_name is String:
 		return _failure("\"new\" must be the name of a resource class")
-	var resource := ResourceFactory.instantiate(type_name)
+	var resource := GodotMcpResourceFactory.instantiate(type_name)
 	if resource == null:
 		return _failure("%s is not a resource class that can be created" % type_name)
 	if not _is_allowed(resource, allowed_types):

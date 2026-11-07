@@ -1,17 +1,17 @@
 extends GutTest
 
-const CommandError := preload("res://addons/godot_mcp_tool/commands/command_error.gd")
-const EditingContext := preload("res://addons/godot_mcp_tool/scene/editing_context.gd")
+const GodotMcpCommandError := preload("res://addons/godot_mcp_tool/commands/command_error.gd")
+const GodotMcpEditingContext := preload("res://addons/godot_mcp_tool/scene/editing_context.gd")
 const FakeSceneAccess := preload("res://tests/support/fake_scene_access.gd")
 const FakeScriptEditorAccess := preload("res://tests/support/fake_script_editor_access.gd")
-const JsonRpc := preload("res://addons/godot_mcp_tool/bridge/json_rpc.gd")
-const NodeReparentCommand := preload("res://addons/godot_mcp_tool/commands/node/node_reparent_command.gd")
-const PlainUndoHistory := preload("res://addons/godot_mcp_tool/scene/plain_undo_history.gd")
-const VariantCodec := preload("res://addons/godot_mcp_tool/codec/variant_codec.gd")
+const GodotMcpJsonRpc := preload("res://addons/godot_mcp_tool/bridge/json_rpc.gd")
+const GodotMcpNodeReparentCommand := preload("res://addons/godot_mcp_tool/commands/node/node_reparent_command.gd")
+const GodotMcpPlainUndoHistory := preload("res://addons/godot_mcp_tool/scene/plain_undo_history.gd")
+const GodotMcpVariantCodec := preload("res://addons/godot_mcp_tool/codec/variant_codec.gd")
 
 var _scenes: FakeSceneAccess
-var _history: PlainUndoHistory
-var _context: EditingContext
+var _history: GodotMcpPlainUndoHistory
+var _context: GodotMcpEditingContext
 var _root: Node3D
 var _player: Node3D
 var _crate: Node3D
@@ -24,8 +24,8 @@ func before_each() -> void:
 	_root.scene_file_path = "res://levels/arena.tscn"
 	_scenes.edited_root = _root
 	add_child(_root)
-	_history = PlainUndoHistory.new()
-	_context = EditingContext.new(_scenes, _history, VariantCodec.new(), FakeScriptEditorAccess.new())
+	_history = GodotMcpPlainUndoHistory.new()
+	_context = GodotMcpEditingContext.new(_scenes, _history, GodotMcpVariantCodec.new(), FakeScriptEditorAccess.new())
 	_player = _add_owned(_root, Node3D.new(), "Player") as Node3D
 	_player.position = Vector3(10, 0, 0)
 	_crate = _add_owned(_root, Node3D.new(), "Crate") as Node3D
@@ -46,7 +46,7 @@ func _add_owned(parent: Node, node: Node, node_name: String) -> Node:
 
 
 func _reparent(params: Dictionary) -> Variant:
-	return await NodeReparentCommand.new(_context).execute(params)
+	return await GodotMcpNodeReparentCommand.new(_context).execute(params)
 
 
 func test_moves_a_node_under_another_parent_and_keeps_its_place_in_the_world() -> void:
@@ -126,34 +126,34 @@ func test_updates_node_paths_after_a_rename() -> void:
 
 func test_refuses_to_move_a_node_into_its_own_children() -> void:
 	var error: Variant = await _reparent({"path": "Crate", "parent": "Crate/Mesh"})
-	assert_true(error is CommandError)
-	assert_eq((error as CommandError).code, JsonRpc.INVALID_PARAMS)
+	assert_true(error is GodotMcpCommandError)
+	assert_eq((error as GodotMcpCommandError).code, GodotMcpJsonRpc.INVALID_PARAMS)
 
 
 func test_refuses_a_name_that_a_sibling_has() -> void:
 	var error: Variant = await _reparent({"path": "Crate", "name": "Player"})
-	assert_true(error is CommandError)
-	assert_string_contains((error as CommandError).message, "Player")
+	assert_true(error is GodotMcpCommandError)
+	assert_string_contains((error as GodotMcpCommandError).message, "Player")
 
 
 func test_refuses_to_move_next_to_a_node_of_the_same_name() -> void:
 	_add_owned(_player, Node3D.new(), "Crate")
 	var error: Variant = await _reparent({"path": "Crate", "parent": "Player"})
-	assert_true(error is CommandError)
-	assert_string_contains((error as CommandError).hint, "name")
+	assert_true(error is GodotMcpCommandError)
+	assert_string_contains((error as GodotMcpCommandError).hint, "name")
 
 
 func test_refuses_to_move_the_scene_root() -> void:
 	var error: Variant = await _reparent({"path": ".", "parent": "Player"})
-	assert_eq((error as CommandError).code, JsonRpc.INVALID_PARAMS)
+	assert_eq((error as GodotMcpCommandError).code, GodotMcpJsonRpc.INVALID_PARAMS)
 
 
 func test_refuses_nodes_inside_an_instanced_scene() -> void:
 	_add_owned(_root, (load("res://tests/fixtures/crate.tscn") as PackedScene).instantiate(PackedScene.GEN_EDIT_STATE_INSTANCE), "Barrel")
 	var error: Variant = await _reparent({"path": "Barrel/Mesh", "parent": "Player"})
-	assert_eq((error as CommandError).code, JsonRpc.INVALID_PARAMS)
+	assert_eq((error as GodotMcpCommandError).code, GodotMcpJsonRpc.INVALID_PARAMS)
 
 
 func test_needs_a_new_parent_name_or_index() -> void:
 	var error: Variant = await _reparent({"path": "Crate"})
-	assert_eq((error as CommandError).code, JsonRpc.INVALID_PARAMS)
+	assert_eq((error as GodotMcpCommandError).code, GodotMcpJsonRpc.INVALID_PARAMS)

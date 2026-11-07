@@ -1,6 +1,6 @@
 extends RefCounted
 
-const InputEventCodec := preload("input_event_codec.gd")
+const GodotMcpInputEventCodec := preload("input_event_codec.gd")
 
 const SETTING_PREFIX := "input/"
 const BUILT_IN_PREFIX := "ui_"
@@ -36,7 +36,7 @@ static func described_events(action_name: String) -> Array:
 	var described: Array = []
 	for event in events if events is Array else []:
 		if event is InputEvent:
-			described.append(InputEventCodec.describe(event))
+			described.append(GodotMcpInputEventCodec.describe(event))
 	return described
 
 

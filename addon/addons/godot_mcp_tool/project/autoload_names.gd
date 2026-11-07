@@ -1,6 +1,6 @@
 extends RefCounted
 
-const GlobalClasses := preload("../util/global_classes.gd")
+const GodotMcpGlobalClasses := preload("../util/global_classes.gd")
 
 const GDSCRIPT_KEYWORDS := [
 	"and", "as", "assert", "await", "break", "breakpoint", "class", "class_name", "const", "continue", "elif", "else",
@@ -20,7 +20,7 @@ static func problem_with(autoload_name: String) -> String:
 		return "\"%s\" is not a valid identifier" % autoload_name
 	if ClassDB.class_exists(autoload_name):
 		return "%s is the name of an engine class" % autoload_name
-	if GlobalClasses.script_of(autoload_name) != null:
+	if GodotMcpGlobalClasses.script_of(autoload_name) != null:
 		return "%s is the class_name of a script" % autoload_name
 	if _is_built_in_type(autoload_name):
 		return "%s is the name of a built-in type" % autoload_name

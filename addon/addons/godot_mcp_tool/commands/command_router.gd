@@ -1,15 +1,15 @@
 extends RefCounted
 
-const Command := preload("command.gd")
+const GodotMcpCommand := preload("command.gd")
 
-var _commands_by_method: Dictionary[String, Command] = {}
+var _commands_by_method: Dictionary[String, GodotMcpCommand] = {}
 
 
-func register(method: String, command: Command) -> void:
+func register(method: String, command: GodotMcpCommand) -> void:
 	_commands_by_method[method] = command
 
 
-func find(method: String) -> Command:
+func find(method: String) -> GodotMcpCommand:
 	return _commands_by_method.get(method)
 
 

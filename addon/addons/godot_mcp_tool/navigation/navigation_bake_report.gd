@@ -1,8 +1,8 @@
 extends RefCounted
 
-const NumberText := preload("../util/number_text.gd")
-const SpatialTransforms := preload("../scene/spatial_transforms.gd")
-const VariantCodec := preload("../codec/variant_codec.gd")
+const GodotMcpNumberText := preload("../util/number_text.gd")
+const GodotMcpSpatialTransforms := preload("../scene/spatial_transforms.gd")
+const GodotMcpVariantCodec := preload("../codec/variant_codec.gd")
 
 const CELL_SIZE_SETTING := "navigation/3d/default_cell_size"
 const CELL_HEIGHT_SETTING := "navigation/3d/default_cell_height"
@@ -10,7 +10,7 @@ const DECIMALS := 3
 const DECIMAL_SCALE := 1000.0
 
 
-static func describe(region: NavigationRegion3D, path: String, codec: VariantCodec) -> Dictionary:
+static func describe(region: NavigationRegion3D, path: String, codec: GodotMcpVariantCodec) -> Dictionary:
 	var navigation_mesh := region.navigation_mesh
 	var report := {
 		"path": path,
@@ -23,7 +23,7 @@ static func describe(region: NavigationRegion3D, path: String, codec: VariantCod
 	if navigation_mesh.get_polygon_count() == 0:
 		report["reason"] = _reason_for_no_polygons(region)
 		return report
-	var bounds := SpatialTransforms.global_of(region) * _bounds_of(navigation_mesh.get_vertices())
+	var bounds := GodotMcpSpatialTransforms.global_of(region) * _bounds_of(navigation_mesh.get_vertices())
 	report["from"] = codec.encode(_rounded_vector(bounds.position))
 	report["to"] = codec.encode(_rounded_vector(bounds.end))
 	return report
@@ -68,7 +68,7 @@ static func _cell_warning(property: String, value: float, setting: String, map_v
 
 
 static func _number(value: float) -> String:
-	return NumberText.of(value, DECIMALS)
+	return GodotMcpNumberText.of(value, DECIMALS)
 
 
 static func _rounded(value: float) -> float:

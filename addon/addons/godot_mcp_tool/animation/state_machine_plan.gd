@@ -1,6 +1,6 @@
 extends RefCounted
 
-const SimilarNames := preload("../util/similar_names.gd")
+const GodotMcpSimilarNames := preload("../util/similar_names.gd")
 
 const START := "Start"
 const END := "End"
@@ -74,7 +74,7 @@ func _plan_state(description: Variant) -> void:
 		reason = "this state is given twice"
 	elif not _player.has_animation(animation):
 		var known := Array(_player.get_animation_list()).map(func(animation_name: StringName) -> String: return str(animation_name))
-		var similar := SimilarNames.hint(animation, known)
+		var similar := GodotMcpSimilarNames.hint(animation, known)
 		reason = "%s has no animation \"%s\"%s" % [_player.name, animation, "" if similar.is_empty() else ". " + similar]
 	if not reason.is_empty():
 		rejected.append({"item": name, "reason": reason})
@@ -105,7 +105,7 @@ func _transition(description: Dictionary, from: String, to: String) -> Variant:
 		return "a state cannot have a transition to itself"
 	for state_name in [from, to]:
 		if not _is_known_state(state_name):
-			return "there is no state %s. %s" % [state_name, SimilarNames.hint(state_name, _state_names())]
+			return "there is no state %s. %s" % [state_name, GodotMcpSimilarNames.hint(state_name, _state_names())]
 	if transitions.any(func(transition: Dictionary) -> bool: return transition["from"] == from and transition["to"] == to):
 		return "this transition is given twice"
 	var planned := {"from": from, "to": to}

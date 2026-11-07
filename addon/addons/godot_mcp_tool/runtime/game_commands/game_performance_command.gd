@@ -1,7 +1,7 @@
 extends "../../commands/command.gd"
 
-const GameScene := preload("game_scene.gd")
-const Params := preload("../../commands/params.gd")
+const GodotMcpGameScene := preload("game_scene.gd")
+const GodotMcpParams := preload("../../commands/params.gd")
 
 const DEFAULT_FRAMES := 60
 const MAXIMUM_FRAMES := 600
@@ -9,19 +9,19 @@ const MILLISECONDS_PER_SECOND := 1000.0
 const MICROSECONDS_PER_MILLISECOND := 1000.0
 const HIGH_PERCENTILE := 0.95
 
-var _scene: GameScene
+var _scene: GodotMcpGameScene
 
 
-func _init(scene: GameScene) -> void:
+func _init(scene: GodotMcpGameScene) -> void:
 	_scene = scene
 
 
 func execute(params: Dictionary) -> Variant:
-	var frames: Variant = Params.whole_number(params, "frames", DEFAULT_FRAMES)
-	if frames is CommandError:
+	var frames: Variant = GodotMcpParams.whole_number(params, "frames", DEFAULT_FRAMES)
+	if frames is GodotMcpCommandError:
 		return frames
 	if frames < 1 or frames > MAXIMUM_FRAMES:
-		return CommandError.new(JsonRpc.INVALID_PARAMS, "\"frames\" must be from 1 to %d" % MAXIMUM_FRAMES)
+		return GodotMcpCommandError.new(GodotMcpJsonRpc.INVALID_PARAMS, "\"frames\" must be from 1 to %d" % MAXIMUM_FRAMES)
 	var tree := Engine.get_main_loop() as SceneTree
 	var frame_times: Array[float] = []
 	var process_times: Array[float] = []

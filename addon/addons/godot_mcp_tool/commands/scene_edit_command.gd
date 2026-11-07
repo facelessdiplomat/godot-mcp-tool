@@ -1,27 +1,27 @@
 extends "command.gd"
 
-const EditingContext := preload("../scene/editing_context.gd")
-const Params := preload("params.gd")
-const SceneEdit := preload("../scene/edits/scene_edit.gd")
+const GodotMcpEditingContext := preload("../scene/editing_context.gd")
+const GodotMcpParams := preload("params.gd")
+const GodotMcpSceneEdit := preload("../scene/edits/scene_edit.gd")
 
-var _context: EditingContext
+var _context: GodotMcpEditingContext
 var _edit_script: Script
 
 
-func _init(context: EditingContext, edit_script: Script) -> void:
+func _init(context: GodotMcpEditingContext, edit_script: Script) -> void:
 	_context = context
 	_edit_script = edit_script
 
 
 func execute(params: Dictionary) -> Variant:
-	var scene_path: Variant = Params.text(params, "scene")
-	if scene_path is CommandError:
+	var scene_path: Variant = GodotMcpParams.text(params, "scene")
+	if scene_path is GodotMcpCommandError:
 		return scene_path
 	var resolved: Variant = _context.scenes.resolve_for_editing(scene_path)
-	if resolved is CommandError:
+	if resolved is GodotMcpCommandError:
 		return resolved
 	var scene_root := resolved as Node
-	var edit: SceneEdit = _edit_script.new(_context)
+	var edit: GodotMcpSceneEdit = _edit_script.new(_context)
 	var problem := edit.prepare(scene_root, params)
 	if problem != null:
 		edit.changes.release_created()

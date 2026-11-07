@@ -1,10 +1,10 @@
 extends RefCounted
 
-const CommandError := preload("../commands/command_error.gd")
-const IndefiniteArticle := preload("../util/indefinite_article.gd")
-const JsonRpc := preload("../bridge/json_rpc.gd")
-const NodeFactory := preload("../scene/node_factory.gd")
-const NodeLocator := preload("../scene/node_locator.gd")
+const GodotMcpCommandError := preload("../commands/command_error.gd")
+const GodotMcpIndefiniteArticle := preload("../util/indefinite_article.gd")
+const GodotMcpJsonRpc := preload("../bridge/json_rpc.gd")
+const GodotMcpNodeFactory := preload("../scene/node_factory.gd")
+const GodotMcpNodeLocator := preload("../scene/node_locator.gd")
 
 const FORBIDDEN_NAME_CHARACTERS := ["/", ":", ",", "["]
 const LIBRARY_SEPARATOR := "/"
@@ -14,13 +14,13 @@ var animation_name := ""
 
 
 static func find_player(scene_root: Node, player_path: String) -> Variant:
-	var node := NodeLocator.find(scene_root, player_path)
+	var node := GodotMcpNodeLocator.find(scene_root, player_path)
 	if node == null:
-		return CommandError.new(JsonRpc.NOT_FOUND, "Node \"%s\" not found" % player_path, NodeLocator.not_found_hint(scene_root, player_path))
+		return GodotMcpCommandError.new(GodotMcpJsonRpc.NOT_FOUND, "Node \"%s\" not found" % player_path, GodotMcpNodeLocator.not_found_hint(scene_root, player_path))
 	if not node is AnimationPlayer:
-		return CommandError.new(
-			JsonRpc.INVALID_PARAMS,
-			"%s is %s, not an AnimationPlayer" % [player_path, IndefiniteArticle.before(NodeFactory.display_class(node))],
+		return GodotMcpCommandError.new(
+			GodotMcpJsonRpc.INVALID_PARAMS,
+			"%s is %s, not an AnimationPlayer" % [player_path, GodotMcpIndefiniteArticle.before(GodotMcpNodeFactory.display_class(node))],
 			"Add an AnimationPlayer with node_add; its tracks animate the nodes under its parent.",
 		)
 	return node
@@ -34,8 +34,8 @@ static func parse(full_name: String) -> Variant:
 		name = name.substr(reference.library_name.length() + 1)
 	reference.animation_name = name
 	if name.is_empty() or FORBIDDEN_NAME_CHARACTERS.any(func(character: String) -> bool: return name.contains(character)) or _has_forbidden_character(reference.library_name):
-		return CommandError.new(
-			JsonRpc.INVALID_PARAMS,
+		return GodotMcpCommandError.new(
+			GodotMcpJsonRpc.INVALID_PARAMS,
 			"\"%s\" is not a valid animation name" % full_name,
 			"Animation names cannot be empty or contain / : , [; write \"library/name\" for an animation of another library than the default one.",
 		)

@@ -1,16 +1,16 @@
 extends GutTest
 
-const CommandError := preload("res://addons/godot_mcp_tool/commands/command_error.gd")
-const EditorRescanCommand := preload("res://addons/godot_mcp_tool/commands/editor/editor_rescan_command.gd")
+const GodotMcpCommandError := preload("res://addons/godot_mcp_tool/commands/command_error.gd")
+const GodotMcpEditorRescanCommand := preload("res://addons/godot_mcp_tool/commands/editor/editor_rescan_command.gd")
 const FakeFileSystemAccess := preload("res://tests/support/fake_file_system_access.gd")
 const FakeScriptEditorAccess := preload("res://tests/support/fake_script_editor_access.gd")
-const JsonRpc := preload("res://addons/godot_mcp_tool/bridge/json_rpc.gd")
+const GodotMcpJsonRpc := preload("res://addons/godot_mcp_tool/bridge/json_rpc.gd")
 
 const FINISH_WAIT_SECONDS := 2.0
 
 var _file_system: FakeFileSystemAccess
 var _scripts: FakeScriptEditorAccess
-var _command: EditorRescanCommand
+var _command: GodotMcpEditorRescanCommand
 var _outcome: Variant
 var _finished := false
 
@@ -18,7 +18,7 @@ var _finished := false
 func before_each() -> void:
 	_file_system = FakeFileSystemAccess.new()
 	_scripts = FakeScriptEditorAccess.new()
-	_command = EditorRescanCommand.new(_file_system, _scripts)
+	_command = GodotMcpEditorRescanCommand.new(_file_system, _scripts)
 	_outcome = null
 	_finished = false
 
@@ -72,6 +72,6 @@ func test_reloads_the_open_scripts_once_the_scan_is_applied() -> void:
 func test_gives_up_when_the_scan_is_not_applied_within_the_timeout() -> void:
 	_rescan_in_background({"timeout_ms": 50})
 	await _wait_until_finished()
-	assert_true(_outcome is CommandError)
-	assert_eq((_outcome as CommandError).code, JsonRpc.TIMEOUT)
+	assert_true(_outcome is GodotMcpCommandError)
+	assert_eq((_outcome as GodotMcpCommandError).code, GodotMcpJsonRpc.TIMEOUT)
 	assert_eq(_scripts.reload_count, 0)

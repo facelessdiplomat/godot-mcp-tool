@@ -1,58 +1,58 @@
 extends "../command.gd"
 
-const EditingContext := preload("../../scene/editing_context.gd")
-const FileSystemAccess := preload("../../editor/file_system_access.gd")
-const FileUsages := preload("../../files/file_usages.gd")
-const Params := preload("../params.gd")
-const ProjectFileIndex := preload("../../files/project_file_index.gd")
-const ProjectPaths := preload("../../files/project_paths.gd")
-const ReferenceRewriter := preload("../../files/reference_rewriter.gd")
-const ResourcePaths := preload("../../util/resource_paths.gd")
-const Waiting := preload("../../util/waiting.gd")
+const GodotMcpEditingContext := preload("../../scene/editing_context.gd")
+const GodotMcpFileSystemAccess := preload("../../editor/file_system_access.gd")
+const GodotMcpFileUsages := preload("../../files/file_usages.gd")
+const GodotMcpParams := preload("../params.gd")
+const GodotMcpProjectFileIndex := preload("../../files/project_file_index.gd")
+const GodotMcpProjectPaths := preload("../../files/project_paths.gd")
+const GodotMcpReferenceRewriter := preload("../../files/reference_rewriter.gd")
+const GodotMcpResourcePaths := preload("../../util/resource_paths.gd")
+const GodotMcpWaiting := preload("../../util/waiting.gd")
 
 const SCAN_TIMEOUT_MSEC := 60_000
 const SINGLETON_MARK := "*"
 
-var _context: EditingContext
-var _file_system: FileSystemAccess
+var _context: GodotMcpEditingContext
+var _file_system: GodotMcpFileSystemAccess
 var _save_settings: Callable
 
 
-func _init(context: EditingContext, file_system: FileSystemAccess, save_settings: Callable) -> void:
+func _init(context: GodotMcpEditingContext, file_system: GodotMcpFileSystemAccess, save_settings: Callable) -> void:
 	_context = context
 	_file_system = file_system
 	_save_settings = save_settings
 
 
 func execute(params: Dictionary) -> Variant:
-	var from: Variant = Params.required_text(params, "from", "\"res://materials/ice.tres\"")
-	var to: Variant = Params.required_text(params, "to", "\"res://surfaces/ice.tres\"")
+	var from: Variant = GodotMcpParams.required_text(params, "from", "\"res://materials/ice.tres\"")
+	var to: Variant = GodotMcpParams.required_text(params, "to", "\"res://surfaces/ice.tres\"")
 	for value in [from, to]:
-		if value is CommandError:
+		if value is GodotMcpCommandError:
 			return value
-	var source: Variant = ProjectPaths.existing(from)
-	if source is CommandError:
+	var source: Variant = GodotMcpProjectPaths.existing(from)
+	if source is GodotMcpCommandError:
 		return source
 	var is_folder := (source as String).ends_with("/")
 	var destination: Variant = _free_destination(source, (to as String).trim_suffix("/"))
-	if destination is CommandError:
+	if destination is GodotMcpCommandError:
 		return destination
 	if is_folder:
-		destination = ProjectPaths.folder(destination)
+		destination = GodotMcpProjectPaths.folder(destination)
 		if (destination as String).begins_with(source):
-			return CommandError.new(JsonRpc.INVALID_PARAMS, "A folder cannot move into itself", "Choose a destination outside %s." % source)
+			return GodotMcpCommandError.new(GodotMcpJsonRpc.INVALID_PARAMS, "A folder cannot move into itself", "Choose a destination outside %s." % source)
 	var renames := _renames(source, destination, is_folder)
-	var usages := FileUsages.find(PackedStringArray(renames.keys()), FileUsages.PROJECT_PREFIX, FileUsages.CodeMentions.BY_PATH)
+	var usages := GodotMcpFileUsages.find(PackedStringArray(renames.keys()), GodotMcpFileUsages.PROJECT_PREFIX, GodotMcpFileUsages.GodotMcpCodeMentions.BY_PATH)
 	var unsaved := _unsaved_scenes_to_change(renames, usages)
 	if not unsaved.is_empty():
-		return CommandError.new(
-			JsonRpc.CONFLICT,
+		return GodotMcpCommandError.new(
+			GodotMcpJsonRpc.CONFLICT,
 			"Moving %s changes scenes with unsaved changes: %s" % [source, ", ".join(unsaved)],
 			"Save them with scene_save, or close them with scene_close, and move again.",
 		)
 	var move_error := _move_on_disk(source, destination, is_folder)
 	if move_error != OK:
-		return CommandError.new(JsonRpc.OPERATION_FAILED, "%s could not be moved to %s: %s" % [source, destination, error_string(move_error)])
+		return GodotMcpCommandError.new(GodotMcpJsonRpc.OPERATION_FAILED, "%s could not be moved to %s: %s" % [source, destination, error_string(move_error)])
 	_update_cached_resources(renames)
 	_file_system.update_files(_old_and_new_paths(renames))
 	var rewritten := _rewrite_users(usages["used_by"], renames)
@@ -60,7 +60,7 @@ func execute(params: Dictionary) -> Variant:
 	var settings := _update_settings(usages["settings"], renames)
 	var applied_before := _file_system.applied_scans()
 	_file_system.scan()
-	await Waiting.until(func() -> bool: return _file_system.applied_scans() != applied_before, SCAN_TIMEOUT_MSEC)
+	await GodotMcpWaiting.until(func() -> bool: return _file_system.applied_scans() != applied_before, SCAN_TIMEOUT_MSEC)
 	return {
 		"from": source,
 		"to": destination,
@@ -74,9 +74,9 @@ func execute(params: Dictionary) -> Variant:
 
 static func _free_destination(source: String, destination: String) -> Variant:
 	if _is_case_only_rename(source.trim_suffix("/"), destination):
-		var location_error := ProjectPaths.location_error(destination)
+		var location_error := GodotMcpProjectPaths.location_error(destination)
 		return destination if location_error == null else location_error
-	return ProjectPaths.free_location(destination)
+	return GodotMcpProjectPaths.free_location(destination)
 
 
 static func _is_case_only_rename(source: String, destination: String) -> bool:
@@ -90,7 +90,7 @@ static func _renames(source: String, destination: String, is_folder: bool) -> Di
 	if not is_folder:
 		return {source: destination}
 	var renames := {}
-	for file_path in ProjectFileIndex.files_under(source):
+	for file_path in GodotMcpProjectFileIndex.files_under(source):
 		renames[file_path] = destination + file_path.trim_prefix(source)
 	return renames
 
@@ -107,7 +107,7 @@ func _unsaved_scenes_to_change(renames: Dictionary, usages: Dictionary) -> Array
 static func _move_on_disk(source: String, destination: String, is_folder: bool) -> Error:
 	var destination_path := destination.trim_suffix("/")
 	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(destination_path.get_base_dir()))
-	var companions := PackedStringArray() if is_folder else ProjectFileIndex.companions_of(source)
+	var companions := PackedStringArray() if is_folder else GodotMcpProjectFileIndex.companions_of(source)
 	var move_error := DirAccess.rename_absolute(ProjectSettings.globalize_path(source.trim_suffix("/")), ProjectSettings.globalize_path(destination_path))
 	if move_error != OK:
 		return move_error
@@ -138,10 +138,10 @@ static func _rewrite_users(users: Array, renames: Dictionary) -> Dictionary:
 	var not_updated: Array = []
 	for user in users:
 		var location: String = renames.get(user["path"], user["path"])
-		if not ReferenceRewriter.can_rewrite(location):
+		if not GodotMcpReferenceRewriter.can_rewrite(location):
 			not_updated.append({"path": location, "reason": "a binary file, which only the editor can rewrite; open it and save it again"})
 			continue
-		var rewrite_error := ReferenceRewriter.rewrite(location, renames)
+		var rewrite_error := GodotMcpReferenceRewriter.rewrite(location, renames)
 		if rewrite_error == OK:
 			updated.append(location)
 		elif rewrite_error != ERR_SKIP:

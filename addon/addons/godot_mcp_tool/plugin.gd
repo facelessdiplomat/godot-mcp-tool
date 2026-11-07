@@ -1,9 +1,9 @@
 @tool
 extends EditorPlugin
 
-const AddonInfo := preload("addon_info.gd")
-const EditorAutoloadRegistry := preload("editor/editor_autoload_registry.gd")
-const SupportedEngine := preload("editor/supported_engine.gd")
+const GodotMcpAddonInfo := preload("addon_info.gd")
+const GodotMcpEditorAutoloadRegistry := preload("editor/editor_autoload_registry.gd")
+const GodotMcpSupportedEngine := preload("editor/supported_engine.gd")
 
 const EDITOR_SERVICES_FILE := "editor/editor_services.gd"
 const AUTOLOAD_PREFIX := "autoload/"
@@ -12,7 +12,7 @@ var _services: RefCounted
 
 
 func _enter_tree() -> void:
-	var engine_problem := SupportedEngine.problem_with(Engine.get_version_info())
+	var engine_problem := GodotMcpSupportedEngine.problem_with(Engine.get_version_info())
 	if not engine_problem.is_empty():
 		push_error(engine_problem)
 		return
@@ -33,8 +33,8 @@ func _exit_tree() -> void:
 
 
 func _disable_plugin() -> void:
-	if ProjectSettings.has_setting(AUTOLOAD_PREFIX + AddonInfo.RUNTIME_AUTOLOAD_NAME):
-		EditorAutoloadRegistry.new(self).remove(AddonInfo.RUNTIME_AUTOLOAD_NAME)
+	if ProjectSettings.has_setting(AUTOLOAD_PREFIX + GodotMcpAddonInfo.RUNTIME_AUTOLOAD_NAME):
+		GodotMcpEditorAutoloadRegistry.new(self).remove(GodotMcpAddonInfo.RUNTIME_AUTOLOAD_NAME)
 
 
 func _run_scene(_scene: String, args: PackedStringArray) -> PackedStringArray:

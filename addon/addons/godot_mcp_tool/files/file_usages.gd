@@ -1,8 +1,8 @@
 extends RefCounted
 
-const ProjectFileIndex := preload("project_file_index.gd")
-const ResourceFiles := preload("../resources/resource_files.gd")
-const ResourcePaths := preload("../util/resource_paths.gd")
+const GodotMcpProjectFileIndex := preload("project_file_index.gd")
+const GodotMcpResourceFiles := preload("../resources/resource_files.gd")
+const GodotMcpResourcePaths := preload("../util/resource_paths.gd")
 
 const RESOURCE_EXTENSIONS := ["tscn", "scn", "tres", "res"]
 const CODE_EXTENSIONS := ["gd", "gdshader", "gdshaderinc"]
@@ -11,19 +11,19 @@ const PROJECT_PREFIX := "res://"
 const ADDONS_FOLDER := "addons/"
 const MAXIMUM_LINE_LENGTH := 160
 
-enum CodeMentions { BY_PATH, BY_PATH_OR_UID }
+enum GodotMcpCodeMentions { BY_PATH, BY_PATH_OR_UID }
 
 
-static func find(targets: PackedStringArray, root := PROJECT_PREFIX, code_mentions := CodeMentions.BY_PATH_OR_UID) -> Dictionary:
-	var names_in_code := targets if code_mentions == CodeMentions.BY_PATH else _with_uids(targets)
+static func find(targets: PackedStringArray, root := PROJECT_PREFIX, code_mentions := GodotMcpCodeMentions.BY_PATH_OR_UID) -> Dictionary:
+	var names_in_code := targets if code_mentions == GodotMcpCodeMentions.BY_PATH else _with_uids(targets)
 	var addons_folder := root.path_join(ADDONS_FOLDER)
 	var searches_addon_code := Array(targets).any(func(target: String) -> bool: return target.begins_with(addons_folder))
 	var used_by: Array = []
 	var code: Array = []
-	for file_path in ProjectFileIndex.files_under(root):
+	for file_path in GodotMcpProjectFileIndex.files_under(root):
 		var extension := file_path.get_extension().to_lower()
 		if extension in RESOURCE_EXTENSIONS:
-			var uses: Array = ResourceFiles.dependencies_of(file_path).filter(func(dependency: String) -> bool: return is_targeted(dependency, targets))
+			var uses: Array = GodotMcpResourceFiles.dependencies_of(file_path).filter(func(dependency: String) -> bool: return is_targeted(dependency, targets))
 			if not uses.is_empty():
 				used_by.append({"path": file_path, "uses": uses})
 		elif extension in CODE_EXTENSIONS and (searches_addon_code or not file_path.begins_with(addons_folder)):
@@ -50,7 +50,7 @@ static func is_targeted(file_path: String, targets: PackedStringArray) -> bool:
 static func _with_uids(targets: PackedStringArray) -> PackedStringArray:
 	var names := targets.duplicate()
 	for target in targets:
-		var file_paths := ProjectFileIndex.files_under(target) if target.ends_with("/") else PackedStringArray([target])
+		var file_paths := GodotMcpProjectFileIndex.files_under(target) if target.ends_with("/") else PackedStringArray([target])
 		for file_path in file_paths:
 			var uid := ResourceLoader.get_resource_uid(file_path)
 			if uid != ResourceUID.INVALID_ID:
@@ -78,7 +78,7 @@ static func _setting_mentions(targets: PackedStringArray) -> Array:
 		var value: Variant = ProjectSettings.get_setting(name)
 		if not value is String:
 			continue
-		var referenced := ResourcePaths.resolve((value as String).trim_prefix(SINGLETON_MARK))
+		var referenced := GodotMcpResourcePaths.resolve((value as String).trim_prefix(SINGLETON_MARK))
 		if referenced.begins_with(PROJECT_PREFIX) and is_targeted(referenced, targets):
 			mentions.append({"name": name, "value": value})
 	return mentions

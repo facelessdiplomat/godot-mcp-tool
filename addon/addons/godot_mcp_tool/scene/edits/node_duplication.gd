@@ -8,33 +8,33 @@ var _copy: Node
 var _properties: Dictionary
 
 
-func prepare(scene_root: Node, params: Dictionary) -> CommandError:
-	var node_path: Variant = Params.required_text(params, "path", "\"Props/Crate\"")
-	var parent_path: Variant = Params.text(params, "parent")
-	var copy_name: Variant = Params.text(params, "name")
-	var properties: Variant = Params.dictionary(params, "properties")
+func prepare(scene_root: Node, params: Dictionary) -> GodotMcpCommandError:
+	var node_path: Variant = GodotMcpParams.required_text(params, "path", "\"Props/Crate\"")
+	var parent_path: Variant = GodotMcpParams.text(params, "parent")
+	var copy_name: Variant = GodotMcpParams.text(params, "name")
+	var properties: Variant = GodotMcpParams.dictionary(params, "properties")
 	for value in [node_path, parent_path, copy_name, properties]:
-		if value is CommandError:
+		if value is GodotMcpCommandError:
 			return value
-	var node := NodeLocator.find(scene_root, node_path)
+	var node := GodotMcpNodeLocator.find(scene_root, node_path)
 	if node == null:
-		return CommandError.new(JsonRpc.NOT_FOUND, "Node \"%s\" not found" % node_path, NodeLocator.not_found_hint(scene_root, node_path))
+		return GodotMcpCommandError.new(GodotMcpJsonRpc.NOT_FOUND, "Node \"%s\" not found" % node_path, GodotMcpNodeLocator.not_found_hint(scene_root, node_path))
 	if node == scene_root:
-		return CommandError.new(JsonRpc.INVALID_PARAMS, "The scene root cannot be duplicated", "Duplicate its children instead, or make another scene with scene_create.")
+		return GodotMcpCommandError.new(GodotMcpJsonRpc.INVALID_PARAMS, "The scene root cannot be duplicated", "Duplicate its children instead, or make another scene with scene_create.")
 	if is_inside_instance(node, scene_root):
-		return CommandError.new(JsonRpc.INVALID_PARAMS, "\"%s\" belongs to an instanced scene and cannot be duplicated here" % node_path, "Duplicate the instance itself.")
-	var parent := node.get_parent() if (parent_path as String).is_empty() else NodeLocator.find(scene_root, parent_path)
+		return GodotMcpCommandError.new(GodotMcpJsonRpc.INVALID_PARAMS, "\"%s\" belongs to an instanced scene and cannot be duplicated here" % node_path, "Duplicate the instance itself.")
+	var parent := node.get_parent() if (parent_path as String).is_empty() else GodotMcpNodeLocator.find(scene_root, parent_path)
 	if parent == null:
-		return CommandError.new(JsonRpc.NOT_FOUND, "Parent node \"%s\" not found" % parent_path, NodeLocator.not_found_hint(scene_root, parent_path))
+		return GodotMcpCommandError.new(GodotMcpJsonRpc.NOT_FOUND, "Parent node \"%s\" not found" % parent_path, GodotMcpNodeLocator.not_found_hint(scene_root, parent_path))
 	if is_inside_instance(parent, scene_root):
-		return CommandError.new(JsonRpc.INVALID_PARAMS, "\"%s\" is inside an instanced scene, so the copy cannot go there" % parent_path, "Pick a parent that belongs to this scene.")
+		return GodotMcpCommandError.new(GodotMcpJsonRpc.INVALID_PARAMS, "\"%s\" is inside an instanced scene, so the copy cannot go there" % parent_path, "Pick a parent that belongs to this scene.")
 	if not (copy_name as String).is_empty():
 		var problem := name_problem(parent, copy_name, null)
 		if problem != null:
 			problem.hint = "Pick another name, or leave name out to number the copy."
 			return problem
 	_scene_root = scene_root
-	_source_path = NodeLocator.path_of(scene_root, node)
+	_source_path = GodotMcpNodeLocator.path_of(scene_root, node)
 	_properties = properties
 	_copy = node.duplicate(DUPLICATE_FLAGS)
 	if not (copy_name as String).is_empty():
@@ -54,9 +54,9 @@ func prepare(scene_root: Node, params: Dictionary) -> CommandError:
 func finish() -> Dictionary:
 	var report := _context.properties.assign(_copy, _properties)
 	return {
-		"path": NodeLocator.path_of(_scene_root, _copy),
+		"path": GodotMcpNodeLocator.path_of(_scene_root, _copy),
 		"source": _source_path,
-		"type": NodeFactory.display_class(_copy),
+		"type": GodotMcpNodeFactory.display_class(_copy),
 		"applied": report["applied"],
 		"rejected": report["rejected"],
 		"not_applied": report["not_applied"],

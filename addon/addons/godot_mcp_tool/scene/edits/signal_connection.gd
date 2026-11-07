@@ -1,6 +1,6 @@
 extends "scene_edit.gd"
 
-const SignalCatalog := preload("../signal_catalog.gd")
+const GodotMcpSignalCatalog := preload("../signal_catalog.gd")
 
 var _scene_root: Node
 var _source: Node
@@ -12,38 +12,38 @@ var _flags: int
 var _already_connected := false
 
 
-func prepare(scene_root: Node, params: Dictionary) -> CommandError:
-	var source_path: Variant = Params.required_text(params, "from", "\"Button\"")
-	var signal_name: Variant = Params.required_text(params, "signal", "\"pressed\"")
-	var target_path: Variant = Params.text(params, "to", ".")
-	var method: Variant = Params.required_text(params, "method", "\"_on_button_pressed\"")
-	var deferred: Variant = Params.flag(params, "deferred", false)
-	var one_shot: Variant = Params.flag(params, "one_shot", false)
+func prepare(scene_root: Node, params: Dictionary) -> GodotMcpCommandError:
+	var source_path: Variant = GodotMcpParams.required_text(params, "from", "\"Button\"")
+	var signal_name: Variant = GodotMcpParams.required_text(params, "signal", "\"pressed\"")
+	var target_path: Variant = GodotMcpParams.text(params, "to", ".")
+	var method: Variant = GodotMcpParams.required_text(params, "method", "\"_on_button_pressed\"")
+	var deferred: Variant = GodotMcpParams.flag(params, "deferred", false)
+	var one_shot: Variant = GodotMcpParams.flag(params, "one_shot", false)
 	for value in [source_path, signal_name, target_path, method, deferred, one_shot]:
-		if value is CommandError:
+		if value is GodotMcpCommandError:
 			return value
 	var binds: Variant = params.get("binds", [])
 	if binds == null:
 		binds = []
 	if not binds is Array:
-		return CommandError.new(JsonRpc.INVALID_PARAMS, "\"binds\" must be a list of values", "Example: {\"binds\": [\"door_a\", 2]}")
-	var source := NodeLocator.find(scene_root, source_path)
+		return GodotMcpCommandError.new(GodotMcpJsonRpc.INVALID_PARAMS, "\"binds\" must be a list of values", "Example: {\"binds\": [\"door_a\", 2]}")
+	var source := GodotMcpNodeLocator.find(scene_root, source_path)
 	if source == null:
-		return CommandError.new(JsonRpc.NOT_FOUND, "Node \"%s\" not found" % source_path, NodeLocator.not_found_hint(scene_root, source_path))
-	var signal_description := SignalCatalog.find_signal(source, signal_name)
+		return GodotMcpCommandError.new(GodotMcpJsonRpc.NOT_FOUND, "Node \"%s\" not found" % source_path, GodotMcpNodeLocator.not_found_hint(scene_root, source_path))
+	var signal_description := GodotMcpSignalCatalog.find_signal(source, signal_name)
 	if signal_description.is_empty():
-		return CommandError.new(JsonRpc.NOT_FOUND, "%s has no signal \"%s\"" % [NodeFactory.display_class(source), signal_name], SignalCatalog.unknown_signal_hint(source, signal_name))
-	var target := NodeLocator.find(scene_root, target_path)
+		return GodotMcpCommandError.new(GodotMcpJsonRpc.NOT_FOUND, "%s has no signal \"%s\"" % [GodotMcpNodeFactory.display_class(source), signal_name], GodotMcpSignalCatalog.unknown_signal_hint(source, signal_name))
+	var target := GodotMcpNodeLocator.find(scene_root, target_path)
 	if target == null:
-		return CommandError.new(JsonRpc.NOT_FOUND, "Node \"%s\" not found" % target_path, NodeLocator.not_found_hint(scene_root, target_path))
+		return GodotMcpCommandError.new(GodotMcpJsonRpc.NOT_FOUND, "Node \"%s\" not found" % target_path, GodotMcpNodeLocator.not_found_hint(scene_root, target_path))
 	if not target.has_method(method):
-		return CommandError.new(JsonRpc.NOT_FOUND, "%s has no method %s()" % [target.name, method], SignalCatalog.missing_method_hint(target, method, signal_description, binds))
-	var arity_problem := SignalCatalog.arity_problem(target, method, signal_description, binds)
+		return GodotMcpCommandError.new(GodotMcpJsonRpc.NOT_FOUND, "%s has no method %s()" % [target.name, method], GodotMcpSignalCatalog.missing_method_hint(target, method, signal_description, binds))
+	var arity_problem := GodotMcpSignalCatalog.arity_problem(target, method, signal_description, binds)
 	if not arity_problem.is_empty():
-		return CommandError.new(
-			JsonRpc.INVALID_PARAMS,
+		return GodotMcpCommandError.new(
+			GodotMcpJsonRpc.INVALID_PARAMS,
 			arity_problem,
-			"%s passes (%s); give the method matching parameters, such as %s" % [signal_name, SignalCatalog.arguments_text(signal_description), SignalCatalog.suggested_function(method, signal_description, binds)],
+			"%s passes (%s); give the method matching parameters, such as %s" % [signal_name, GodotMcpSignalCatalog.arguments_text(signal_description), GodotMcpSignalCatalog.suggested_function(method, signal_description, binds)],
 		)
 	_scene_root = scene_root
 	_source = source
@@ -64,11 +64,11 @@ func prepare(scene_root: Node, params: Dictionary) -> CommandError:
 
 func finish() -> Dictionary:
 	return {
-		"from": NodeLocator.path_of(_scene_root, _source),
+		"from": GodotMcpNodeLocator.path_of(_scene_root, _source),
 		"signal": _signal_name,
-		"to": NodeLocator.path_of(_scene_root, _target),
+		"to": GodotMcpNodeLocator.path_of(_scene_root, _target),
 		"method": _method,
-		"flags": SignalCatalog.flag_names(_flags),
+		"flags": GodotMcpSignalCatalog.flag_names(_flags),
 		"binds": _context.codec.encode(_binds),
 		"already_connected": _already_connected,
 	}

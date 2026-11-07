@@ -1,19 +1,19 @@
 extends GutTest
 
-const CommandJournal := preload("res://addons/godot_mcp_tool/editor/command_journal.gd")
-const McpDock := preload("res://addons/godot_mcp_tool/editor/mcp_dock.gd")
+const GodotMcpCommandJournal := preload("res://addons/godot_mcp_tool/editor/command_journal.gd")
+const GodotMcpMcpDock := preload("res://addons/godot_mcp_tool/editor/mcp_dock.gd")
 
-var _journal: CommandJournal
+var _journal: GodotMcpCommandJournal
 var _status: Dictionary
 var _unsafe_tools_allowed := false
-var _dock: McpDock
+var _dock: GodotMcpMcpDock
 
 
 func before_each() -> void:
-	_journal = CommandJournal.new(func() -> String: return "12:03:41")
+	_journal = GodotMcpCommandJournal.new(func() -> String: return "12:03:41")
 	_status = {"bridge": "listening on 127.0.0.1:50731", "clients": 1, "game": "running"}
 	_unsafe_tools_allowed = false
-	_dock = McpDock.new(
+	_dock = GodotMcpMcpDock.new(
 		_journal,
 		func() -> Dictionary: return _status,
 		func() -> bool: return _unsafe_tools_allowed,

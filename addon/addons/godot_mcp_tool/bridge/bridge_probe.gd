@@ -1,6 +1,6 @@
 extends RefCounted
 
-const AddonInfo := preload("../addon_info.gd")
+const GodotMcpAddonInfo := preload("../addon_info.gd")
 
 const TIMEOUT_MSEC := 1000
 const POLL_INTERVAL_MSEC := 5
@@ -8,7 +8,7 @@ const POLL_INTERVAL_MSEC := 5
 
 static func is_listening(port: int) -> bool:
 	var connection := StreamPeerTCP.new()
-	if connection.connect_to_host(AddonInfo.LOOPBACK_ADDRESS, port) != OK:
+	if connection.connect_to_host(GodotMcpAddonInfo.LOOPBACK_ADDRESS, port) != OK:
 		return false
 	_poll_until_connected_or_refused(connection)
 	var listening := _stays_connected(connection)

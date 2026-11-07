@@ -8,7 +8,7 @@ func handles(property: Dictionary) -> bool:
 	return property.get("type") == TYPE_COLOR
 
 
-func decode(value: Variant, _property: Dictionary, _target: Object, _decoder: ValueDecoder) -> DecodeOutcome:
+func decode(value: Variant, _property: Dictionary, _target: Object, _decoder: GodotMcpValueDecoder) -> GodotMcpDecodeOutcome:
 	if value is String:
 		return _decode_text(value)
 	var channels := _channels_of(value)
@@ -17,7 +17,7 @@ func decode(value: Variant, _property: Dictionary, _target: Object, _decoder: Va
 	return _success(Color(channels[0], channels[1], channels[2], channels[3]))
 
 
-func _decode_text(text: String) -> DecodeOutcome:
+func _decode_text(text: String) -> GodotMcpDecodeOutcome:
 	if text.begins_with("Color("):
 		return _decode_godot_syntax(text, TYPE_COLOR)
 	var parsed := Color.from_string(text, UNKNOWN_COLOR)

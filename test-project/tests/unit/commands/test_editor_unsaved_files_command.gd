@@ -1,23 +1,23 @@
 extends GutTest
 
-const EditingContext := preload("res://addons/godot_mcp_tool/scene/editing_context.gd")
-const EditorUnsavedFilesCommand := preload("res://addons/godot_mcp_tool/commands/editor/editor_unsaved_files_command.gd")
+const GodotMcpEditingContext := preload("res://addons/godot_mcp_tool/scene/editing_context.gd")
+const GodotMcpEditorUnsavedFilesCommand := preload("res://addons/godot_mcp_tool/commands/editor/editor_unsaved_files_command.gd")
 const FakeSceneAccess := preload("res://tests/support/fake_scene_access.gd")
 const FakeScriptEditorAccess := preload("res://tests/support/fake_script_editor_access.gd")
-const PlainUndoHistory := preload("res://addons/godot_mcp_tool/scene/plain_undo_history.gd")
-const VariantCodec := preload("res://addons/godot_mcp_tool/codec/variant_codec.gd")
+const GodotMcpPlainUndoHistory := preload("res://addons/godot_mcp_tool/scene/plain_undo_history.gd")
+const GodotMcpVariantCodec := preload("res://addons/godot_mcp_tool/codec/variant_codec.gd")
 
 var _scenes: FakeSceneAccess
 var _scripts: FakeScriptEditorAccess
-var _history: PlainUndoHistory
-var _context: EditingContext
+var _history: GodotMcpPlainUndoHistory
+var _context: GodotMcpEditingContext
 
 
 func before_each() -> void:
 	_scenes = FakeSceneAccess.new()
 	_scripts = FakeScriptEditorAccess.new()
-	_history = PlainUndoHistory.new()
-	_context = EditingContext.new(_scenes, _history, VariantCodec.new(), _scripts)
+	_history = GodotMcpPlainUndoHistory.new()
+	_context = GodotMcpEditingContext.new(_scenes, _history, GodotMcpVariantCodec.new(), _scripts)
 
 
 func after_each() -> void:
@@ -26,7 +26,7 @@ func after_each() -> void:
 
 
 func _unsaved_files() -> Dictionary:
-	return await EditorUnsavedFilesCommand.new(_context, _scripts).execute({})
+	return await GodotMcpEditorUnsavedFilesCommand.new(_context, _scripts).execute({})
 
 
 func test_lists_the_open_scenes_and_scripts_with_unsaved_changes() -> void:

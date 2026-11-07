@@ -1,8 +1,8 @@
 extends GutTest
 
-const ImportedSceneReport := preload("res://addons/godot_mcp_tool/assets/imported_scene_report.gd")
+const GodotMcpImportedSceneReport := preload("res://addons/godot_mcp_tool/assets/imported_scene_report.gd")
 const ScratchFolder := preload("res://tests/support/scratch_folder.gd")
-const VariantCodec := preload("res://addons/godot_mcp_tool/codec/variant_codec.gd")
+const GodotMcpVariantCodec := preload("res://addons/godot_mcp_tool/codec/variant_codec.gd")
 
 const CHARACTER := "res://tests/fixtures/models/character.glb"
 
@@ -42,7 +42,7 @@ func _saved_scene_with_capsule_collision() -> String:
 
 
 func test_measures_the_imported_scene_and_lists_its_nodes() -> void:
-	var report: Dictionary = ImportedSceneReport.describe(CHARACTER, VariantCodec.new())
+	var report: Dictionary = GodotMcpImportedSceneReport.describe(CHARACTER, GodotMcpVariantCodec.new())
 	assert_eq(report["size"], "Vector3(50, 180, 50)")
 	assert_eq(report["position"], "Vector3(-25, 0, -25)")
 	assert_eq(report["nodes"], [{"path": ".", "type": "Node3D"}, {"path": "Body", "type": "MeshInstance3D", "size": "Vector3(50, 180, 50)"}])
@@ -50,7 +50,7 @@ func test_measures_the_imported_scene_and_lists_its_nodes() -> void:
 
 
 func test_describes_collision_shapes_with_their_dimensions() -> void:
-	var report: Dictionary = ImportedSceneReport.describe(_saved_scene_with_capsule_collision(), VariantCodec.new())
+	var report: Dictionary = GodotMcpImportedSceneReport.describe(_saved_scene_with_capsule_collision(), GodotMcpVariantCodec.new())
 	assert_eq(
 		report["collision_shapes"],
 		[{"path": "StaticBody3D/CollisionShape3D", "shape": "CapsuleShape3D", "dimensions": [{"name": "radius", "value": 0.25}, {"name": "height", "value": 1.8}], "position": "Vector3(0, 0.9, 0)"}],

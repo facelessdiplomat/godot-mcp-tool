@@ -23,11 +23,11 @@ func _init() -> void:
 		_converters.append(converter_script.new())
 
 
-func decode(value: Variant, property: Dictionary, target: Object = null) -> DecodeOutcome:
+func decode(value: Variant, property: Dictionary, target: Object = null) -> GodotMcpDecodeOutcome:
 	for converter in _converters:
 		if converter.handles(property):
 			return converter.decode(value, property, target, self)
-	return DecodeOutcome.new(false, null, "values of type %s cannot be set through the bridge yet" % type_string(property.get("type", TYPE_NIL)))
+	return GodotMcpDecodeOutcome.new(false, null, "values of type %s cannot be set through the bridge yet" % type_string(property.get("type", TYPE_NIL)))
 
 
 func encode(value: Variant) -> Variant:

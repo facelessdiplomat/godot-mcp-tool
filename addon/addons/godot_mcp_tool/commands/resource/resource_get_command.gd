@@ -1,31 +1,31 @@
 extends "../command.gd"
 
-const EditingContext := preload("../../scene/editing_context.gd")
-const NodeFactory := preload("../../scene/node_factory.gd")
-const Params := preload("../params.gd")
-const ResourceFiles := preload("../../resources/resource_files.gd")
+const GodotMcpEditingContext := preload("../../scene/editing_context.gd")
+const GodotMcpNodeFactory := preload("../../scene/node_factory.gd")
+const GodotMcpParams := preload("../params.gd")
+const GodotMcpResourceFiles := preload("../../resources/resource_files.gd")
 
-var _context: EditingContext
+var _context: GodotMcpEditingContext
 
 
-func _init(context: EditingContext) -> void:
+func _init(context: GodotMcpEditingContext) -> void:
 	_context = context
 
 
 func execute(params: Dictionary) -> Variant:
-	var resource_path: Variant = Params.required_text(params, "path", "\"res://materials/ice.tres\"")
-	var names: Variant = Params.text_list(params, "names")
-	var include_defaults: Variant = Params.flag(params, "include_defaults", false)
+	var resource_path: Variant = GodotMcpParams.required_text(params, "path", "\"res://materials/ice.tres\"")
+	var names: Variant = GodotMcpParams.text_list(params, "names")
+	var include_defaults: Variant = GodotMcpParams.flag(params, "include_defaults", false)
 	for value in [resource_path, names, include_defaults]:
-		if value is CommandError:
+		if value is GodotMcpCommandError:
 			return value
-	var loaded: Variant = ResourceFiles.load_existing(resource_path)
-	if loaded is CommandError:
+	var loaded: Variant = GodotMcpResourceFiles.load_existing(resource_path)
+	if loaded is GodotMcpCommandError:
 		return loaded
 	var resource := loaded as Resource
 	return {
 		"path": resource_path,
-		"type": NodeFactory.display_class(resource),
+		"type": GodotMcpNodeFactory.display_class(resource),
 		"properties": _context.properties.describe(resource, PackedStringArray(names), include_defaults),
-		"dependencies": ResourceFiles.dependencies_of(resource_path),
+		"dependencies": GodotMcpResourceFiles.dependencies_of(resource_path),
 	}

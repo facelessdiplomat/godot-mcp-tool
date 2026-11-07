@@ -1,20 +1,20 @@
 extends RefCounted
 
-const AnimationVocabulary := preload("animation_vocabulary.gd")
-const NodeLocator := preload("../scene/node_locator.gd")
-const SimilarNames := preload("../util/similar_names.gd")
-const VariantCodec := preload("../codec/variant_codec.gd")
+const GodotMcpAnimationVocabulary := preload("animation_vocabulary.gd")
+const GodotMcpNodeLocator := preload("../scene/node_locator.gd")
+const GodotMcpSimilarNames := preload("../util/similar_names.gd")
+const GodotMcpVariantCodec := preload("../codec/variant_codec.gd")
 
 const STEPPED_TYPES := [TYPE_BOOL, TYPE_STRING, TYPE_STRING_NAME, TYPE_NODE_PATH, TYPE_OBJECT]
 const DEFAULT_LENGTH := 1.0
 const DECIMAL_SCALE := 1000.0
 const RESET_LENGTH := 0.001
 
-var _codec: VariantCodec
+var _codec: GodotMcpVariantCodec
 var _root: Node
 
 
-func _init(codec: VariantCodec, root: Node) -> void:
+func _init(codec: GodotMcpVariantCodec, root: Node) -> void:
 	_codec = codec
 	_root = root
 
@@ -88,8 +88,8 @@ func describe(track: Dictionary) -> Dictionary:
 	return {
 		"path": track["path"],
 		"keys": keys.size(),
-		"interpolation": AnimationVocabulary.name_of(AnimationVocabulary.INTERPOLATIONS, track["interpolation"]),
-		"update": AnimationVocabulary.name_of(AnimationVocabulary.UPDATE_MODES, track["update"]),
+		"interpolation": GodotMcpAnimationVocabulary.name_of(GodotMcpAnimationVocabulary.INTERPOLATIONS, track["interpolation"]),
+		"update": GodotMcpAnimationVocabulary.name_of(GodotMcpAnimationVocabulary.UPDATE_MODES, track["update"]),
 		"from": _codec.encode(keys.front()["value"]),
 		"to": _codec.encode(keys.back()["value"]),
 	}
@@ -105,15 +105,15 @@ func _plan_track(description: Variant) -> Variant:
 		return "track paths are Node:property relative to the parent of the AnimationPlayer, such as \"Door:position\" or \".:visible\""
 	var target := _root.get_node_or_null(NodePath(node_part))
 	if target == null:
-		return "there is no node %s under %s. %s" % [node_part, _root.name, NodeLocator.not_found_hint(_root, node_part)]
+		return "there is no node %s under %s. %s" % [node_part, _root.name, GodotMcpNodeLocator.not_found_hint(_root, node_part)]
 	var property: Variant = _property_of(target, property_path)
 	if property is String:
 		return property
-	var interpolation: Variant = _named_value(description, "interpolation", AnimationVocabulary.INTERPOLATIONS, "linear")
+	var interpolation: Variant = _named_value(description, "interpolation", GodotMcpAnimationVocabulary.INTERPOLATIONS, "linear")
 	if interpolation is String:
 		return interpolation
 	var default_update := "discrete" if _is_stepped(property) else "continuous"
-	var update: Variant = _named_value(description, "update", AnimationVocabulary.UPDATE_MODES, default_update)
+	var update: Variant = _named_value(description, "update", GodotMcpAnimationVocabulary.UPDATE_MODES, default_update)
 	if update is String:
 		return update
 	var keys: Variant = _decode_keys(description.get("keys", []), property, target, property_path)
@@ -128,7 +128,7 @@ func _property_of(target: Node, property_path: String) -> Variant:
 	for property in target.get_property_list():
 		properties[str(property["name"])] = property
 	if not properties.has(property_name):
-		var similar := SimilarNames.hint(property_name, properties.keys())
+		var similar := GodotMcpSimilarNames.hint(property_name, properties.keys())
 		return "%s has no property \"%s\"%s" % [target.name, property_name, "" if similar.is_empty() else ". " + similar]
 	if property_path == property_name:
 		return properties[property_name]
@@ -157,9 +157,9 @@ func _decode_keys(key_descriptions: Variant, property: Dictionary, target: Node,
 
 static func _named_value(description: Dictionary, key: String, names: Dictionary, default_name: String) -> Variant:
 	var name: Variant = description.get(key, default_name)
-	var value: Variant = AnimationVocabulary.value_of(names, name)
+	var value: Variant = GodotMcpAnimationVocabulary.value_of(names, name)
 	if value == null:
-		return "unknown %s \"%s\"; use one of: %s" % [key, name, AnimationVocabulary.listed(names)]
+		return "unknown %s \"%s\"; use one of: %s" % [key, name, GodotMcpAnimationVocabulary.listed(names)]
 	return value
 
 

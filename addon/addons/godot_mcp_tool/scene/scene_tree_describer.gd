@@ -1,6 +1,6 @@
 extends RefCounted
 
-const NodeFactory := preload("node_factory.gd")
+const GodotMcpNodeFactory := preload("node_factory.gd")
 
 var node_count := 0
 var truncated := false
@@ -19,7 +19,7 @@ func describe(scene_root: Node, max_depth: int, max_nodes: int) -> Dictionary:
 
 
 static func traits_of(node: Node, scene_root: Node) -> Dictionary:
-	var traits := {"type": NodeFactory.display_class(node)}
+	var traits := {"type": GodotMcpNodeFactory.display_class(node)}
 	var script := node.get_script() as Script
 	if script != null:
 		traits["script"] = "built-in" if script.resource_path.contains("::") or script.resource_path.is_empty() else script.resource_path

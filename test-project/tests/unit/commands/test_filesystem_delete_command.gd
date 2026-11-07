@@ -1,24 +1,24 @@
 extends GutTest
 
-const CommandError := preload("res://addons/godot_mcp_tool/commands/command_error.gd")
-const EditingContext := preload("res://addons/godot_mcp_tool/scene/editing_context.gd")
+const GodotMcpCommandError := preload("res://addons/godot_mcp_tool/commands/command_error.gd")
+const GodotMcpEditingContext := preload("res://addons/godot_mcp_tool/scene/editing_context.gd")
 const FakeFileSystemAccess := preload("res://tests/support/fake_file_system_access.gd")
 const FakeFileTrash := preload("res://tests/support/fake_file_trash.gd")
 const FakeSceneAccess := preload("res://tests/support/fake_scene_access.gd")
 const FakeScriptEditorAccess := preload("res://tests/support/fake_script_editor_access.gd")
-const FilesystemDeleteCommand := preload("res://addons/godot_mcp_tool/commands/file/filesystem_delete_command.gd")
-const JsonRpc := preload("res://addons/godot_mcp_tool/bridge/json_rpc.gd")
-const PlainUndoHistory := preload("res://addons/godot_mcp_tool/scene/plain_undo_history.gd")
+const GodotMcpFilesystemDeleteCommand := preload("res://addons/godot_mcp_tool/commands/file/filesystem_delete_command.gd")
+const GodotMcpJsonRpc := preload("res://addons/godot_mcp_tool/bridge/json_rpc.gd")
+const GodotMcpPlainUndoHistory := preload("res://addons/godot_mcp_tool/scene/plain_undo_history.gd")
 const ScratchProject := preload("res://tests/support/scratch_project.gd")
-const VariantCodec := preload("res://addons/godot_mcp_tool/codec/variant_codec.gd")
+const GodotMcpVariantCodec := preload("res://addons/godot_mcp_tool/codec/variant_codec.gd")
 
 const MAIN_SCENE_SETTING := "application/run/main_scene"
 const AUTOLOAD_SETTING := "autoload/McpTestCrate"
 
 var _project: ScratchProject
 var _scenes: FakeSceneAccess
-var _history: PlainUndoHistory
-var _context: EditingContext
+var _history: GodotMcpPlainUndoHistory
+var _context: GodotMcpEditingContext
 var _file_system: FakeFileSystemAccess
 var _trash: FakeFileTrash
 var _settings_saves := 0
@@ -29,8 +29,8 @@ func before_each() -> void:
 	_project = ScratchProject.new()
 	_project.build_crate_level()
 	_scenes = FakeSceneAccess.new()
-	_history = PlainUndoHistory.new()
-	_context = EditingContext.new(_scenes, _history, VariantCodec.new(), FakeScriptEditorAccess.new())
+	_history = GodotMcpPlainUndoHistory.new()
+	_context = GodotMcpEditingContext.new(_scenes, _history, GodotMcpVariantCodec.new(), FakeScriptEditorAccess.new())
 	_file_system = FakeFileSystemAccess.new()
 	_file_system.applies_scans_at_once = true
 	_trash = FakeFileTrash.new()
@@ -48,7 +48,7 @@ func after_each() -> void:
 
 
 func _delete(paths: Array, force := false) -> Variant:
-	var command := FilesystemDeleteCommand.new(_context, _file_system, _trash, func() -> Error:
+	var command := GodotMcpFilesystemDeleteCommand.new(_context, _file_system, _trash, func() -> Error:
 		_settings_saves += 1
 		return OK)
 	return await command.execute({"paths": paths, "force": force})
@@ -112,8 +112,8 @@ func test_clears_the_project_settings_that_point_at_a_forced_file() -> void:
 
 func test_never_deletes_the_script_of_an_autoload() -> void:
 	ProjectSettings.set_setting(AUTOLOAD_SETTING, "*" + _project.path("crate.gd"))
-	var refused: CommandError = await _delete([_project.path("crate.gd")], true)
-	assert_eq(refused.code, JsonRpc.CONFLICT)
+	var refused: GodotMcpCommandError = await _delete([_project.path("crate.gd")], true)
+	assert_eq(refused.code, GodotMcpJsonRpc.CONFLICT)
 	assert_string_contains(refused.message, "McpTestCrate")
 	assert_string_contains(refused.hint, "autoload_remove")
 	assert_true(FileAccess.file_exists(_project.path("crate.gd")))
@@ -124,8 +124,8 @@ func test_closes_an_open_scene_before_deleting_it_and_keeps_one_with_unsaved_cha
 	crate.scene_file_path = _project.path("crate.tscn")
 	_scenes.edited_root = crate
 	_scenes.unsaved_roots = [crate]
-	var refused: CommandError = await _delete([_project.path("crate.tscn")], true)
-	assert_eq(refused.code, JsonRpc.CONFLICT)
+	var refused: GodotMcpCommandError = await _delete([_project.path("crate.tscn")], true)
+	assert_eq(refused.code, GodotMcpJsonRpc.CONFLICT)
 	assert_true(FileAccess.file_exists(_project.path("crate.tscn")))
 	_scenes.unsaved_roots = []
 	var result: Dictionary = await _delete([_project.path("crate.tscn")], true)
@@ -141,7 +141,7 @@ func test_moves_a_whole_folder_to_the_trash() -> void:
 
 
 func test_explains_what_it_needs() -> void:
-	var missing: CommandError = await _delete([_project.path("lava.tres")])
-	assert_eq(missing.code, JsonRpc.NOT_FOUND)
-	var nothing: CommandError = await _delete([])
-	assert_eq(nothing.code, JsonRpc.INVALID_PARAMS)
+	var missing: GodotMcpCommandError = await _delete([_project.path("lava.tres")])
+	assert_eq(missing.code, GodotMcpJsonRpc.NOT_FOUND)
+	var nothing: GodotMcpCommandError = await _delete([])
+	assert_eq(nothing.code, GodotMcpJsonRpc.INVALID_PARAMS)

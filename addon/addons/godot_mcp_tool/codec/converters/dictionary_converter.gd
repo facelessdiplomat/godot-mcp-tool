@@ -7,7 +7,7 @@ func handles(property: Dictionary) -> bool:
 	return property.get("type") == TYPE_DICTIONARY
 
 
-func decode(value: Variant, _property: Dictionary, target: Object, decoder: ValueDecoder) -> DecodeOutcome:
+func decode(value: Variant, _property: Dictionary, target: Object, decoder: GodotMcpValueDecoder) -> GodotMcpDecodeOutcome:
 	if not value is Dictionary:
 		return _failure("expected a JSON object")
 	var decoded := {}

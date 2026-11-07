@@ -1,7 +1,7 @@
 extends RefCounted
 
-const CommandError := preload("command_error.gd")
-const JsonRpc := preload("../bridge/json_rpc.gd")
+const GodotMcpCommandError := preload("command_error.gd")
+const GodotMcpJsonRpc := preload("../bridge/json_rpc.gd")
 
 
 static func text(params: Dictionary, key: String, default_value: String = "") -> Variant:
@@ -16,7 +16,7 @@ static func text(params: Dictionary, key: String, default_value: String = "") ->
 static func required_text(params: Dictionary, key: String, example: String) -> Variant:
 	var value: Variant = params.get(key)
 	if not value is String or (value as String).strip_edges().is_empty():
-		return CommandError.new(JsonRpc.INVALID_PARAMS, "\"%s\" is required" % key, "Example: %s" % example)
+		return GodotMcpCommandError.new(GodotMcpJsonRpc.INVALID_PARAMS, "\"%s\" is required" % key, "Example: %s" % example)
 	return (value as String).strip_edges()
 
 
@@ -61,5 +61,5 @@ static func text_list(params: Dictionary, key: String) -> Variant:
 	return value
 
 
-static func _invalid(key: String, expected: String) -> CommandError:
-	return CommandError.new(JsonRpc.INVALID_PARAMS, "\"%s\" must be %s" % [key, expected])
+static func _invalid(key: String, expected: String) -> GodotMcpCommandError:
+	return GodotMcpCommandError.new(GodotMcpJsonRpc.INVALID_PARAMS, "\"%s\" must be %s" % [key, expected])

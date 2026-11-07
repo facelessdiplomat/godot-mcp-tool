@@ -1,16 +1,16 @@
 extends GutTest
 
-const CommandError := preload("res://addons/godot_mcp_tool/commands/command_error.gd")
-const GameChannel := preload("res://addons/godot_mcp_tool/runtime/game_channel.gd")
-const JsonRpc := preload("res://addons/godot_mcp_tool/bridge/json_rpc.gd")
+const GodotMcpCommandError := preload("res://addons/godot_mcp_tool/commands/command_error.gd")
+const GodotMcpGameChannel := preload("res://addons/godot_mcp_tool/runtime/game_channel.gd")
+const GodotMcpJsonRpc := preload("res://addons/godot_mcp_tool/bridge/json_rpc.gd")
 
 var _sent: Array = []
-var _channel: GameChannel
+var _channel: GodotMcpGameChannel
 
 
 func before_each() -> void:
 	_sent = []
-	_channel = GameChannel.new(func(payload: Dictionary) -> bool:
+	_channel = GodotMcpGameChannel.new(func(payload: Dictionary) -> bool:
 		_sent.append(payload)
 		return true)
 
@@ -41,32 +41,32 @@ func test_sends_a_request_and_returns_the_answer() -> void:
 
 
 func test_turns_an_error_answer_into_a_command_error() -> void:
-	_answer_after_a_frame({"error": {"code": JsonRpc.NOT_FOUND, "message": "Node \"Plyer\" not found", "hint": "Similar: Player."}})
+	_answer_after_a_frame({"error": {"code": GodotMcpJsonRpc.NOT_FOUND, "message": "Node \"Plyer\" not found", "hint": "Similar: Player."}})
 	var outcome: Variant = await _channel.request("properties.get", {"path": "Plyer"}, 1000)
-	assert_true(outcome is CommandError)
-	assert_eq((outcome as CommandError).code, JsonRpc.NOT_FOUND)
-	assert_eq((outcome as CommandError).hint, "Similar: Player.")
+	assert_true(outcome is GodotMcpCommandError)
+	assert_eq((outcome as GodotMcpCommandError).code, GodotMcpJsonRpc.NOT_FOUND)
+	assert_eq((outcome as GodotMcpCommandError).hint, "Similar: Player.")
 
 
 func test_reports_a_game_that_does_not_answer() -> void:
 	var outcome: Variant = await _channel.request("tree", {}, 30)
-	assert_true(outcome is CommandError)
-	assert_eq((outcome as CommandError).code, JsonRpc.TIMEOUT)
+	assert_true(outcome is GodotMcpCommandError)
+	assert_eq((outcome as GodotMcpCommandError).code, GodotMcpJsonRpc.TIMEOUT)
 
 
 func test_reports_that_no_game_is_running_when_it_cannot_send() -> void:
-	var channel := GameChannel.new(func(_payload: Dictionary) -> bool: return false)
+	var channel := GodotMcpGameChannel.new(func(_payload: Dictionary) -> bool: return false)
 	var outcome: Variant = await channel.request("tree", {}, 1000)
-	assert_true(outcome is CommandError)
-	assert_eq((outcome as CommandError).code, JsonRpc.GAME_NOT_RUNNING)
+	assert_true(outcome is GodotMcpCommandError)
+	assert_eq((outcome as GodotMcpCommandError).code, GodotMcpJsonRpc.GAME_NOT_RUNNING)
 
 
 func test_ends_waiting_requests_when_the_game_stops() -> void:
 	_stop_after_a_frame()
 	var started_msec := Time.get_ticks_msec()
 	var outcome: Variant = await _channel.request("wait", {"ms": 5000}, 10000)
-	assert_true(outcome is CommandError)
-	assert_eq((outcome as CommandError).code, JsonRpc.GAME_NOT_RUNNING)
+	assert_true(outcome is GodotMcpCommandError)
+	assert_eq((outcome as GodotMcpCommandError).code, GodotMcpJsonRpc.GAME_NOT_RUNNING)
 	assert_lt(Time.get_ticks_msec() - started_msec, 1000)
 
 
@@ -82,10 +82,10 @@ func test_ends_requests_that_wait_on_frames_when_the_game_stops_in_the_debugger(
 	_break_after_a_frame()
 	var started_msec := Time.get_ticks_msec()
 	var outcome: Variant = await _channel.request("input", {"steps": [{"wait_ms": 5000}]}, 10000, true)
-	assert_true(outcome is CommandError)
-	assert_eq((outcome as CommandError).code, JsonRpc.CONFLICT)
-	assert_eq((outcome as CommandError).message, "The game stopped in the debugger before this call finished; its frames do not advance while it is stopped")
-	assert_eq((outcome as CommandError).hint, "debug_state shows where it stopped; debug_continue resumes the game, and the rest of this call plays out then.")
+	assert_true(outcome is GodotMcpCommandError)
+	assert_eq((outcome as GodotMcpCommandError).code, GodotMcpJsonRpc.CONFLICT)
+	assert_eq((outcome as GodotMcpCommandError).message, "The game stopped in the debugger before this call finished; its frames do not advance while it is stopped")
+	assert_eq((outcome as GodotMcpCommandError).hint, "debug_state shows where it stopped; debug_continue resumes the game, and the rest of this call plays out then.")
 	assert_lt(Time.get_ticks_msec() - started_msec, 1000)
 
 

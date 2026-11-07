@@ -1611,6 +1611,8 @@ The whole integration suite, run next to that editor, found two more problems:
       for each of 4.7.2 and `master`.
 - [x] Publication to npm: version 0.1.0 went out on 2026-11-07, after the addon and integration tests had also passed
       on Godot 4.8 beta 2, and `npx -y godot-mcp-tool@0.1.0` now starts the server that the plugin asks for.
+- [x] Version 0.1.1: a game that registered a native class named like a member of an addon script, such as
+      `GameTime`, stopped the addon scripts from parsing; every such member now starts with `GodotMcp` (ADR-12).
 - [ ] Publication to the Godot Asset Store (it replaced the Asset Library in 4.7).
 
 **Done when** the package is published, CI is green and the user documentation passes its check (below).
@@ -1889,6 +1891,16 @@ in the Claude Code CLI — `claude --debug=mcp` (the server's stderr ends up in 
 - So the minimum is 4.7, the current stable since 2026-06; its editor also brings the Asset Store we publish to.
   Older editors get a clear message from the plugin, which then does nothing, and the server warns about older
   Godot executables. Cost: projects on 4.5 and 4.6 cannot use the tool until they move to 4.7.
+
+### ADR-12. Members of addon scripts that could be class names start with `GodotMcp`
+
+- GDScript refuses a script whose member has the name of a native class, and a game can register any name as a
+  native class through GDExtension. The game dark-life registered `GameTime`, which the addon used for a `preload`
+  constant, and the runtime scripts of the addon stopped parsing, so the game tools broke.
+- So every member of an addon script whose name could be a class name, such as `preload` constants, enums and inner
+  classes, starts with `GodotMcp`, and `server/test/addon/AddonMemberNames.test.ts` fails when one does not. A
+  leading underscore would be just as safe but is unusual for constants, and a short `Mcp` prefix could meet the
+  classes of another MCP extension. Cost: longer names in the addon scripts.
 
 ---
 

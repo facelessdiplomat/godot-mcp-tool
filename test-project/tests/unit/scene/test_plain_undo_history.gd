@@ -1,12 +1,12 @@
 extends GutTest
 
-const PlainUndoHistory := preload("res://addons/godot_mcp_tool/scene/plain_undo_history.gd")
+const GodotMcpPlainUndoHistory := preload("res://addons/godot_mcp_tool/scene/plain_undo_history.gd")
 
-var _history: PlainUndoHistory
+var _history: GodotMcpPlainUndoHistory
 
 
 func before_each() -> void:
-	_history = PlainUndoHistory.new()
+	_history = GodotMcpPlainUndoHistory.new()
 
 
 func after_each() -> void:

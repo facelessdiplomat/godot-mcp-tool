@@ -1,6 +1,6 @@
 extends RefCounted
 
-const ResponsivenessPolicy := preload("responsiveness_policy.gd")
+const GodotMcpResponsivenessPolicy := preload("responsiveness_policy.gd")
 
 const FOCUSED_SLEEP_SETTINGS := [
 	"interface/editor/timers/low_processor_mode_sleep_usec",
@@ -20,7 +20,7 @@ static func update(last_activity_msec: int) -> void:
 	if EditorInterface.get_base_control().get_window().has_focus():
 		return
 	var settings := EditorInterface.get_editor_settings()
-	var desired := ResponsivenessPolicy.desired_unfocused_sleep_usec(
+	var desired := GodotMcpResponsivenessPolicy.desired_unfocused_sleep_usec(
 		Time.get_ticks_msec(),
 		last_activity_msec,
 		_first_setting(settings, FOCUSED_SLEEP_SETTINGS, DEFAULT_FOCUSED_SLEEP_USEC),

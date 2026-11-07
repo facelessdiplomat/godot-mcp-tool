@@ -1,6 +1,6 @@
 {
   "name": "godot-mcp-tool",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "MCP server that connects Claude Code to the Godot editor",
   "license": "MIT",
   "author": "facelessdiplomat",

@@ -1,15 +1,15 @@
 extends RefCounted
 
-const CommandError := preload("../commands/command_error.gd")
-const JsonRpc := preload("../bridge/json_rpc.gd")
-const ScriptEditorAccess := preload("script_editor_access.gd")
+const GodotMcpCommandError := preload("../commands/command_error.gd")
+const GodotMcpJsonRpc := preload("../bridge/json_rpc.gd")
+const GodotMcpScriptEditorAccess := preload("script_editor_access.gd")
 
 const BUILT_IN_RESOURCE_SEPARATOR := "::"
 
-var _scripts: ScriptEditorAccess
+var _scripts: GodotMcpScriptEditorAccess
 
 
-func _init(scripts: ScriptEditorAccess) -> void:
+func _init(scripts: GodotMcpScriptEditorAccess) -> void:
 	_scripts = scripts
 
 
@@ -17,8 +17,8 @@ func prepare_for_saving() -> Variant:
 	await _scripts.reload_open_files()
 	var conflicting := _full_paths(_scripts.files_changed_outside())
 	if not conflicting.is_empty():
-		return CommandError.new(
-			JsonRpc.CONFLICT,
+		return GodotMcpCommandError.new(
+			GodotMcpJsonRpc.CONFLICT,
 			"Changed on disk while the editor has unsaved changes to them: %s. Saving now would overwrite the files on disk with the editor's version" % ", ".join(conflicting),
 			"Nothing was saved. The editor shows the dialog \"Files have been modified outside Godot\": ask the user to choose \"Reload from disk\" to keep the files on disk, or \"Ignore external changes\" to keep the editor's version, then try again.",
 		)

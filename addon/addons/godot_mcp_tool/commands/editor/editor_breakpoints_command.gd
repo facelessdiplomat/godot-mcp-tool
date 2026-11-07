@@ -1,11 +1,11 @@
 extends "../command.gd"
 
-const ScriptEditorAccess := preload("../../editor/script_editor_access.gd")
+const GodotMcpScriptEditorAccess := preload("../../editor/script_editor_access.gd")
 
-var _scripts: ScriptEditorAccess
+var _scripts: GodotMcpScriptEditorAccess
 
 
-func _init(scripts: ScriptEditorAccess) -> void:
+func _init(scripts: GodotMcpScriptEditorAccess) -> void:
 	_scripts = scripts
 
 

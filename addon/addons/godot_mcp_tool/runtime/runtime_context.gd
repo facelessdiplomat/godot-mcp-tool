@@ -1,17 +1,17 @@
 extends RefCounted
 
-const GameChannel := preload("game_channel.gd")
-const GameLauncher := preload("game_launcher.gd")
-const GameState := preload("game_state.gd")
-const LogStore := preload("log_store.gd")
+const GodotMcpGameChannel := preload("game_channel.gd")
+const GodotMcpGameLauncher := preload("game_launcher.gd")
+const GodotMcpGameState := preload("game_state.gd")
+const GodotMcpLogStore := preload("log_store.gd")
 
-var game: GameState
-var log_store: LogStore
-var launcher: GameLauncher
-var channel: GameChannel
+var game: GodotMcpGameState
+var log_store: GodotMcpLogStore
+var launcher: GodotMcpGameLauncher
+var channel: GodotMcpGameChannel
 
 
-func _init(game_state: GameState, store: LogStore, game_launcher: GameLauncher, game_channel: GameChannel) -> void:
+func _init(game_state: GodotMcpGameState, store: GodotMcpLogStore, game_launcher: GodotMcpGameLauncher, game_channel: GodotMcpGameChannel) -> void:
 	game = game_state
 	log_store = store
 	launcher = game_launcher

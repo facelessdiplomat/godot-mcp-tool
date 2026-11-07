@@ -5,20 +5,20 @@ var _node: Node
 var _properties: Dictionary
 
 
-func prepare(scene_root: Node, params: Dictionary) -> CommandError:
-	var type_text: Variant = Params.required_text(params, "type", "\"MeshInstance3D\" or \"res://props/crate.tscn\"")
-	var parent_path: Variant = Params.text(params, "parent", ".")
-	var node_name: Variant = Params.text(params, "name")
-	var index: Variant = Params.whole_number(params, "index", -1)
-	var properties: Variant = Params.dictionary(params, "properties")
+func prepare(scene_root: Node, params: Dictionary) -> GodotMcpCommandError:
+	var type_text: Variant = GodotMcpParams.required_text(params, "type", "\"MeshInstance3D\" or \"res://props/crate.tscn\"")
+	var parent_path: Variant = GodotMcpParams.text(params, "parent", ".")
+	var node_name: Variant = GodotMcpParams.text(params, "name")
+	var index: Variant = GodotMcpParams.whole_number(params, "index", -1)
+	var properties: Variant = GodotMcpParams.dictionary(params, "properties")
 	for value in [type_text, parent_path, node_name, index, properties]:
-		if value is CommandError:
+		if value is GodotMcpCommandError:
 			return value
-	var parent := NodeLocator.find(scene_root, parent_path)
+	var parent := GodotMcpNodeLocator.find(scene_root, parent_path)
 	if parent == null:
-		return CommandError.new(JsonRpc.NOT_FOUND, "Parent node \"%s\" not found" % parent_path, NodeLocator.not_found_hint(scene_root, parent_path))
+		return GodotMcpCommandError.new(GodotMcpJsonRpc.NOT_FOUND, "Parent node \"%s\" not found" % parent_path, GodotMcpNodeLocator.not_found_hint(scene_root, parent_path))
 	var created: Variant = _context.nodes.create(type_text)
-	if created is CommandError:
+	if created is GodotMcpCommandError:
 		return created
 	_scene_root = scene_root
 	_node = created
@@ -39,8 +39,8 @@ func prepare(scene_root: Node, params: Dictionary) -> CommandError:
 func finish() -> Dictionary:
 	var report := _context.properties.assign(_node, _properties)
 	return {
-		"path": NodeLocator.path_of(_scene_root, _node),
-		"type": NodeFactory.display_class(_node),
+		"path": GodotMcpNodeLocator.path_of(_scene_root, _node),
+		"type": GodotMcpNodeFactory.display_class(_node),
 		"applied": report["applied"],
 		"rejected": report["rejected"],
 		"not_applied": report["not_applied"],

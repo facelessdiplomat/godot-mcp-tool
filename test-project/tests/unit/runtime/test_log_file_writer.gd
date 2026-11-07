@@ -1,6 +1,6 @@
 extends GutTest
 
-const LogFileWriter := preload("res://addons/godot_mcp_tool/runtime/log_file_writer.gd")
+const GodotMcpLogFileWriter := preload("res://addons/godot_mcp_tool/runtime/log_file_writer.gd")
 
 var _path := ""
 
@@ -21,7 +21,7 @@ func _lines() -> Array:
 
 
 func test_writes_one_json_line_per_entry_and_one_for_readiness() -> void:
-	var writer := LogFileWriter.new(_path)
+	var writer := GodotMcpLogFileWriter.new(_path)
 	writer.send_entries([{"level": "info", "message": "Arena loaded"}, {"level": "error", "message": "Boom."}])
 	writer.send_ready("res://main.tscn")
 	writer.close()
@@ -33,5 +33,5 @@ func test_writes_one_json_line_per_entry_and_one_for_readiness() -> void:
 
 
 func test_finds_the_log_file_among_the_user_arguments() -> void:
-	assert_eq(LogFileWriter.path_from_arguments(PackedStringArray(["--level=2", "--mcp-log-file=/tmp/game.ndjson"])), "/tmp/game.ndjson")
-	assert_eq(LogFileWriter.path_from_arguments(PackedStringArray(["--level=2"])), "")
+	assert_eq(GodotMcpLogFileWriter.path_from_arguments(PackedStringArray(["--level=2", "--mcp-log-file=/tmp/game.ndjson"])), "/tmp/game.ndjson")
+	assert_eq(GodotMcpLogFileWriter.path_from_arguments(PackedStringArray(["--level=2"])), "")

@@ -1,29 +1,29 @@
 extends GutTest
 
-const AnimationTreeGetCommand := preload("res://addons/godot_mcp_tool/commands/animation/animation_tree_get_command.gd")
-const AnimationTreeSetCommand := preload("res://addons/godot_mcp_tool/commands/animation/animation_tree_set_command.gd")
-const CommandError := preload("res://addons/godot_mcp_tool/commands/command_error.gd")
-const EditingContext := preload("res://addons/godot_mcp_tool/scene/editing_context.gd")
+const GodotMcpAnimationTreeGetCommand := preload("res://addons/godot_mcp_tool/commands/animation/animation_tree_get_command.gd")
+const GodotMcpAnimationTreeSetCommand := preload("res://addons/godot_mcp_tool/commands/animation/animation_tree_set_command.gd")
+const GodotMcpCommandError := preload("res://addons/godot_mcp_tool/commands/command_error.gd")
+const GodotMcpEditingContext := preload("res://addons/godot_mcp_tool/scene/editing_context.gd")
 const FakeSceneAccess := preload("res://tests/support/fake_scene_access.gd")
 const FakeScriptEditorAccess := preload("res://tests/support/fake_script_editor_access.gd")
-const JsonRpc := preload("res://addons/godot_mcp_tool/bridge/json_rpc.gd")
-const PlainUndoHistory := preload("res://addons/godot_mcp_tool/scene/plain_undo_history.gd")
-const VariantCodec := preload("res://addons/godot_mcp_tool/codec/variant_codec.gd")
+const GodotMcpJsonRpc := preload("res://addons/godot_mcp_tool/bridge/json_rpc.gd")
+const GodotMcpPlainUndoHistory := preload("res://addons/godot_mcp_tool/scene/plain_undo_history.gd")
+const GodotMcpVariantCodec := preload("res://addons/godot_mcp_tool/codec/variant_codec.gd")
 
 const TREE := "Character/AnimationTree"
 const PLAYER := "Character/AnimationPlayer"
 
 var _scenes: FakeSceneAccess
-var _history: PlainUndoHistory
-var _context: EditingContext
+var _history: GodotMcpPlainUndoHistory
+var _context: GodotMcpEditingContext
 var _level: Node3D
 var _tree: AnimationTree
 
 
 func before_each() -> void:
 	_scenes = FakeSceneAccess.new()
-	_history = PlainUndoHistory.new()
-	_context = EditingContext.new(_scenes, _history, VariantCodec.new(), FakeScriptEditorAccess.new())
+	_history = GodotMcpPlainUndoHistory.new()
+	_context = GodotMcpEditingContext.new(_scenes, _history, GodotMcpVariantCodec.new(), FakeScriptEditorAccess.new())
 	_level = Node3D.new()
 	_level.name = "Level"
 	_level.scene_file_path = "res://level.tscn"
@@ -54,7 +54,7 @@ func _add(node: Node, name: String, parent: Node) -> Node:
 
 
 func _set_up(params: Dictionary) -> Variant:
-	return await AnimationTreeSetCommand.new(_context).execute(params)
+	return await GodotMcpAnimationTreeSetCommand.new(_context).execute(params)
 
 
 func _walking_machine() -> Dictionary:
@@ -165,25 +165,25 @@ func test_warns_when_no_transition_leaves_start() -> void:
 
 
 func test_explains_what_it_needs() -> void:
-	var no_player: CommandError = await _set_up({"tree": TREE, "states": [{"name": "idle", "animation": "idle"}], "transitions": []})
-	assert_eq(no_player.code, JsonRpc.INVALID_PARAMS)
+	var no_player: GodotMcpCommandError = await _set_up({"tree": TREE, "states": [{"name": "idle", "animation": "idle"}], "transitions": []})
+	assert_eq(no_player.code, GodotMcpJsonRpc.INVALID_PARAMS)
 	assert_string_contains(no_player.message, "AnimationPlayer")
-	var not_a_tree: CommandError = await _set_up({"tree": PLAYER, "player": PLAYER, "states": [{"name": "idle", "animation": "idle"}]})
+	var not_a_tree: GodotMcpCommandError = await _set_up({"tree": PLAYER, "player": PLAYER, "states": [{"name": "idle", "animation": "idle"}]})
 	assert_eq(not_a_tree.message, "Character/AnimationPlayer is an AnimationPlayer, not an AnimationTree")
-	var not_a_player: CommandError = await _set_up({"tree": TREE, "player": "Character", "states": [{"name": "idle", "animation": "idle"}]})
+	var not_a_player: GodotMcpCommandError = await _set_up({"tree": TREE, "player": "Character", "states": [{"name": "idle", "animation": "idle"}]})
 	assert_eq(not_a_player.message, "Character is a Node3D, not an AnimationPlayer")
-	var no_states: CommandError = await _set_up({"tree": TREE, "player": PLAYER, "states": []})
-	assert_eq(no_states.code, JsonRpc.INVALID_PARAMS)
+	var no_states: GodotMcpCommandError = await _set_up({"tree": TREE, "player": PLAYER, "states": []})
+	assert_eq(no_states.code, GodotMcpJsonRpc.INVALID_PARAMS)
 	var nothing_usable: Dictionary = await _set_up({"tree": TREE, "player": PLAYER, "states": [{"name": "run", "animation": "sprint"}]})
 	assert_eq(nothing_usable["states"], [])
 	assert_null(_tree.tree_root)
 
 
 func test_reads_the_state_machine_of_a_tree() -> void:
-	var empty: Dictionary = await AnimationTreeGetCommand.new(_context).execute({"tree": TREE})
+	var empty: Dictionary = await GodotMcpAnimationTreeGetCommand.new(_context).execute({"tree": TREE})
 	assert_eq(empty, {"scene": "res://level.tscn", "tree": TREE, "player": "", "active": true, "expression_base": ".", "root": ""})
 	await _set_up(_walking_machine())
-	var result: Dictionary = await AnimationTreeGetCommand.new(_context).execute({"tree": TREE})
+	var result: Dictionary = await GodotMcpAnimationTreeGetCommand.new(_context).execute({"tree": TREE})
 	assert_eq(result["player"], PLAYER)
 	assert_eq(result["root"], "AnimationNodeStateMachine")
 	assert_eq(result["states"], [{"name": "idle", "animation": "idle"}, {"name": "walk", "animation": "walk"}])

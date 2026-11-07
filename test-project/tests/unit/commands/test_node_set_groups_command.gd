@@ -1,17 +1,17 @@
 extends GutTest
 
-const CommandError := preload("res://addons/godot_mcp_tool/commands/command_error.gd")
-const EditingContext := preload("res://addons/godot_mcp_tool/scene/editing_context.gd")
+const GodotMcpCommandError := preload("res://addons/godot_mcp_tool/commands/command_error.gd")
+const GodotMcpEditingContext := preload("res://addons/godot_mcp_tool/scene/editing_context.gd")
 const FakeSceneAccess := preload("res://tests/support/fake_scene_access.gd")
 const FakeScriptEditorAccess := preload("res://tests/support/fake_script_editor_access.gd")
-const JsonRpc := preload("res://addons/godot_mcp_tool/bridge/json_rpc.gd")
-const NodeSetGroupsCommand := preload("res://addons/godot_mcp_tool/commands/node/node_set_groups_command.gd")
-const PlainUndoHistory := preload("res://addons/godot_mcp_tool/scene/plain_undo_history.gd")
-const VariantCodec := preload("res://addons/godot_mcp_tool/codec/variant_codec.gd")
+const GodotMcpJsonRpc := preload("res://addons/godot_mcp_tool/bridge/json_rpc.gd")
+const GodotMcpNodeSetGroupsCommand := preload("res://addons/godot_mcp_tool/commands/node/node_set_groups_command.gd")
+const GodotMcpPlainUndoHistory := preload("res://addons/godot_mcp_tool/scene/plain_undo_history.gd")
+const GodotMcpVariantCodec := preload("res://addons/godot_mcp_tool/codec/variant_codec.gd")
 
 var _scenes: FakeSceneAccess
-var _history: PlainUndoHistory
-var _context: EditingContext
+var _history: GodotMcpPlainUndoHistory
+var _context: GodotMcpEditingContext
 var _root: Node3D
 var _player: CharacterBody3D
 
@@ -27,8 +27,8 @@ func before_each() -> void:
 	_player.add_to_group("player", true)
 	_root.add_child(_player)
 	_player.owner = _root
-	_history = PlainUndoHistory.new()
-	_context = EditingContext.new(_scenes, _history, VariantCodec.new(), FakeScriptEditorAccess.new())
+	_history = GodotMcpPlainUndoHistory.new()
+	_context = GodotMcpEditingContext.new(_scenes, _history, GodotMcpVariantCodec.new(), FakeScriptEditorAccess.new())
 
 
 func after_each() -> void:
@@ -37,7 +37,7 @@ func after_each() -> void:
 
 
 func _set_groups(params: Dictionary) -> Variant:
-	return await NodeSetGroupsCommand.new(_context).execute(params)
+	return await GodotMcpNodeSetGroupsCommand.new(_context).execute(params)
 
 
 func test_adds_and_removes_groups_as_one_undo_step() -> void:
@@ -72,15 +72,15 @@ func test_reports_groups_that_needed_no_change() -> void:
 
 
 func test_needs_groups_with_visible_names() -> void:
-	var nothing: CommandError = await _set_groups({"path": "Player"})
-	var hidden: CommandError = await _set_groups({"path": "Player", "add": ["_internal"]})
-	var empty: CommandError = await _set_groups({"path": "Player", "add": [" "]})
-	assert_eq(nothing.code, JsonRpc.INVALID_PARAMS)
+	var nothing: GodotMcpCommandError = await _set_groups({"path": "Player"})
+	var hidden: GodotMcpCommandError = await _set_groups({"path": "Player", "add": ["_internal"]})
+	var empty: GodotMcpCommandError = await _set_groups({"path": "Player", "add": [" "]})
+	assert_eq(nothing.code, GodotMcpJsonRpc.INVALID_PARAMS)
 	assert_string_contains(hidden.message, "_internal")
-	assert_eq(empty.code, JsonRpc.INVALID_PARAMS)
+	assert_eq(empty.code, GodotMcpJsonRpc.INVALID_PARAMS)
 	assert_false(_player.is_in_group("_internal"))
 
 
 func test_explains_a_missing_node() -> void:
-	var result: CommandError = await _set_groups({"path": "Ghost", "add": ["enemies"]})
-	assert_eq(result.code, JsonRpc.NOT_FOUND)
+	var result: GodotMcpCommandError = await _set_groups({"path": "Ghost", "add": ["enemies"]})
+	assert_eq(result.code, GodotMcpJsonRpc.NOT_FOUND)

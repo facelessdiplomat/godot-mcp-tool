@@ -1,6 +1,6 @@
 extends Logger
 
-const LogEntryBuilder := preload("log_entry_builder.gd")
+const GodotMcpLogEntryBuilder := preload("log_entry_builder.gd")
 
 const DEFAULT_PENDING_LIMIT := 1000
 const IGNORED_ENGINE_SOURCES := ["servers/rendering/dummy/", "modules/gdscript/language_server/"]
@@ -22,14 +22,14 @@ func _init(include_plain_messages: bool, pending_limit: int = DEFAULT_PENDING_LI
 func _log_message(message: String, error: bool) -> void:
 	if not error and not _include_plain_messages:
 		return
-	_keep(LogEntryBuilder.from_message(message, error))
+	_keep(GodotMcpLogEntryBuilder.from_message(message, error))
 
 
 func _log_error(function: String, file: String, line: int, code: String, rationale: String, _editor_notify: bool, error_type: int, script_backtraces: Array[ScriptBacktrace]) -> void:
-	var engine_source := LogEntryBuilder.engine_source_path(file)
+	var engine_source := GodotMcpLogEntryBuilder.engine_source_path(file)
 	if IGNORED_ENGINE_SOURCES.any(func(ignored_source: String) -> bool: return engine_source.begins_with(ignored_source)):
 		return
-	_keep(LogEntryBuilder.from_error(function, file, line, code, rationale, error_type, script_backtraces, _addon_script_prefix))
+	_keep(GodotMcpLogEntryBuilder.from_error(function, file, line, code, rationale, error_type, script_backtraces, _addon_script_prefix))
 
 
 func take_pending() -> Array:

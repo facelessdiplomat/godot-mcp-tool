@@ -1,7 +1,7 @@
 extends RefCounted
 
-const EnumOptions := preload("../codec/enum_options.gd")
-const VariantCodec := preload("../codec/variant_codec.gd")
+const GodotMcpEnumOptions := preload("../codec/enum_options.gd")
+const GodotMcpVariantCodec := preload("../codec/variant_codec.gd")
 
 const OPTION_ENUMS := {
 	"meshes/light_baking": "Disabled,Static,Static Lightmaps,Dynamic",
@@ -53,13 +53,13 @@ static func node_option_names() -> Array:
 	return NODE_OPTIONS.keys()
 
 
-static func describe_option(name: String, value: Variant, codec: VariantCodec) -> Variant:
+static func describe_option(name: String, value: Variant, codec: GodotMcpVariantCodec) -> Variant:
 	if OPTION_ENUMS.has(name) and value is int:
 		return _enum_name(OPTION_ENUMS[name], value, codec)
 	return codec.encode(value)
 
 
-static func describe_node_option(name: String, value: Variant, codec: VariantCodec) -> Variant:
+static func describe_node_option(name: String, value: Variant, codec: GodotMcpVariantCodec) -> Variant:
 	var option: Dictionary = NODE_OPTIONS.get(name, {})
 	if option.get("hint") == PROPERTY_HINT_ENUM and value is int:
 		return _enum_name(option["hint_string"], value, codec)
@@ -70,6 +70,6 @@ static func _property(name: String, option: Dictionary) -> Dictionary:
 	return {"name": name, "type": option["type"], "hint": option.get("hint", PROPERTY_HINT_NONE), "hint_string": option.get("hint_string", ""), "usage": PROPERTY_USAGE_DEFAULT}
 
 
-static func _enum_name(hint_string: String, value: int, codec: VariantCodec) -> Variant:
-	var option_name := EnumOptions.name_of(EnumOptions.parse(hint_string), value)
+static func _enum_name(hint_string: String, value: int, codec: GodotMcpVariantCodec) -> Variant:
+	var option_name := GodotMcpEnumOptions.name_of(GodotMcpEnumOptions.parse(hint_string), value)
 	return option_name if not option_name.is_empty() else codec.encode(value)

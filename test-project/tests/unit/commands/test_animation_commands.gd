@@ -1,19 +1,19 @@
 extends GutTest
 
-const AnimationDeleteCommand := preload("res://addons/godot_mcp_tool/commands/animation/animation_delete_command.gd")
-const AnimationGetCommand := preload("res://addons/godot_mcp_tool/commands/animation/animation_get_command.gd")
-const AnimationSetCommand := preload("res://addons/godot_mcp_tool/commands/animation/animation_set_command.gd")
-const CommandError := preload("res://addons/godot_mcp_tool/commands/command_error.gd")
-const EditingContext := preload("res://addons/godot_mcp_tool/scene/editing_context.gd")
+const GodotMcpAnimationDeleteCommand := preload("res://addons/godot_mcp_tool/commands/animation/animation_delete_command.gd")
+const GodotMcpAnimationGetCommand := preload("res://addons/godot_mcp_tool/commands/animation/animation_get_command.gd")
+const GodotMcpAnimationSetCommand := preload("res://addons/godot_mcp_tool/commands/animation/animation_set_command.gd")
+const GodotMcpCommandError := preload("res://addons/godot_mcp_tool/commands/command_error.gd")
+const GodotMcpEditingContext := preload("res://addons/godot_mcp_tool/scene/editing_context.gd")
 const FakeSceneAccess := preload("res://tests/support/fake_scene_access.gd")
 const FakeScriptEditorAccess := preload("res://tests/support/fake_script_editor_access.gd")
-const JsonRpc := preload("res://addons/godot_mcp_tool/bridge/json_rpc.gd")
-const PlainUndoHistory := preload("res://addons/godot_mcp_tool/scene/plain_undo_history.gd")
-const VariantCodec := preload("res://addons/godot_mcp_tool/codec/variant_codec.gd")
+const GodotMcpJsonRpc := preload("res://addons/godot_mcp_tool/bridge/json_rpc.gd")
+const GodotMcpPlainUndoHistory := preload("res://addons/godot_mcp_tool/scene/plain_undo_history.gd")
+const GodotMcpVariantCodec := preload("res://addons/godot_mcp_tool/codec/variant_codec.gd")
 
 var _scenes: FakeSceneAccess
-var _history: PlainUndoHistory
-var _context: EditingContext
+var _history: GodotMcpPlainUndoHistory
+var _context: GodotMcpEditingContext
 var _level: Node3D
 var _door: Node3D
 var _lamp: OmniLight3D
@@ -22,8 +22,8 @@ var _player: AnimationPlayer
 
 func before_each() -> void:
 	_scenes = FakeSceneAccess.new()
-	_history = PlainUndoHistory.new()
-	_context = EditingContext.new(_scenes, _history, VariantCodec.new(), FakeScriptEditorAccess.new())
+	_history = GodotMcpPlainUndoHistory.new()
+	_context = GodotMcpEditingContext.new(_scenes, _history, GodotMcpVariantCodec.new(), FakeScriptEditorAccess.new())
 	_level = Node3D.new()
 	_level.name = "Level"
 	_level.scene_file_path = "res://level.tscn"
@@ -48,7 +48,7 @@ func _add(node: Node, name: String) -> Node:
 
 
 func _set_animation(params: Dictionary) -> Variant:
-	return await AnimationSetCommand.new(_context).execute(params)
+	return await GodotMcpAnimationSetCommand.new(_context).execute(params)
 
 
 func _door_rising(keys := [{"time": 0, "value": [0, 1, 0]}, {"time": 1, "value": [0, 4, 0]}]) -> Dictionary:
@@ -140,15 +140,15 @@ func test_rejects_the_tracks_it_cannot_use_and_keeps_the_rest() -> void:
 
 
 func test_explains_what_it_needs() -> void:
-	var missing_player: CommandError = await _set_animation({"player": "Gate", "name": "open", "tracks": _door_rising()["tracks"]})
-	assert_eq(missing_player.code, JsonRpc.NOT_FOUND)
-	var not_a_player: CommandError = await _set_animation({"player": "Door", "name": "open", "tracks": _door_rising()["tracks"]})
-	assert_eq(not_a_player.code, JsonRpc.INVALID_PARAMS)
+	var missing_player: GodotMcpCommandError = await _set_animation({"player": "Gate", "name": "open", "tracks": _door_rising()["tracks"]})
+	assert_eq(missing_player.code, GodotMcpJsonRpc.NOT_FOUND)
+	var not_a_player: GodotMcpCommandError = await _set_animation({"player": "Door", "name": "open", "tracks": _door_rising()["tracks"]})
+	assert_eq(not_a_player.code, GodotMcpJsonRpc.INVALID_PARAMS)
 	assert_eq(not_a_player.message, "Door is a Node3D, not an AnimationPlayer")
-	var bad_name: CommandError = await _set_animation({"player": "AnimationPlayer", "name": "open:fast", "tracks": _door_rising()["tracks"]})
-	assert_eq(bad_name.code, JsonRpc.INVALID_PARAMS)
-	var no_tracks: CommandError = await _set_animation({"player": "AnimationPlayer", "name": "open", "tracks": []})
-	assert_eq(no_tracks.code, JsonRpc.INVALID_PARAMS)
+	var bad_name: GodotMcpCommandError = await _set_animation({"player": "AnimationPlayer", "name": "open:fast", "tracks": _door_rising()["tracks"]})
+	assert_eq(bad_name.code, GodotMcpJsonRpc.INVALID_PARAMS)
+	var no_tracks: GodotMcpCommandError = await _set_animation({"player": "AnimationPlayer", "name": "open", "tracks": []})
+	assert_eq(no_tracks.code, GodotMcpJsonRpc.INVALID_PARAMS)
 	var nothing_usable: Dictionary = await _set_animation({"player": "AnimationPlayer", "name": "open", "tracks": [{"path": "Gate:position", "keys": [{"time": 0, "value": [0, 0, 0]}]}]})
 	assert_eq(nothing_usable["tracks"], [])
 	assert_false(_player.has_animation("open"))
@@ -198,27 +198,27 @@ func test_leaves_reset_as_it_is_when_reset_itself_is_set() -> void:
 
 func test_reads_the_animations_of_a_player_and_the_keys_of_one() -> void:
 	await _set_animation(_door_rising())
-	var listed: Dictionary = await AnimationGetCommand.new(_context).execute({"player": "AnimationPlayer"})
+	var listed: Dictionary = await GodotMcpAnimationGetCommand.new(_context).execute({"player": "AnimationPlayer"})
 	assert_eq(listed["player"], "AnimationPlayer")
 	assert_eq(listed["root_node"], "..")
 	assert_eq(listed["autoplay"], "")
 	assert_eq(listed["animations"], [{"name": "RESET", "length": 0.001, "loop": "none", "tracks": 1}, {"name": "open", "length": 1.0, "loop": "none", "tracks": 1}])
-	var detailed: Dictionary = await AnimationGetCommand.new(_context).execute({"player": "AnimationPlayer", "name": "open"})
+	var detailed: Dictionary = await GodotMcpAnimationGetCommand.new(_context).execute({"player": "AnimationPlayer", "name": "open"})
 	assert_eq(detailed["animation"], {
 		"name": "open",
 		"length": 1.0,
 		"loop": "none",
 		"tracks": [{"path": "Door:position", "type": "value", "interpolation": "linear", "update": "continuous", "key_count": 2, "keys": [{"time": 0.0, "value": "Vector3(0, 1, 0)"}, {"time": 1.0, "value": "Vector3(0, 4, 0)"}]}],
 	})
-	var unknown: CommandError = await AnimationGetCommand.new(_context).execute({"player": "AnimationPlayer", "name": "close"})
-	assert_eq(unknown.code, JsonRpc.NOT_FOUND)
+	var unknown: GodotMcpCommandError = await GodotMcpAnimationGetCommand.new(_context).execute({"player": "AnimationPlayer", "name": "close"})
+	assert_eq(unknown.code, GodotMcpJsonRpc.NOT_FOUND)
 	assert_string_contains(unknown.hint, "open")
 
 
 func test_clears_the_autoplay_that_named_the_deleted_animation() -> void:
 	await _set_animation(_door_rising())
 	_player.autoplay = "open"
-	await AnimationDeleteCommand.new(_context).execute({"player": "AnimationPlayer", "name": "open"})
+	await GodotMcpAnimationDeleteCommand.new(_context).execute({"player": "AnimationPlayer", "name": "open"})
 	assert_eq(_player.autoplay, "")
 	assert_true(_history.undo())
 	assert_eq(_player.autoplay, "open")
@@ -228,11 +228,11 @@ func test_clears_the_autoplay_that_named_the_deleted_animation() -> void:
 
 func test_deletes_an_animation_as_one_undo_step() -> void:
 	await _set_animation(_door_rising())
-	var result: Dictionary = await AnimationDeleteCommand.new(_context).execute({"player": "AnimationPlayer", "name": "open"})
+	var result: Dictionary = await GodotMcpAnimationDeleteCommand.new(_context).execute({"player": "AnimationPlayer", "name": "open"})
 	assert_eq(result, {"scene": "res://level.tscn", "player": "AnimationPlayer", "name": "open"})
 	assert_false(_player.has_animation("open"))
 	assert_eq(_history.last_action_name(), "MCP: Delete animation open")
 	assert_true(_history.undo())
 	assert_true(_player.has_animation("open"))
-	var missing: CommandError = await AnimationDeleteCommand.new(_context).execute({"player": "AnimationPlayer", "name": "close"})
-	assert_eq(missing.code, JsonRpc.NOT_FOUND)
+	var missing: GodotMcpCommandError = await GodotMcpAnimationDeleteCommand.new(_context).execute({"player": "AnimationPlayer", "name": "close"})
+	assert_eq(missing.code, GodotMcpJsonRpc.NOT_FOUND)

@@ -1,9 +1,9 @@
 extends GutTest
 
-const CommandError := preload("res://addons/godot_mcp_tool/commands/command_error.gd")
-const InputMapGetCommand := preload("res://addons/godot_mcp_tool/commands/input/input_map_get_command.gd")
-const InputMapSetCommand := preload("res://addons/godot_mcp_tool/commands/input/input_map_set_command.gd")
-const JsonRpc := preload("res://addons/godot_mcp_tool/bridge/json_rpc.gd")
+const GodotMcpCommandError := preload("res://addons/godot_mcp_tool/commands/command_error.gd")
+const GodotMcpInputMapGetCommand := preload("res://addons/godot_mcp_tool/commands/input/input_map_get_command.gd")
+const GodotMcpInputMapSetCommand := preload("res://addons/godot_mcp_tool/commands/input/input_map_set_command.gd")
+const GodotMcpJsonRpc := preload("res://addons/godot_mcp_tool/bridge/json_rpc.gd")
 
 const MOVE_ACTION := "mcp_test_move_forward"
 const JUMP_ACTION := "mcp_test_jump"
@@ -23,7 +23,7 @@ func after_each() -> void:
 
 
 func _set_actions(actions: Dictionary) -> Variant:
-	var command := InputMapSetCommand.new(func() -> Error:
+	var command := GodotMcpInputMapSetCommand.new(func() -> Error:
 		_save_calls += 1
 		return OK)
 	return await command.execute({"actions": actions})
@@ -98,20 +98,20 @@ func test_explains_an_action_name_it_cannot_use() -> void:
 
 func test_requires_actions() -> void:
 	var error: Variant = await _set_actions({})
-	assert_true(error is CommandError)
-	assert_eq((error as CommandError).code, JsonRpc.INVALID_PARAMS)
+	assert_true(error is GodotMcpCommandError)
+	assert_eq((error as GodotMcpCommandError).code, GodotMcpJsonRpc.INVALID_PARAMS)
 
 
 func test_lists_the_actions_of_the_project_without_the_built_in_ones() -> void:
 	await _set_actions({MOVE_ACTION: ["W"]})
-	var result: Dictionary = await InputMapGetCommand.new().execute({})
+	var result: Dictionary = await GodotMcpInputMapGetCommand.new().execute({})
 	assert_true(MOVE_ACTION in _action_names(result))
 	assert_false("ui_accept" in _action_names(result))
 
 
 func test_lists_named_actions_with_their_events_and_explains_unknown_names() -> void:
 	await _set_actions({MOVE_ACTION: ["W", {"type": "joypad_button", "button": "a"}]})
-	var result: Dictionary = await InputMapGetCommand.new().execute({"actions": [MOVE_ACTION, "mcp_test_move_forwrd"]})
+	var result: Dictionary = await GodotMcpInputMapGetCommand.new().execute({"actions": [MOVE_ACTION, "mcp_test_move_forwrd"]})
 	var events: Array = ((result["actions"] as Array)[0] as Dictionary)["events"]
 	assert_eq(events.map(func(event: Dictionary) -> String: return event["type"]), ["key", "joypad_button"])
 	assert_eq(((result["unknown"] as Array)[0] as Dictionary)["name"], "mcp_test_move_forwrd")
@@ -119,5 +119,5 @@ func test_lists_named_actions_with_their_events_and_explains_unknown_names() -> 
 
 
 func test_lists_the_built_in_actions_on_request() -> void:
-	var result: Dictionary = await InputMapGetCommand.new().execute({"include_builtin": true})
+	var result: Dictionary = await GodotMcpInputMapGetCommand.new().execute({"include_builtin": true})
 	assert_true("ui_accept" in _action_names(result))

@@ -1,11 +1,11 @@
 extends RefCounted
 
-const BridgeConnection := preload("bridge_connection.gd")
+const GodotMcpBridgeConnection := preload("bridge_connection.gd")
 
 var last_activity_msec := -1
 
 var _tcp_server := TCPServer.new()
-var _connections: Array[BridgeConnection] = []
+var _connections: Array[GodotMcpBridgeConnection] = []
 var _create_session: Callable
 
 
@@ -26,18 +26,18 @@ func connection_count() -> int:
 
 
 func authenticated_count() -> int:
-	return _connections.filter(func(connection: BridgeConnection) -> bool: return connection.session.is_authenticated).size()
+	return _connections.filter(func(connection: GodotMcpBridgeConnection) -> bool: return connection.session.is_authenticated).size()
 
 
 func poll() -> void:
 	while _tcp_server.is_connection_available():
 		var peer := _tcp_server.take_connection()
 		if peer != null:
-			_connections.append(BridgeConnection.new(peer, _create_session.call()))
+			_connections.append(GodotMcpBridgeConnection.new(peer, _create_session.call()))
 	for connection in _connections:
 		if connection.poll() > 0:
 			last_activity_msec = Time.get_ticks_msec()
-	_connections = _connections.filter(func(connection: BridgeConnection) -> bool: return not connection.is_closed)
+	_connections = _connections.filter(func(connection: GodotMcpBridgeConnection) -> bool: return not connection.is_closed)
 
 
 func broadcast(message: Dictionary) -> void:

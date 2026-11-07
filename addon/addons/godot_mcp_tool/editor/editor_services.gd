@@ -1,35 +1,35 @@
 extends RefCounted
 
-const AddonInfo := preload("../addon_info.gd")
-const Authenticator := preload("../bridge/authenticator.gd")
-const BottomPanel := preload("bottom_panel.gd")
-const BridgeServer := preload("../bridge/bridge_server.gd")
-const BridgeSession := preload("../bridge/bridge_session.gd")
-const CommandCatalog := preload("../commands/command_catalog.gd")
-const CommandJournal := preload("command_journal.gd")
-const CommandRouter := preload("../commands/command_router.gd")
-const DiscoveryFile := preload("../bridge/discovery_file.gd")
-const EditingContext := preload("../scene/editing_context.gd")
-const EditorAutoloadRegistry := preload("editor_autoload_registry.gd")
-const EditorFileSystemAccess := preload("editor_file_system_access.gd")
-const EditorGameLauncher := preload("../runtime/editor_game_launcher.gd")
-const EditorSceneAccess := preload("../scene/editor_scene_access.gd")
-const EditorScriptEditorAccess := preload("editor_script_editor_access.gd")
-const EditorUndoHistory := preload("../scene/editor_undo_history.gd")
-const FirstScanGate := preload("first_scan_gate.gd")
-const GameState := preload("../runtime/game_state.gd")
-const GodotVersionText := preload("godot_version_text.gd")
-const LogStore := preload("../runtime/log_store.gd")
-const McpDock := preload("mcp_dock.gd")
-const ResponsivenessController := preload("responsiveness_controller.gd")
-const RunArguments := preload("../runtime/run_arguments.gd")
-const RunRequest := preload("../runtime/run_request.gd")
-const RuntimeContext := preload("../runtime/runtime_context.gd")
-const RuntimeDebugger := preload("../runtime/runtime_debugger.gd")
-const RuntimeLogger := preload("../runtime/runtime_logger.gd")
-const TokenGenerator := preload("../bridge/token_generator.gd")
-const UnsafeToolsSwitch := preload("unsafe_tools_switch.gd")
-const VariantCodec := preload("../codec/variant_codec.gd")
+const GodotMcpAddonInfo := preload("../addon_info.gd")
+const GodotMcpAuthenticator := preload("../bridge/authenticator.gd")
+const GodotMcpBottomPanel := preload("bottom_panel.gd")
+const GodotMcpBridgeServer := preload("../bridge/bridge_server.gd")
+const GodotMcpBridgeSession := preload("../bridge/bridge_session.gd")
+const GodotMcpCommandCatalog := preload("../commands/command_catalog.gd")
+const GodotMcpCommandJournal := preload("command_journal.gd")
+const GodotMcpCommandRouter := preload("../commands/command_router.gd")
+const GodotMcpDiscoveryFile := preload("../bridge/discovery_file.gd")
+const GodotMcpEditingContext := preload("../scene/editing_context.gd")
+const GodotMcpEditorAutoloadRegistry := preload("editor_autoload_registry.gd")
+const GodotMcpEditorFileSystemAccess := preload("editor_file_system_access.gd")
+const GodotMcpEditorGameLauncher := preload("../runtime/editor_game_launcher.gd")
+const GodotMcpEditorSceneAccess := preload("../scene/editor_scene_access.gd")
+const GodotMcpEditorScriptEditorAccess := preload("editor_script_editor_access.gd")
+const GodotMcpEditorUndoHistory := preload("../scene/editor_undo_history.gd")
+const GodotMcpFirstScanGate := preload("first_scan_gate.gd")
+const GodotMcpGameState := preload("../runtime/game_state.gd")
+const GodotMcpGodotVersionText := preload("godot_version_text.gd")
+const GodotMcpLogStore := preload("../runtime/log_store.gd")
+const GodotMcpMcpDock := preload("mcp_dock.gd")
+const GodotMcpResponsivenessController := preload("responsiveness_controller.gd")
+const GodotMcpRunArguments := preload("../runtime/run_arguments.gd")
+const GodotMcpRunRequest := preload("../runtime/run_request.gd")
+const GodotMcpRuntimeContext := preload("../runtime/runtime_context.gd")
+const GodotMcpRuntimeDebugger := preload("../runtime/runtime_debugger.gd")
+const GodotMcpRuntimeLogger := preload("../runtime/runtime_logger.gd")
+const GodotMcpTokenGenerator := preload("../bridge/token_generator.gd")
+const GodotMcpUnsafeToolsSwitch := preload("unsafe_tools_switch.gd")
+const GodotMcpVariantCodec := preload("../codec/variant_codec.gd")
 
 const LANGUAGE_SERVER_PORT_SETTING := "network/language_server/remote_port"
 const DEBUG_ADAPTER_PORT_SETTING := "network/debug_adapter/remote_port"
@@ -41,18 +41,18 @@ const RUNTIME_AGENT_FILE := "runtime/runtime_agent.gd"
 const EDITOR_SOURCE := "editor"
 
 var _plugin: EditorPlugin
-var _runtime: RuntimeContext
-var _runtime_debugger: RuntimeDebugger
-var _editor_logger: RuntimeLogger
-var _router: CommandRouter
-var _bridge_server: BridgeServer
-var _discovery_file: DiscoveryFile
-var _first_scan_gate: FirstScanGate
+var _runtime: GodotMcpRuntimeContext
+var _runtime_debugger: GodotMcpRuntimeDebugger
+var _editor_logger: GodotMcpRuntimeLogger
+var _router: GodotMcpCommandRouter
+var _bridge_server: GodotMcpBridgeServer
+var _discovery_file: GodotMcpDiscoveryFile
+var _first_scan_gate: GodotMcpFirstScanGate
 var _token := ""
-var _unsafe_tools := UnsafeToolsSwitch.new()
-var _command_journal := CommandJournal.new()
+var _unsafe_tools := GodotMcpUnsafeToolsSwitch.new()
+var _command_journal := GodotMcpCommandJournal.new()
 var _bridge_state := ""
-var _dock_panel: BottomPanel
+var _dock_panel: GodotMcpBottomPanel
 
 
 func _init(plugin: EditorPlugin) -> void:
@@ -60,23 +60,23 @@ func _init(plugin: EditorPlugin) -> void:
 
 
 func start() -> void:
-	var log_store := LogStore.new()
-	var game := GameState.new()
-	_runtime_debugger = RuntimeDebugger.new(game, log_store)
+	var log_store := GodotMcpLogStore.new()
+	var game := GodotMcpGameState.new()
+	_runtime_debugger = GodotMcpRuntimeDebugger.new(game, log_store)
 	_plugin.add_debugger_plugin(_runtime_debugger)
-	_runtime = RuntimeContext.new(game, log_store, EditorGameLauncher.new(), _runtime_debugger.channel)
-	_editor_logger = RuntimeLogger.new(false)
+	_runtime = GodotMcpRuntimeContext.new(game, log_store, GodotMcpEditorGameLauncher.new(), _runtime_debugger.channel)
+	_editor_logger = GodotMcpRuntimeLogger.new(false)
 	OS.add_logger(_editor_logger)
 	_ensure_runtime_autoload()
-	var context := EditingContext.new(EditorSceneAccess.new(), EditorUndoHistory.new(_plugin.get_undo_redo()), VariantCodec.new(), EditorScriptEditorAccess.new())
+	var context := GodotMcpEditingContext.new(GodotMcpEditorSceneAccess.new(), GodotMcpEditorUndoHistory.new(_plugin.get_undo_redo()), GodotMcpVariantCodec.new(), GodotMcpEditorScriptEditorAccess.new())
 	_unsafe_tools.install(_plugin)
-	_router = CommandCatalog.build_router(context, _runtime, _read_indentation, ProjectSettings.save, EditorAutoloadRegistry.new(_plugin), _unsafe_tools.is_allowed)
-	_token = TokenGenerator.generate()
-	_first_scan_gate = FirstScanGate.new(EditorFileSystemAccess.new())
+	_router = GodotMcpCommandCatalog.build_router(context, _runtime, _read_indentation, ProjectSettings.save, GodotMcpEditorAutoloadRegistry.new(_plugin), _unsafe_tools.is_allowed)
+	_token = GodotMcpTokenGenerator.generate()
+	_first_scan_gate = GodotMcpFirstScanGate.new(GodotMcpEditorFileSystemAccess.new())
 	_bridge_state = _start_bridge()
-	var dock := McpDock.new(_command_journal, _read_dock_status, _unsafe_tools.is_allowed, _unsafe_tools.set_allowed)
-	_dock_panel = BottomPanel.new(_plugin, dock)
-	_dock_panel.add(McpDock.TAB_TITLE)
+	var dock := GodotMcpMcpDock.new(_command_journal, _read_dock_status, _unsafe_tools.is_allowed, _unsafe_tools.set_allowed)
+	_dock_panel = GodotMcpBottomPanel.new(_plugin, dock)
+	_dock_panel.add(GodotMcpMcpDock.TAB_TITLE)
 
 
 func process() -> void:
@@ -84,7 +84,7 @@ func process() -> void:
 	if _bridge_server == null:
 		return
 	_bridge_server.poll()
-	ResponsivenessController.update(_bridge_server.last_activity_msec)
+	GodotMcpResponsivenessController.update(_bridge_server.last_activity_msec)
 
 
 func stop() -> void:
@@ -107,25 +107,25 @@ func stop() -> void:
 
 
 func run_arguments(args: PackedStringArray) -> PackedStringArray:
-	var agent_run: RunRequest = _runtime.game.take_agent_run_request()
-	return RunArguments.extend(args, agent_run, DisplayServer.get_name() == "headless")
+	var agent_run: GodotMcpRunRequest = _runtime.game.take_agent_run_request()
+	return GodotMcpRunArguments.extend(args, agent_run, DisplayServer.get_name() == "headless")
 
 
 func _start_bridge() -> String:
-	_bridge_server = BridgeServer.new(_create_session)
-	var listen_error := _bridge_server.listen(AddonInfo.LOOPBACK_ADDRESS, 0)
+	_bridge_server = GodotMcpBridgeServer.new(_create_session)
+	var listen_error := _bridge_server.listen(GodotMcpAddonInfo.LOOPBACK_ADDRESS, 0)
 	if listen_error != OK:
-		push_error("Godot MCP Tool: the bridge could not listen on %s: %s" % [AddonInfo.LOOPBACK_ADDRESS, error_string(listen_error)])
+		push_error("Godot MCP Tool: the bridge could not listen on %s: %s" % [GodotMcpAddonInfo.LOOPBACK_ADDRESS, error_string(listen_error)])
 		_bridge_server = null
-		return "off: it could not listen on %s (%s)" % [AddonInfo.LOOPBACK_ADDRESS, error_string(listen_error)]
-	var discovery_file := DiscoveryFile.new(_project_path().path_join(AddonInfo.DISCOVERY_RELATIVE_PATH))
+		return "off: it could not listen on %s (%s)" % [GodotMcpAddonInfo.LOOPBACK_ADDRESS, error_string(listen_error)]
+	var discovery_file := GodotMcpDiscoveryFile.new(_project_path().path_join(GodotMcpAddonInfo.DISCOVERY_RELATIVE_PATH))
 	var claim_error := discovery_file.claim(_build_discovery_record())
 	if claim_error == ERR_ALREADY_IN_USE:
 		print("Godot MCP Tool: the editor in process %d already serves this project, so this one keeps its bridge off." % discovery_file.owner_pid())
 		_bridge_server.stop()
 		_bridge_server = null
 		return "off: the editor in process %d already serves this project" % discovery_file.owner_pid()
-	var address := "%s:%d" % [AddonInfo.LOOPBACK_ADDRESS, _bridge_server.get_port()]
+	var address := "%s:%d" % [GodotMcpAddonInfo.LOOPBACK_ADDRESS, _bridge_server.get_port()]
 	if claim_error != OK:
 		push_error("Godot MCP Tool: could not write %s: %s" % [discovery_file.path, error_string(claim_error)])
 		return "listening on %s, but no server finds it: %s could not be written" % [address, discovery_file.path]
@@ -134,9 +134,9 @@ func _start_bridge() -> String:
 	return "listening on %s" % address
 
 
-func _create_session() -> BridgeSession:
-	return BridgeSession.new(
-		Authenticator.new(_token, AddonInfo.BRIDGE_PROTOCOL_VERSION),
+func _create_session() -> GodotMcpBridgeSession:
+	return GodotMcpBridgeSession.new(
+		GodotMcpAuthenticator.new(_token, GodotMcpAddonInfo.BRIDGE_PROTOCOL_VERSION),
 		_router,
 		_build_hello_payload,
 		_read_status,
@@ -168,10 +168,10 @@ func _collect_editor_log() -> void:
 
 func _ensure_runtime_autoload() -> void:
 	var agent_path := (_plugin.get_script() as Script).resource_path.get_base_dir().path_join(RUNTIME_AGENT_FILE)
-	var setting := AUTOLOAD_PREFIX + AddonInfo.RUNTIME_AUTOLOAD_NAME
+	var setting := AUTOLOAD_PREFIX + GodotMcpAddonInfo.RUNTIME_AUTOLOAD_NAME
 	if ProjectSettings.has_setting(setting) and str(ProjectSettings.get_setting(setting)).trim_prefix("*") == agent_path:
 		return
-	_plugin.add_autoload_singleton(AddonInfo.RUNTIME_AUTOLOAD_NAME, agent_path)
+	_plugin.add_autoload_singleton(GodotMcpAddonInfo.RUNTIME_AUTOLOAD_NAME, agent_path)
 	_place_autoload_first(setting)
 	ProjectSettings.save()
 
@@ -190,9 +190,9 @@ func _build_hello_payload() -> Dictionary:
 	var available_methods := PackedStringArray(["hello"])
 	available_methods.append_array(_router.methods())
 	return {
-		"protocol": AddonInfo.BRIDGE_PROTOCOL_VERSION,
-		"godot_version": GodotVersionText.from_version_info(Engine.get_version_info()),
-		"addon_version": AddonInfo.ADDON_VERSION,
+		"protocol": GodotMcpAddonInfo.BRIDGE_PROTOCOL_VERSION,
+		"godot_version": GodotMcpGodotVersionText.from_version_info(Engine.get_version_info()),
+		"addon_version": GodotMcpAddonInfo.ADDON_VERSION,
 		"project_path": _project_path(),
 		"executable_path": OS.get_executable_path(),
 		"methods": available_methods,
@@ -201,12 +201,12 @@ func _build_hello_payload() -> Dictionary:
 
 func _build_discovery_record() -> Dictionary:
 	return {
-		"protocol": AddonInfo.BRIDGE_PROTOCOL_VERSION,
+		"protocol": GodotMcpAddonInfo.BRIDGE_PROTOCOL_VERSION,
 		"port": _bridge_server.get_port(),
 		"token": _token,
 		"pid": OS.get_process_id(),
-		"godot_version": GodotVersionText.from_version_info(Engine.get_version_info()),
-		"addon_version": AddonInfo.ADDON_VERSION,
+		"godot_version": GodotMcpGodotVersionText.from_version_info(Engine.get_version_info()),
+		"addon_version": GodotMcpAddonInfo.ADDON_VERSION,
 		"project_path": _project_path(),
 		"executable_path": OS.get_executable_path(),
 		"lsp_port": int(EditorInterface.get_editor_settings().get_setting(LANGUAGE_SERVER_PORT_SETTING)),

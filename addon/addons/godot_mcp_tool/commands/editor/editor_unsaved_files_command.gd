@@ -1,15 +1,15 @@
 extends "../command.gd"
 
-const EditingContext := preload("../../scene/editing_context.gd")
-const ScriptEditorAccess := preload("../../editor/script_editor_access.gd")
+const GodotMcpEditingContext := preload("../../scene/editing_context.gd")
+const GodotMcpScriptEditorAccess := preload("../../editor/script_editor_access.gd")
 
 const BUILT_IN_RESOURCE_SEPARATOR := "::"
 
-var _context: EditingContext
-var _scripts: ScriptEditorAccess
+var _context: GodotMcpEditingContext
+var _scripts: GodotMcpScriptEditorAccess
 
 
-func _init(context: EditingContext, scripts: ScriptEditorAccess) -> void:
+func _init(context: GodotMcpEditingContext, scripts: GodotMcpScriptEditorAccess) -> void:
 	_context = context
 	_scripts = scripts
 

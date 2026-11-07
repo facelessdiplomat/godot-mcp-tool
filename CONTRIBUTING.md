@@ -70,7 +70,9 @@ The rules live in [CLAUDE.md](CLAUDE.md), which Claude Code follows in this repo
 - **Test first.** Write a failing test, then the code that makes it pass, then tidy up: vitest in `server/`, GUT for
   the classes of the addon, and an integration test when the code needs a real editor or game.
 - **Types everywhere.** TypeScript in strict mode; GDScript with static types. Addon scripts are loaded through
-  `preload` constants instead of `class_name`, so they never clash with the classes of a game.
+  `preload` constants instead of `class_name`, and every member that could have the name of a class starts with
+  `GodotMcp` (ADR-12 in the plan), so the addon never clashes with the classes of a game, its native classes
+  included. `server/test/addon/AddonMemberNames.test.ts` fails when a member breaks this.
 - **English.** Code, descriptions and documents are in English.
 
 ## Changing a tool

@@ -1,8 +1,8 @@
 extends GutTest
 
-const CommandError := preload("res://addons/godot_mcp_tool/commands/command_error.gd")
-const ImportSettings := preload("res://addons/godot_mcp_tool/assets/import_settings.gd")
-const JsonRpc := preload("res://addons/godot_mcp_tool/bridge/json_rpc.gd")
+const GodotMcpCommandError := preload("res://addons/godot_mcp_tool/commands/command_error.gd")
+const GodotMcpImportSettings := preload("res://addons/godot_mcp_tool/assets/import_settings.gd")
+const GodotMcpJsonRpc := preload("res://addons/godot_mcp_tool/bridge/json_rpc.gd")
 const ScratchFolder := preload("res://tests/support/scratch_folder.gd")
 
 const CHARACTER := "res://tests/fixtures/models/character.glb"
@@ -33,7 +33,7 @@ func _part_settings_on_disk(asset_path: String) -> Variant:
 
 
 func test_reads_the_importer_and_the_options() -> void:
-	var settings: ImportSettings = ImportSettings.open(CHARACTER)
+	var settings: GodotMcpImportSettings = GodotMcpImportSettings.open(CHARACTER)
 	assert_eq(settings.importer(), "scene")
 	assert_eq(settings.imported_type(), "PackedScene")
 	assert_has(settings.option_names(), "nodes/root_scale")
@@ -44,11 +44,11 @@ func test_reads_the_importer_and_the_options() -> void:
 
 func test_saves_options_and_node_settings() -> void:
 	var copy := _copied_character()
-	var settings: ImportSettings = ImportSettings.open(copy)
+	var settings: GodotMcpImportSettings = GodotMcpImportSettings.open(copy)
 	settings.set_option("nodes/root_scale", 0.01)
 	settings.set_node_option("Body", "generate/physics", true)
 	assert_eq(settings.save(), OK)
-	var saved: ImportSettings = ImportSettings.open(copy)
+	var saved: GodotMcpImportSettings = GodotMcpImportSettings.open(copy)
 	assert_eq(saved.option("nodes/root_scale"), 0.01)
 	assert_eq(saved.node_settings(), {"Body": {"generate/physics": true}})
 	assert_eq(_part_settings_on_disk(copy), {"nodes": {"PATH:Body": {"generate/physics": true}}})
@@ -60,7 +60,7 @@ func test_keeps_the_settings_of_other_parts() -> void:
 	file.load(copy + ".import")
 	file.set_value("params", "_subresources", {"materials": {"Skin": {"use_external/enabled": true}}, "nodes": {"PATH:Body": {"generate/physics": true}}})
 	file.save(copy + ".import")
-	var settings: ImportSettings = ImportSettings.open(copy)
+	var settings: GodotMcpImportSettings = GodotMcpImportSettings.open(copy)
 	settings.set_node_option("Body", "physics/shape_type", 6)
 	settings.save()
 	assert_eq(
@@ -70,11 +70,11 @@ func test_keeps_the_settings_of_other_parts() -> void:
 
 
 func test_explains_files_that_are_not_imported() -> void:
-	var scene: CommandError = ImportSettings.open("res://tests/fixtures/crate.tscn")
-	assert_eq(scene.code, JsonRpc.INVALID_PARAMS)
+	var scene: GodotMcpCommandError = GodotMcpImportSettings.open("res://tests/fixtures/crate.tscn")
+	assert_eq(scene.code, GodotMcpJsonRpc.INVALID_PARAMS)
 	assert_eq(scene.message, "res://tests/fixtures/crate.tscn is not imported, so it has no import settings")
-	var missing: CommandError = ImportSettings.open("res://models/missing.glb")
-	assert_eq(missing.code, JsonRpc.NOT_FOUND)
+	var missing: GodotMcpCommandError = GodotMcpImportSettings.open("res://models/missing.glb")
+	assert_eq(missing.code, GodotMcpJsonRpc.NOT_FOUND)
 	assert_eq(missing.message, "res://models/missing.glb not found")
-	var outside: CommandError = ImportSettings.open("res://../outside.glb")
-	assert_eq(outside.code, JsonRpc.INVALID_PARAMS)
+	var outside: GodotMcpCommandError = GodotMcpImportSettings.open("res://../outside.glb")
+	assert_eq(outside.code, GodotMcpJsonRpc.INVALID_PARAMS)

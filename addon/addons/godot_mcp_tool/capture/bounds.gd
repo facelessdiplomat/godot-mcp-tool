@@ -1,6 +1,6 @@
 extends RefCounted
 
-const SpatialTransforms := preload("../scene/spatial_transforms.gd")
+const GodotMcpSpatialTransforms := preload("../scene/spatial_transforms.gd")
 
 
 static func measure(node: Node) -> Dictionary:
@@ -12,16 +12,16 @@ static func measure(node: Node) -> Dictionary:
 		if subtree_node is GeometryInstance3D and not _is_particles(subtree_node):
 			var local_bounds := _local_bounds(subtree_node)
 			if local_bounds.size != Vector3.ZERO:
-				var world_bounds := SpatialTransforms.global_of(subtree_node) * local_bounds
+				var world_bounds := GodotMcpSpatialTransforms.global_of(subtree_node) * local_bounds
 				visual = world_bounds if visual_count == 0 else visual.merge(world_bounds)
 				visual_count += 1
 		elif subtree_node is CollisionShape3D and (subtree_node as CollisionShape3D).shape != null:
-			var shape_bounds := SpatialTransforms.global_of(subtree_node) * (subtree_node as CollisionShape3D).shape.get_debug_mesh().get_aabb()
+			var shape_bounds := GodotMcpSpatialTransforms.global_of(subtree_node) * (subtree_node as CollisionShape3D).shape.get_debug_mesh().get_aabb()
 			collision = shape_bounds if collision_count == 0 else collision.merge(shape_bounds)
 			collision_count += 1
 	var measured := visual if visual_count > 0 else collision
 	if visual_count == 0 and collision_count == 0:
-		measured = AABB(SpatialTransforms.global_of(node).origin, Vector3.ZERO)
+		measured = AABB(GodotMcpSpatialTransforms.global_of(node).origin, Vector3.ZERO)
 	return {"aabb": measured, "visual_count": visual_count, "collision_count": collision_count}
 
 

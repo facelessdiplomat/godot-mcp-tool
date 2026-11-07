@@ -1,8 +1,8 @@
 extends "../command.gd"
 
-const InputActions := preload("../../input/input_actions.gd")
-const InputEventCodec := preload("../../input/input_event_codec.gd")
-const Params := preload("../params.gd")
+const GodotMcpInputActions := preload("../../input/input_actions.gd")
+const GodotMcpInputEventCodec := preload("../../input/input_event_codec.gd")
+const GodotMcpParams := preload("../params.gd")
 
 const FORBIDDEN_NAME_CHARACTERS := ["/", ":", "\"", "="]
 const ALL_DEVICES := -1
@@ -15,11 +15,11 @@ func _init(save_settings: Callable) -> void:
 
 
 func execute(params: Dictionary) -> Variant:
-	var actions: Variant = Params.dictionary(params, "actions")
-	if actions is CommandError:
+	var actions: Variant = GodotMcpParams.dictionary(params, "actions")
+	if actions is GodotMcpCommandError:
 		return actions
 	if (actions as Dictionary).is_empty():
-		return CommandError.new(JsonRpc.INVALID_PARAMS, "\"actions\" needs at least one action", "Example: {\"actions\": {\"move_forward\": [\"W\", \"Up\"], \"jump\": [\"Space\"]}}")
+		return GodotMcpCommandError.new(GodotMcpJsonRpc.INVALID_PARAMS, "\"actions\" needs at least one action", "Example: {\"actions\": {\"move_forward\": [\"W\", \"Up\"], \"jump\": [\"Space\"]}}")
 	var applied: Array = []
 	var removed: Array = []
 	var rejected: Array = []
@@ -30,25 +30,25 @@ func execute(params: Dictionary) -> Variant:
 		if rejection.is_empty() and actions[action_key] == null:
 			rejection = _check_removal(action_name)
 			if rejection.is_empty():
-				previous[action_name] = InputActions.described_events(action_name)
-				InputActions.remove(action_name)
+				previous[action_name] = GodotMcpInputActions.described_events(action_name)
+				GodotMcpInputActions.remove(action_name)
 				removed.append(action_name)
 				continue
 		if not rejection.is_empty():
 			rejected.append({"name": action_name, "reason": rejection})
 			continue
-		var parsed: Variant = _parse(actions[action_key], InputActions.deadzone_of(action_name))
+		var parsed: Variant = _parse(actions[action_key], GodotMcpInputActions.deadzone_of(action_name))
 		if parsed is String:
 			rejected.append({"name": action_name, "reason": parsed})
 			continue
-		previous[action_name] = InputActions.described_events(action_name) if InputActions.exists(action_name) else null
-		InputActions.write(action_name, parsed["deadzone"], parsed["events"])
+		previous[action_name] = GodotMcpInputActions.described_events(action_name) if GodotMcpInputActions.exists(action_name) else null
+		GodotMcpInputActions.write(action_name, parsed["deadzone"], parsed["events"])
 		applied.append(action_name)
 	if not applied.is_empty() or not removed.is_empty():
 		var save_error: Error = _save_settings.call()
 		if save_error != OK:
-			return CommandError.new(JsonRpc.OPERATION_FAILED, "The input actions changed but project.godot could not be saved: %s" % error_string(save_error))
-	return {"applied": applied, "removed": removed, "rejected": rejected, "previous": previous, "actions": applied.map(InputActions.describe)}
+			return GodotMcpCommandError.new(GodotMcpJsonRpc.OPERATION_FAILED, "The input actions changed but project.godot could not be saved: %s" % error_string(save_error))
+	return {"applied": applied, "removed": removed, "rejected": rejected, "previous": previous, "actions": applied.map(GodotMcpInputActions.describe)}
 
 
 static func _check_name(action_name: String) -> String:
@@ -61,9 +61,9 @@ static func _check_name(action_name: String) -> String:
 
 
 static func _check_removal(action_name: String) -> String:
-	if InputActions.is_built_in_action(action_name):
+	if GodotMcpInputActions.is_built_in_action(action_name):
 		return "Built-in ui_ actions cannot be removed; give them other events instead"
-	if not InputActions.exists(action_name):
+	if not GodotMcpInputActions.exists(action_name):
 		return "There is no input action \"%s\" to remove" % action_name
 	return ""
 
@@ -81,7 +81,7 @@ static func _parse(description: Variant, current_deadzone: float) -> Variant:
 		return "Give the events as a list, such as [\"W\", \"Up\"]"
 	var events: Array = []
 	for event_description in event_descriptions:
-		var event: Variant = InputEventCodec.decode(event_description)
+		var event: Variant = GodotMcpInputEventCodec.decode(event_description)
 		if event is String:
 			return event
 		(event as InputEvent).device = ALL_DEVICES

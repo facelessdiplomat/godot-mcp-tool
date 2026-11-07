@@ -1,6 +1,6 @@
 extends GutTest
 
-const NodeLocator := preload("res://addons/godot_mcp_tool/scene/node_locator.gd")
+const GodotMcpNodeLocator := preload("res://addons/godot_mcp_tool/scene/node_locator.gd")
 
 var _root: Node3D
 var _player: CharacterBody3D
@@ -19,27 +19,27 @@ func before_each() -> void:
 
 
 func test_finds_the_root_by_dot_or_empty_path() -> void:
-	assert_eq(NodeLocator.find(_root, "."), _root)
-	assert_eq(NodeLocator.find(_root, ""), _root)
+	assert_eq(GodotMcpNodeLocator.find(_root, "."), _root)
+	assert_eq(GodotMcpNodeLocator.find(_root, ""), _root)
 
 
 func test_finds_nested_nodes_by_relative_path() -> void:
-	assert_eq(NodeLocator.find(_root, "Player/Camera"), _camera)
+	assert_eq(GodotMcpNodeLocator.find(_root, "Player/Camera"), _camera)
 
 
 func test_accepts_paths_that_start_with_the_root_name() -> void:
-	assert_eq(NodeLocator.find(_root, "Arena"), _root)
-	assert_eq(NodeLocator.find(_root, "Arena/Player"), _player)
+	assert_eq(GodotMcpNodeLocator.find(_root, "Arena"), _root)
+	assert_eq(GodotMcpNodeLocator.find(_root, "Arena/Player"), _player)
 
 
 func test_returns_null_for_a_missing_node() -> void:
-	assert_null(NodeLocator.find(_root, "Player/Mesh"))
+	assert_null(GodotMcpNodeLocator.find(_root, "Player/Mesh"))
 
 
 func test_describes_paths_relative_to_the_root() -> void:
-	assert_eq(NodeLocator.path_of(_root, _root), ".")
-	assert_eq(NodeLocator.path_of(_root, _camera), "Player/Camera")
+	assert_eq(GodotMcpNodeLocator.path_of(_root, _root), ".")
+	assert_eq(GodotMcpNodeLocator.path_of(_root, _camera), "Player/Camera")
 
 
 func test_suggests_similar_existing_paths() -> void:
-	assert_has(NodeLocator.similar_paths(_root, "Player/Camra"), "Player/Camera")
+	assert_has(GodotMcpNodeLocator.similar_paths(_root, "Player/Camra"), "Player/Camera")

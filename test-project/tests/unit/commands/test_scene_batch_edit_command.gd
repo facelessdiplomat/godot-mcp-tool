@@ -1,13 +1,13 @@
 extends GutTest
 
-const CommandError := preload("res://addons/godot_mcp_tool/commands/command_error.gd")
-const EditingContext := preload("res://addons/godot_mcp_tool/scene/editing_context.gd")
+const GodotMcpCommandError := preload("res://addons/godot_mcp_tool/commands/command_error.gd")
+const GodotMcpEditingContext := preload("res://addons/godot_mcp_tool/scene/editing_context.gd")
 const FakeSceneAccess := preload("res://tests/support/fake_scene_access.gd")
 const FakeScriptEditorAccess := preload("res://tests/support/fake_script_editor_access.gd")
-const JsonRpc := preload("res://addons/godot_mcp_tool/bridge/json_rpc.gd")
-const PlainUndoHistory := preload("res://addons/godot_mcp_tool/scene/plain_undo_history.gd")
-const SceneBatchEditCommand := preload("res://addons/godot_mcp_tool/commands/scene/scene_batch_edit_command.gd")
-const VariantCodec := preload("res://addons/godot_mcp_tool/codec/variant_codec.gd")
+const GodotMcpJsonRpc := preload("res://addons/godot_mcp_tool/bridge/json_rpc.gd")
+const GodotMcpPlainUndoHistory := preload("res://addons/godot_mcp_tool/scene/plain_undo_history.gd")
+const GodotMcpSceneBatchEditCommand := preload("res://addons/godot_mcp_tool/commands/scene/scene_batch_edit_command.gd")
+const GodotMcpVariantCodec := preload("res://addons/godot_mcp_tool/codec/variant_codec.gd")
 
 const ARENA_SCRIPT := """extends Node3D
 
@@ -17,8 +17,8 @@ func _on_start_pressed() -> void:
 """
 
 var _scenes: FakeSceneAccess
-var _history: PlainUndoHistory
-var _context: EditingContext
+var _history: GodotMcpPlainUndoHistory
+var _context: GodotMcpEditingContext
 var _root: Node3D
 
 
@@ -33,8 +33,8 @@ func before_each() -> void:
 	_root.scene_file_path = "res://levels/arena.tscn"
 	_scenes.edited_root = _root
 	add_child(_root)
-	_history = PlainUndoHistory.new()
-	_context = EditingContext.new(_scenes, _history, VariantCodec.new(), FakeScriptEditorAccess.new())
+	_history = GodotMcpPlainUndoHistory.new()
+	_context = GodotMcpEditingContext.new(_scenes, _history, GodotMcpVariantCodec.new(), FakeScriptEditorAccess.new())
 
 
 func after_each() -> void:
@@ -50,7 +50,7 @@ func _add_owned(parent: Node, node: Node, node_name: String) -> Node:
 
 
 func _batch(operations: Array) -> Variant:
-	return await SceneBatchEditCommand.new(_context).execute({"operations": operations})
+	return await GodotMcpSceneBatchEditCommand.new(_context).execute({"operations": operations})
 
 
 func test_applies_operations_that_build_on_each_other_as_one_undo_step() -> void:
@@ -79,10 +79,10 @@ func test_changes_nothing_when_an_operation_fails() -> void:
 		{"op": "node_delete", "paths": ["Crate"]},
 		{"op": "node_set_properties", "path": "Ghost", "properties": {"visible": false}},
 	])
-	assert_true(error is CommandError)
-	assert_eq((error as CommandError).code, JsonRpc.NOT_FOUND)
-	assert_string_contains((error as CommandError).message, "Operation 3 (node_set_properties)")
-	assert_string_contains((error as CommandError).message, "Nothing was changed")
+	assert_true(error is GodotMcpCommandError)
+	assert_eq((error as GodotMcpCommandError).code, GodotMcpJsonRpc.NOT_FOUND)
+	assert_string_contains((error as GodotMcpCommandError).message, "Operation 3 (node_set_properties)")
+	assert_string_contains((error as GodotMcpCommandError).message, "Nothing was changed")
 	assert_null(_root.get_node_or_null("Player"))
 	assert_not_null(_root.get_node_or_null("Crate"))
 	assert_eq(_root.get_node("Crate").owner, _root)
@@ -91,8 +91,8 @@ func test_changes_nothing_when_an_operation_fails() -> void:
 
 func test_fails_when_a_property_is_rejected() -> void:
 	var error: Variant = await _batch([{"op": "node_add", "type": "CharacterBody3D", "name": "Player", "properties": {"speed": 5}}])
-	assert_true(error is CommandError)
-	assert_string_contains((error as CommandError).message, "speed")
+	assert_true(error is GodotMcpCommandError)
+	assert_string_contains((error as GodotMcpCommandError).message, "speed")
 	assert_null(_root.get_node_or_null("Player"))
 
 
@@ -144,16 +144,16 @@ func test_sets_groups_of_nodes_added_in_the_same_batch() -> void:
 
 func test_explains_an_unknown_operation() -> void:
 	var error: Variant = await _batch([{"op": "node_fly"}])
-	assert_true(error is CommandError)
-	assert_string_contains((error as CommandError).message, "Operation 1")
-	assert_string_contains((error as CommandError).hint, "node_add")
+	assert_true(error is GodotMcpCommandError)
+	assert_string_contains((error as GodotMcpCommandError).message, "Operation 1")
+	assert_string_contains((error as GodotMcpCommandError).hint, "node_add")
 
 
 func test_refuses_an_operation_with_a_scene_of_its_own() -> void:
 	var error: Variant = await _batch([{"op": "node_add", "type": "Node3D", "scene": "res://other.tscn"}])
-	assert_eq((error as CommandError).code, JsonRpc.INVALID_PARAMS)
+	assert_eq((error as GodotMcpCommandError).code, GodotMcpJsonRpc.INVALID_PARAMS)
 
 
 func test_needs_operations() -> void:
 	var error: Variant = await _batch([])
-	assert_eq((error as CommandError).code, JsonRpc.INVALID_PARAMS)
+	assert_eq((error as GodotMcpCommandError).code, GodotMcpJsonRpc.INVALID_PARAMS)

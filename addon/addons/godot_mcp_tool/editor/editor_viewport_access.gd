@@ -1,6 +1,6 @@
 extends RefCounted
 
-const ViewRenderer := preload("../capture/view_renderer.gd")
+const GodotMcpViewRenderer := preload("../capture/view_renderer.gd")
 
 const MAIN_VIEWPORT := 0
 const EDITOR_CAMERA_LABEL := "editor camera"
@@ -24,8 +24,8 @@ func viewport_size() -> Vector2i:
 	return size if size.x > 0 and size.y > 0 else FALLBACK_SIZE
 
 
-func renderer() -> ViewRenderer:
-	return ViewRenderer.new(EditorInterface.get_base_control(), _draw_now)
+func renderer() -> GodotMcpViewRenderer:
+	return GodotMcpViewRenderer.new(EditorInterface.get_base_control(), _draw_now)
 
 
 static func _draw_now() -> void:

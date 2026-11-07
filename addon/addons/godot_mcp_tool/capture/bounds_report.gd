@@ -1,19 +1,19 @@
 extends RefCounted
 
-const Bounds := preload("bounds.gd")
-const CommandError := preload("../commands/command_error.gd")
-const JsonRpc := preload("../bridge/json_rpc.gd")
-const NodeFactory := preload("../scene/node_factory.gd")
-const VariantCodec := preload("../codec/variant_codec.gd")
+const GodotMcpBounds := preload("bounds.gd")
+const GodotMcpCommandError := preload("../commands/command_error.gd")
+const GodotMcpJsonRpc := preload("../bridge/json_rpc.gd")
+const GodotMcpNodeFactory := preload("../scene/node_factory.gd")
+const GodotMcpVariantCodec := preload("../codec/variant_codec.gd")
 
 const DECIMAL_SCALE := 1000.0
 
 
-static func describe(node: Node, codec: VariantCodec) -> Variant:
+static func describe(node: Node, codec: GodotMcpVariantCodec) -> Variant:
 	var not_3d := _not_3d_error(node)
 	if not_3d != null:
 		return not_3d
-	var measured := Bounds.measure(node)
+	var measured := GodotMcpBounds.measure(node)
 	var aabb := measured["aabb"] as AABB
 	return {
 		"position": codec.encode(_rounded(aabb.position)),
@@ -29,15 +29,15 @@ static func framing_bounds(node: Node, is_whole_scene: bool) -> Variant:
 	var not_3d := _not_3d_error(node)
 	if not_3d != null and not is_whole_scene:
 		return not_3d
-	return Bounds.measure(node)["aabb"]
+	return GodotMcpBounds.measure(node)["aabb"]
 
 
-static func _not_3d_error(node: Node) -> CommandError:
+static func _not_3d_error(node: Node) -> GodotMcpCommandError:
 	if node is Node3D:
 		return null
-	return CommandError.new(
-		JsonRpc.INVALID_PARAMS,
-		"\"%s\" is a %s, not a 3D node" % [node.name, NodeFactory.display_class(node)],
+	return GodotMcpCommandError.new(
+		GodotMcpJsonRpc.INVALID_PARAMS,
+		"\"%s\" is a %s, not a 3D node" % [node.name, GodotMcpNodeFactory.display_class(node)],
 		"Bounds are measured for Node3D nodes, such as MeshInstance3D, CSGBox3D or CharacterBody3D, together with their children.",
 	)
 
