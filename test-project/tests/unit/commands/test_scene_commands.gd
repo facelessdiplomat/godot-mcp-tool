@@ -173,6 +173,32 @@ func test_saves_the_edited_scene() -> void:
 	assert_eq(_scenes.saved_paths, PackedStringArray(["res://levels/arena.tscn"]))
 
 
+func test_reports_the_saved_scene_when_the_editor_replaces_its_root_while_saving() -> void:
+	_build_arena()
+	_scenes.while_saving = _scenes.replace_edited_root
+	var result: Dictionary = await GodotMcpSceneSaveCommand.new(_context).execute({})
+	assert_eq(result["saved"], ["res://levels/arena.tscn"])
+	assert_eq(_scenes.saved_paths, PackedStringArray(["res://levels/arena.tscn"]))
+
+
+func test_saves_the_root_that_replaced_the_scene_while_scripts_were_prepared() -> void:
+	_build_arena()
+	_scripts.while_reloading = _scenes.replace_edited_root
+	var result: Dictionary = await GodotMcpSceneSaveCommand.new(_context).execute({})
+	assert_eq(result["saved"], ["res://levels/arena.tscn"])
+	assert_eq(_scenes.saved_paths, PackedStringArray(["res://levels/arena.tscn"]))
+
+
+func test_reports_a_scene_closed_while_scripts_were_prepared() -> void:
+	_build_arena()
+	_scripts.while_reloading = _scenes.release
+	var error: Variant = await GodotMcpSceneSaveCommand.new(_context).execute({})
+	assert_true(error is GodotMcpCommandError)
+	assert_eq((error as GodotMcpCommandError).code, GodotMcpJsonRpc.NOT_FOUND)
+	assert_string_contains((error as GodotMcpCommandError).message, "was closed")
+	assert_eq(_scenes.saved_paths, PackedStringArray())
+
+
 func test_reports_unsaved_scripts_that_the_save_writes() -> void:
 	_build_arena()
 	_scripts.unsaved = PackedStringArray(["res://player/player.gd"])
@@ -213,6 +239,26 @@ func test_saves_unsaved_changes_before_closing_on_request() -> void:
 	assert_eq(_scenes.saved_paths, PackedStringArray(["res://levels/arena.tscn"]))
 	assert_eq(result["saved"], true)
 	assert_eq(_scenes.closed_paths, PackedStringArray(["res://levels/arena.tscn"]))
+
+
+func test_closes_the_root_that_replaced_the_scene_while_its_changes_were_saved() -> void:
+	var root := _build_arena()
+	_scenes.unsaved_roots.append(root)
+	_scenes.while_saving = _scenes.replace_edited_root
+	var result: Dictionary = await GodotMcpSceneCloseCommand.new(_context).execute({"unsaved": "save"})
+	assert_eq(_scenes.saved_paths, PackedStringArray(["res://levels/arena.tscn"]))
+	assert_eq(_scenes.closed_paths, PackedStringArray(["res://levels/arena.tscn"]))
+	assert_eq(result["closed"], "res://levels/arena.tscn")
+	assert_eq(result["saved"], true)
+
+
+func test_reports_a_scene_closed_while_its_changes_were_saved_as_closed() -> void:
+	var root := _build_arena()
+	_scenes.unsaved_roots.append(root)
+	_scenes.while_saving = _scenes.release
+	var result: Dictionary = await GodotMcpSceneCloseCommand.new(_context).execute({"unsaved": "save"})
+	assert_eq(_scenes.closed_paths, PackedStringArray())
+	assert_eq_deep(result, {"closed": "res://levels/arena.tscn", "saved": true, "discarded_changes": false, "current": ""})
 
 
 func test_discards_unsaved_changes_on_request() -> void:

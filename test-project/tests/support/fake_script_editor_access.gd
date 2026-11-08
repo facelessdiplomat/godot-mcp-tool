@@ -5,6 +5,7 @@ var open_scripts := PackedStringArray()
 var changed_outside := PackedStringArray()
 var reload_count := 0
 var breakpoint_lines := PackedStringArray()
+var while_reloading := Callable()
 
 
 func unsaved_files() -> PackedStringArray:
@@ -17,6 +18,8 @@ func open_script_paths() -> PackedStringArray:
 
 func reload_open_files() -> void:
 	reload_count += 1
+	if while_reloading.is_valid():
+		while_reloading.call()
 
 
 func files_changed_outside() -> PackedStringArray:

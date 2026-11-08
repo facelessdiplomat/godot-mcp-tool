@@ -8,6 +8,7 @@ var closed_paths := PackedStringArray()
 var selected_nodes: Array[Node] = []
 var selected_file := ""
 var reloaded_paths := PackedStringArray()
+var while_saving := Callable()
 
 
 func edited_scene_root() -> Node:
@@ -34,7 +35,17 @@ func open_scene(scene_path: String) -> Error:
 
 func save_scene(scene_root: Node) -> Error:
 	saved_paths.append(scene_root.scene_file_path)
+	if while_saving.is_valid():
+		while_saving.call()
 	return OK
+
+
+func replace_edited_root() -> void:
+	var replacement: Node = ClassDB.instantiate(edited_root.get_class())
+	replacement.name = edited_root.name
+	replacement.scene_file_path = edited_root.scene_file_path
+	edited_root.free()
+	edited_root = replacement
 
 
 func is_scene_unsaved(scene_root: Node) -> bool:

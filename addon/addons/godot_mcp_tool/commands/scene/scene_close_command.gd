@@ -37,14 +37,21 @@ func execute(params: Dictionary) -> Variant:
 		if save_error != OK:
 			return GodotMcpCommandError.new(GodotMcpJsonRpc.OPERATION_FAILED, "Could not save %s, so it stays open: %s" % [closed_path, error_string(save_error)])
 		saved = true
+		scene_root = _context.scenes.find_open_root(closed_path)
+	if scene_root == null:
+		return _closed_result(closed_path, saved, false)
 	var close_error := access.close_scene(scene_root)
 	if close_error != OK:
 		return GodotMcpCommandError.new(GodotMcpJsonRpc.OPERATION_FAILED, "Could not close %s: %s" % [closed_path, error_string(close_error)])
-	var current_root := access.edited_scene_root()
+	return _closed_result(closed_path, saved, has_unsaved_changes and unsaved_choice == DISCARD_CHANGES)
+
+
+func _closed_result(closed_path: String, saved: bool, discarded_changes: bool) -> Dictionary:
+	var current_root := _context.scenes.access.edited_scene_root()
 	return {
 		"closed": closed_path,
 		"saved": saved,
-		"discarded_changes": has_unsaved_changes and unsaved_choice == DISCARD_CHANGES,
+		"discarded_changes": discarded_changes,
 		"current": current_root.scene_file_path if current_root != null else "",
 	}
 

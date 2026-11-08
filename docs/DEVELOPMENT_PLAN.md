@@ -1613,6 +1613,9 @@ The whole integration suite, run next to that editor, found two more problems:
       on Godot 4.8 beta 2, and `npx -y godot-mcp-tool@0.1.0` now starts the server that the plugin asks for.
 - [x] Version 0.1.1: a game that registered a native class named like a member of an addon script, such as
       `GameTime`, stopped the addon scripts from parsing; every such member now starts with `GodotMcp` (ADR-12).
+- [x] Version 0.1.2: `scene_save` reported an error for a scene that it had saved, and `scene_close` with
+      `unsaved: "save"` could close a freed scene, when the editor rebuilt the root of the scene meanwhile because the
+      scenes instanced in it had changed; both commands now look the root up again by the path of the scene.
 - [ ] Publication to the Godot Asset Store (it replaced the Asset Library in 4.7).
 
 **Done when** the package is published, CI is green and the user documentation passes its check (below).
