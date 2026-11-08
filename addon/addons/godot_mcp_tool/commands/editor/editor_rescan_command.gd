@@ -1,5 +1,6 @@
 extends "../command.gd"
 
+const GodotMcpExtensionAccess := preload("../../editor/extension_access.gd")
 const GodotMcpFileSystemAccess := preload("../../editor/file_system_access.gd")
 const GodotMcpParams := preload("../params.gd")
 const GodotMcpScriptEditorAccess := preload("../../editor/script_editor_access.gd")
@@ -9,11 +10,13 @@ const DEFAULT_TIMEOUT_MSEC := 60_000
 
 var _file_system: GodotMcpFileSystemAccess
 var _scripts: GodotMcpScriptEditorAccess
+var _extensions: GodotMcpExtensionAccess
 
 
-func _init(file_system: GodotMcpFileSystemAccess, scripts: GodotMcpScriptEditorAccess) -> void:
+func _init(file_system: GodotMcpFileSystemAccess, scripts: GodotMcpScriptEditorAccess, extensions: GodotMcpExtensionAccess) -> void:
 	_file_system = file_system
 	_scripts = scripts
+	_extensions = extensions
 
 
 func execute(params: Dictionary) -> Variant:
@@ -22,9 +25,10 @@ func execute(params: Dictionary) -> Variant:
 		return timeout_msec
 	var started_msec := Time.get_ticks_msec()
 	var applied_before := _file_system.applied_scans()
+	var reloaded_extensions := _extensions.take_reloaded()
 	if not _file_system.is_scanning():
 		_file_system.scan()
 	if not await GodotMcpWaiting.until(func() -> bool: return _file_system.applied_scans() != applied_before, timeout_msec):
 		return GodotMcpCommandError.new(GodotMcpJsonRpc.TIMEOUT, "The file system scan did not finish within %d ms" % timeout_msec, "Large projects may need a longer timeout_ms.")
 	await _scripts.reload_open_files()
-	return {"duration_ms": Time.get_ticks_msec() - started_msec}
+	return {"duration_ms": Time.get_ticks_msec() - started_msec, "reloaded_extensions": reloaded_extensions}

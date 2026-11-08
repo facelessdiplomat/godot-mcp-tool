@@ -46,12 +46,6 @@ const settingsWriteSchema = applyReportSchema.extend({ previous: z.record(z.stri
 
 type SettingsWrite = z.infer<typeof settingsWriteSchema>;
 
-const rescanSchema = z.object({ duration_ms: z.number() });
-
-type Rescan = z.infer<typeof rescanSchema>;
-
-const rescanTimeoutMs = 90_000;
-
 const projectInfoInput = z.object({});
 
 export function createProjectInfoTool(editor: EditorGateway): BridgeTool<typeof projectInfoInput, ProjectInfo> {
@@ -177,27 +171,6 @@ export function createProjectSettingsSetTool(editor: EditorGateway): BridgeTool<
       const previousText = previousValues.map(([name, value]) => `${name} = ${formatValue(value)}`).join('; ');
       return textResult(`Saved project.godot.\n${formatApplyReport(result)}\nPrevious values: ${previousText}`);
     },
-  });
-}
-
-const editorRescanInput = z.object({});
-
-export function createEditorRescanTool(editor: EditorGateway): BridgeTool<typeof editorRescanInput, Rescan> {
-  return new BridgeTool(editor, {
-    name: 'editor_rescan',
-    definition: {
-      title: 'Rescan project files',
-      description:
-        'Make the editor pick up files changed outside it, such as scripts, scenes or assets written to disk: rescan the project, import new assets and reload changed scripts. Call it after writing files and before using them in scenes.',
-      inputSchema: editorRescanInput,
-      annotations: changingAnnotations({ destructive: false, idempotent: true }),
-      alwaysLoad: true,
-    },
-    method: 'editor.rescan',
-    responseSchema: rescanSchema,
-    timeoutMs: rescanTimeoutMs,
-    present: ({ duration_ms }) =>
-      textResult(`The editor rescanned the project files in ${String(duration_ms)} ms and reloaded scripts changed on disk.`),
   });
 }
 

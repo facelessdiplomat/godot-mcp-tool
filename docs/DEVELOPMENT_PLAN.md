@@ -430,7 +430,7 @@ reads either one.
 
 | Tool | What it does | M | Kind | Needs |
 |---|---|---|---|---|
-| `editor_rescan` | Sync the editor with the disk (§9.3): scan, reimport, reload open scripts; wait until done | 1 | W (idempotent) | E (C: `--headless --import`) |
+| `editor_rescan` | Sync the editor with the disk (§9.3): reload rebuilt GDExtensions, scan, reimport, reload open scripts; wait until done | 1 | W (idempotent) | E (C: `--headless --import`) |
 | `editor_launch` | Launch the editor for the project and wait until the addon connects; with a window unless `headless`; refuses to start a second editor while one is registered in the discovery file | 2 | W | C |
 | `editor_screenshot` | Render of the 3D scene open in the editor from the editor camera or from given views (§8.9), without the grid and gizmos; says when the editor's preview sun and sky light it. 2D scenes and UI are checked with `game_screenshot`; a capture of the whole editor window is not planned yet | 2 | R | E |
 | `editor_select` | Select nodes or files so the user sees what the agent is talking about | 3 | W (harmless) | E |
@@ -824,6 +824,9 @@ What we do:
   unsaved changes reload without a dialog; `godot_status` warns when it is off;
 - UIDs (Godot 4.4+): a new script gets its `.uid` file only after a scan, so a new file can be referenced only after
   a sync. Files must be moved together with their `.uid`/`.import` files (`filesystem_move`).
+- GDExtension libraries rebuilt on disk: `editor_rescan` first asks the editor to reload them the way it does when
+  its window gets focus, so scripts see the new classes and methods without the user clicking into the editor
+  (ADR-13).
 
 How it is implemented (milestone 1): the addon relies on the engine's own check. `ScriptEditor.reload_open_files()`
 compares each open tab's last known modification time with the disk; tabs without unsaved changes reload silently
@@ -1615,7 +1618,10 @@ The whole integration suite, run next to that editor, found two more problems:
       `GameTime`, stopped the addon scripts from parsing; every such member now starts with `GodotMcp` (ADR-12).
 - [x] Version 0.1.2: `scene_save` reported an error for a scene that it had saved, and `scene_close` with
       `unsaved: "save"` could close a freed scene, when the editor rebuilt the root of the scene meanwhile because the
-      scenes instanced in it had changed; both commands now look the root up again by the path of the scene.
+      scenes instanced in it had changed; both commands now look the root up again by the path of the scene. Also,
+      `editor_rescan` reloads GDExtension libraries rebuilt on disk, which the editor otherwise does only when its
+      window gets focus, so an agent that rebuilds a native library no longer has to ask the user to click into the
+      editor (ADR-13).
 - [ ] Publication to the Godot Asset Store (it replaced the Asset Library in 4.7).
 
 **Done when** the package is published, CI is green and the user documentation passes its check (below).
@@ -1905,6 +1911,27 @@ in the Claude Code CLI — `claude --debug=mcp` (the server's stderr ends up in 
   leading underscore would be just as safe but is unusual for constants, and a short `Mcp` prefix could meet the
   classes of another MCP extension. Cost: longer names in the addon scripts.
 
+### ADR-13. `editor_rescan` reloads rebuilt GDExtensions through the editor's focus-in handling
+
+- The editor reloads a GDExtension whose library changed on disk only when its window gets focus: `EditorNode`
+  answers `NOTIFICATION_APPLICATION_FOCUS_IN` by rescanning and deferring `GDExtensionManager::reload_extensions()`,
+  which reloads the changed reloadable libraries and then every script. Until then scripts that use new classes or
+  methods of the library fail to parse, so an agent that rebuilt a native library had to ask the user to click into
+  the editor (found while building dark-life, whose game logic is a GDExtension).
+- Scripts can call `GDExtensionManager.reload_extension()`, but it reloads whether or not the library changed
+  (`has_library_changed()` is not exposed) and leaves the scripts alone, whose compiled code keeps method binds of
+  the old library.
+- So the addon sends the editor node, the parent of `EditorInterface.get_base_control()`, the focus-in notification
+  and keeps the low-processor sleep that was set before, since the notification restores the focused one. The reload
+  of every script that follows also reloads the addon scripts and cancels their suspended functions, so a command
+  that awaited it would never answer: the request to reload, `editor.reload_extensions`, answers at once, and
+  `editor_rescan` sends the scan, `editor.rescan`, as a second request, which the addon reads after the reload. The
+  scan reports the extensions that `extension_loaded` named in between. With an addon that lacks the first method,
+  `editor_rescan` only scans.
+- Cost: the addon relies on the place of the editor node and runs the rest of the focus-in handling too, such as the
+  check for open scenes changed on disk; other commands that wait at that moment, such as `game_wait`, lose their
+  answer.
+
 ---
 
 ## Appendix B. Verified Godot API facts
@@ -1938,6 +1965,7 @@ Checked against the sources in `~/Software/godot` (`master`, 4.8-beta, commit `6
 | The editor starts its plugins inside its first scan (`_first_scan_filesystem` calls `EditorNode::init_plugins`), before it imports new and changed files; `EditorFileSystem.is_scanning()` includes the `first_scan` flag, which turns false only after that import | `editor/file_system/editor_file_system.cpp` |
 | `project.godot` is written with its sections in alphabetical order (`_save_settings_text` walks an `RBMap` of sections) and a blank line after each header and each section | `core/config/project_settings.cpp` |
 | When an editor plugin's scripts change on disk, the running editor reloads them in place: a member variable that the new code adds starts empty, because `_enter_tree` has already run, so the plugin may fail until the editor restarts | observed on 4.8 |
+| The editor reloads changed GDExtension libraries only on `NOTIFICATION_APPLICATION_FOCUS_IN` of `EditorNode`, which defers `GDExtensionManager::reload_extensions()`: it reloads each reloadable extension whose `.gdextension` file or library has a new modification time, emits `extension_loaded` for each and `extensions_reloaded` once, then defers `_reload_all_scripts()`. Scripts may call `reload_extension(path)`, which reloads unconditionally and reloads no scripts; `has_library_changed()` and `is_reloadable()` are not bound. `EditorNode` is the parent of `EditorInterface.get_base_control()`. Reloading all scripts cancels the suspended functions of every reloaded script, the addon's included, while the members of their instances keep their values | `editor/editor_node.cpp`, `core/extension/gdextension_manager.cpp`, `core/extension/gdextension_library_loader.cpp`, observed on 4.8 |
 | `EditorDock` and `EditorPlugin.add_dock()` exist since 4.6; `add_control_to_dock()` and `add_control_to_bottom_panel()` now wrap a control in an `EditorDock` and exist only in builds with deprecated APIs (without `DISABLE_DEPRECATED`) | `editor/plugins/editor_plugin.cpp`, `doc/classes/EditorDock.xml` |
 | A dock added to a side slot of a default-size editor window lands behind the scroll arrows of its tab bar, while the bottom panel has room for one more tab | observed on 4.8 |
 | An unfocused editor window redraws only when something changes, so `RenderingServer.frame_post_draw` may not come for a long time; `RenderingServer.force_draw()` draws it at once | observed on 4.8 |

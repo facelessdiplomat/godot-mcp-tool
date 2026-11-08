@@ -18,8 +18,8 @@ import {
   createNodeSetGroupsTool,
   createNodeSetPropertiesTool,
 } from './nodeTools.js';
+import { EditorRescanTool } from './EditorRescanTool.js';
 import {
-  createEditorRescanTool,
   createEditorSelectTool,
   createProjectInfoTool,
   createProjectSettingsGetTool,
@@ -35,7 +35,7 @@ export function createEditorTools(editor: EditorGateway, projectReader: EditorGa
     createProjectInfoTool(projectReader),
     createProjectSettingsGetTool(projectReader),
     createProjectSettingsSetTool(editor),
-    createEditorRescanTool(editor),
+    new EditorRescanTool(editor),
     createEditorScreenshotTool(editor, readCapture),
     createInputMapGetTool(projectReader),
     createInputMapSetTool(editor),

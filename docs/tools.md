@@ -47,7 +47,7 @@ No parameters.
 
 ### `editor_rescan`
 
-**Rescan project files.** Make the editor pick up files changed outside it, such as scripts, scenes or assets written to disk: rescan the project, import new assets and reload changed scripts. Call it after writing files and before using them in scenes.
+**Rescan project files.** Make the editor pick up files changed outside it, such as scripts, scenes or assets written to disk and GDExtension libraries rebuilt by a native build: reload the rebuilt GDExtensions, rescan the project, import new assets and reload changed scripts, as the editor does when its window gets focus. Call it after writing files or rebuilding a GDExtension, before using them in scenes or validating scripts that use them.
 
 *Makes changes · loaded at the start*
 

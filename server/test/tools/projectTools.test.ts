@@ -1,7 +1,6 @@
 import type { CallToolResult } from '@modelcontextprotocol/server';
 import { describe, expect, it } from 'vitest';
 import {
-  createEditorRescanTool,
   createEditorSelectTool,
   createProjectInfoTool,
   createProjectSettingsGetTool,
@@ -155,13 +154,5 @@ describe('project tools', () => {
     const text = textOf(await createProjectSettingsSetTool(editor).execute({ values: { 'application/run/main_scene': 'res://levels/arena.tscn' } }));
 
     expect(text).toBe('Saved project.godot.\nApplied: application/run/main_scene\nPrevious values: application/run/main_scene = ""');
-  });
-
-  it('editor_rescan reports the duration', async () => {
-    const editor = new FakeEditorGateway().respondTo('editor.rescan', { duration_ms: 120 });
-
-    const text = textOf(await createEditorRescanTool(editor).execute({}));
-
-    expect(text).toBe('The editor rescanned the project files in 120 ms and reloaded scripts changed on disk.');
   });
 });

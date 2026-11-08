@@ -21,7 +21,8 @@ are described in the files linked at the end.
 ## The loop: change, check, run, observe
 
 1. **Scripts**: write `.gd` files with your own file tools, then check them with `script_validate`. After creating or
-   changing scripts that scenes use, or adding a `class_name`, call `editor_rescan`.
+   changing scripts that scenes use, adding a `class_name` or rebuilding a GDExtension library, call `editor_rescan`:
+   it also reloads the rebuilt library, so scripts see its new classes and methods.
 2. **Scenes**: never edit `.tscn` or `.tres` files as text while the editor runs. Build with `scene_create` and
    `scene_batch_edit` (many changes as one Undo step; nothing changes when one of them fails), adjust with the
    `node_` tools, connect signals with `signal_connect`. Shared materials and other resources: `resource_create`,

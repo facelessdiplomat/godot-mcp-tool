@@ -2,6 +2,7 @@ extends GutTest
 
 const GodotMcpCommandError := preload("res://addons/godot_mcp_tool/commands/command_error.gd")
 const GodotMcpEditorRescanCommand := preload("res://addons/godot_mcp_tool/commands/editor/editor_rescan_command.gd")
+const FakeExtensionAccess := preload("res://tests/support/fake_extension_access.gd")
 const FakeFileSystemAccess := preload("res://tests/support/fake_file_system_access.gd")
 const FakeScriptEditorAccess := preload("res://tests/support/fake_script_editor_access.gd")
 const GodotMcpJsonRpc := preload("res://addons/godot_mcp_tool/bridge/json_rpc.gd")
@@ -10,6 +11,7 @@ const FINISH_WAIT_SECONDS := 2.0
 
 var _file_system: FakeFileSystemAccess
 var _scripts: FakeScriptEditorAccess
+var _extensions: FakeExtensionAccess
 var _command: GodotMcpEditorRescanCommand
 var _outcome: Variant
 var _finished := false
@@ -18,7 +20,8 @@ var _finished := false
 func before_each() -> void:
 	_file_system = FakeFileSystemAccess.new()
 	_scripts = FakeScriptEditorAccess.new()
-	_command = GodotMcpEditorRescanCommand.new(_file_system, _scripts)
+	_extensions = FakeExtensionAccess.new()
+	_command = GodotMcpEditorRescanCommand.new(_file_system, _scripts, _extensions)
 	_outcome = null
 	_finished = false
 
@@ -75,3 +78,19 @@ func test_gives_up_when_the_scan_is_not_applied_within_the_timeout() -> void:
 	assert_true(_outcome is GodotMcpCommandError)
 	assert_eq((_outcome as GodotMcpCommandError).code, GodotMcpJsonRpc.TIMEOUT)
 	assert_eq(_scripts.reload_count, 0)
+
+
+func test_reports_the_extensions_the_editor_reloaded_since_the_reload_request() -> void:
+	_extensions.rebuilt = PackedStringArray(["res://bin/game.gdextension"])
+	_rescan_in_background()
+	_file_system.apply_scan()
+	await _wait_until_finished()
+	assert_eq((_outcome as Dictionary)["reloaded_extensions"], PackedStringArray(["res://bin/game.gdextension"]))
+	assert_eq(_extensions.reload_requests, 0)
+
+
+func test_reports_no_extensions_when_none_was_rebuilt() -> void:
+	_rescan_in_background()
+	_file_system.apply_scan()
+	await _wait_until_finished()
+	assert_eq((_outcome as Dictionary)["reloaded_extensions"], PackedStringArray())
