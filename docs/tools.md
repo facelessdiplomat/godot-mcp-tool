@@ -431,11 +431,12 @@ No parameters.
 
 ### `node_snap_to_floor`
 
-**Place on the floor.** Move 3D nodes straight down or up until the bottom of each rests on what is below it, a collision shape or a visible mesh, as Snap Object to Floor in the editor does, as one Undo step. The bottom comes from the collision shapes of the node, or from its meshes when it has none. Use it to put props on uneven ground or on top of other objects.
+**Place on the floor.** Move 3D nodes straight down or up until each touches what is below it, a collision shape or a visible mesh, as one Undo step. A node stops where the first point of its collision shapes, or of its meshes when it has none, meets the surface, so nothing sinks into the ground and a node tilted like a slope lies flat on it. With align, each node is first turned so that its up axis follows the surface under it. Use it to put props on uneven ground, on slopes or on top of other objects.
 
 *Makes changes*
 
 - `paths` (required): list of strings, at least 1. The 3D nodes to place, such as ["Crate", "Props/Barrel"].
+- `align`: boolean. First turn each node so that its up axis follows the surface under it, such as a crate on a slope, then place it. Default: false, which keeps the rotation.
 - `scene`: string. The scene to change, as a res:// path or "main"; it is opened in the editor if it is not open yet. Default: the scene currently open in the editor.
 
 ### `node_add_collision`

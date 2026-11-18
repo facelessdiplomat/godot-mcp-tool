@@ -13,13 +13,16 @@ half-meter box.
 **Done when**
 
 - The arena holds ten instances of `res://crate.tscn`.
-- The bottom of every crate lies within a centimeter of the hill under its center.
+- Every crate lies flat on the hill: in the running game, the four corners of its bottom are within a centimeter of
+  the slope.
 - In the running game the player, walking right, stops at the rock.
 
 **Notes**
 
 - `node_add_collision` gives the hill a trimesh collision and the rock a convex or sphere collision; it is also an
   operation of `scene_batch_edit`.
-- `node_snap_to_floor` places all crates in one call; `scene_raycast` and `node_get_bounds` check the result.
-- Placing crates by guessing heights, or scaling the rock instead of giving it a collision, fails the checks.
+- `node_snap_to_floor` with `align` tilts all crates to the slopes and lays them on the hill in one call;
+  `scene_raycast` checks the result.
+- An upright crate on a slope touches it with one edge only and fails the check; so do crates placed by guessing
+  heights, or a rock scaled instead of given a collision.
 - Evaluation run: `server/test/evals/scenarios/cratesOnTheHill.ts`.

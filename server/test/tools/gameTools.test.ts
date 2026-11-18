@@ -33,6 +33,20 @@ describe('game tools', () => {
     expect(createGameRunTool(editor, new GameOutputCursor()).definition.showsErrors).toBe(true);
   });
 
+  it('game_run says when the game runs without a window', async () => {
+    const editor = new FakeEditorGateway().respondTo('game.run', { ...quietRun, windowless: true });
+
+    const text = textOf(await createGameRunTool(editor, new GameOutputCursor()).execute({}));
+
+    expect(text).toBe(
+      [
+        'The game is running res://levels/arena.tscn; it was ready after 850 ms.',
+        'It runs without a window, so game_screenshot cannot show it; check it with game_get_properties, game_get_tree and node_get_bounds.',
+        'No output yet.',
+      ].join('\n'),
+    );
+  });
+
   it('game_run asks the editor to stop the game at its first error', async () => {
     const editor = new FakeEditorGateway().respondTo('game.run', quietRun);
 
@@ -295,6 +309,28 @@ describe('game tools', () => {
     const text = textOf(await createGameSetPropertiesTool(editor).execute({ path: 'Player', properties: { position: [0, 5, 0] } }));
 
     expect(text).toBe('Updated Player in the running game. The change lasts until the game stops; scene files stay as they are.\nApplied: position');
+  });
+
+  it('game_set_properties points to window_size of game_run when the game window keeps its size', async () => {
+    const editor = new FakeEditorGateway().respondTo('game.set_properties', {
+      scene: 'res://levels/arena.tscn',
+      path: '/root',
+      applied: [],
+      rejected: [],
+      not_applied: [{ name: 'size', expected: 'Vector2i(1024, 768)', actual: 'Vector2i(1152, 648)' }],
+    });
+
+    const result = await createGameSetPropertiesTool(editor).execute({ path: '/root', properties: { size: [1024, 768] } });
+
+    expect(result.isError).toBe(true);
+    expect(textOf(result)).toBe(
+      [
+        'No property of /root in the running game took the requested value.',
+        'Not applied, the engine kept another value:',
+        '- size: wanted "Vector2i(1024, 768)", got "Vector2i(1152, 648)"',
+        'The game window keeps the size it started with: to try another size, run the game again with window_size in game_run, such as [1024, 768].',
+      ].join('\n'),
+    );
   });
 
   it('game_wait reports a condition that became true', async () => {

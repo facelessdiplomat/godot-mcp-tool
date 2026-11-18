@@ -11,6 +11,7 @@ export interface HelloResult {
   readonly projectPath: string;
   readonly executablePath: string;
   readonly methods: readonly string[];
+  readonly windowless?: boolean;
 }
 
 export type NotificationListener = (method: string, params: unknown) => void;
@@ -50,6 +51,7 @@ const helloResultSchema = z.object({
   project_path: z.string(),
   executable_path: z.string(),
   methods: z.array(z.string()),
+  windowless: z.boolean().optional(),
 });
 
 const errorObjectSchema = z.object({
@@ -101,6 +103,7 @@ export class BridgeClient implements EditorBridge {
       projectPath: hello.data.project_path,
       executablePath: hello.data.executable_path,
       methods: hello.data.methods,
+      ...(hello.data.windowless === undefined ? {} : { windowless: hello.data.windowless }),
     };
   }
 

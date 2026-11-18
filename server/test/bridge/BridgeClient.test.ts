@@ -2,7 +2,7 @@ import { createServer } from 'node:net';
 import { afterEach, describe, expect, it } from 'vitest';
 import { BridgeClient } from '../../src/bridge/BridgeClient.js';
 import { BridgeRequestError } from '../../src/bridge/BridgeErrors.js';
-import { editorRequiringToken, FakeAddonServer, type FakeRequestHandler } from '../support/FakeAddonServer.js';
+import { editorRequiringToken, FakeAddonServer, type FakeRequestHandler, helloResultFromEditor } from '../support/FakeAddonServer.js';
 
 const clientOptions = { clientName: 'godot-mcp-tool/0.1.0', protocol: 1, requestTimeoutMs: 2_000 };
 
@@ -42,6 +42,16 @@ describe('BridgeClient', () => {
       params: { token: 'secret', protocol: 1, client: 'godot-mcp-tool/0.1.0' },
     });
     expect(bridge.isOpen).toBe(true);
+  });
+
+  it('reads whether the editor runs without a window', async () => {
+    const bridge = await connectTo((request, connection) => {
+      connection.reply(request.id, { ...helloResultFromEditor, windowless: true });
+    });
+
+    const hello = await bridge.connect();
+
+    expect(hello.windowless).toBe(true);
   });
 
   it('rejects a wrong token', async () => {

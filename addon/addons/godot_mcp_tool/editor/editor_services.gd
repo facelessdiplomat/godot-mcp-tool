@@ -19,6 +19,7 @@ const GodotMcpEditorUndoHistory := preload("../scene/editor_undo_history.gd")
 const GodotMcpFirstScanGate := preload("first_scan_gate.gd")
 const GodotMcpGameState := preload("../runtime/game_state.gd")
 const GodotMcpGodotVersionText := preload("godot_version_text.gd")
+const GodotMcpHeadlessWindow := preload("../runtime/headless_window.gd")
 const GodotMcpLogStore := preload("../runtime/log_store.gd")
 const GodotMcpMcpDock := preload("mcp_dock.gd")
 const GodotMcpResponsivenessController := preload("responsiveness_controller.gd")
@@ -196,6 +197,7 @@ func _build_hello_payload() -> Dictionary:
 		"project_path": _project_path(),
 		"executable_path": OS.get_executable_path(),
 		"methods": available_methods,
+		"windowless": GodotMcpHeadlessWindow.is_windowless(),
 	}
 
 

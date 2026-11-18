@@ -67,6 +67,8 @@ const snappedNodeSchema = z.object({
   on: z.string().optional(),
   by: z.enum(['collision', 'mesh']).optional(),
   position: z.string().optional(),
+  tilt: z.number().optional(),
+  rotation: z.string().optional(),
   reason: z.string().optional(),
 });
 
@@ -76,6 +78,10 @@ type SnappedNodes = z.infer<typeof snappedNodesSchema>;
 
 const nodeSnapToFloorInput = z.object({
   paths: z.array(z.string().min(1)).min(1).describe('The 3D nodes to place, such as ["Crate", "Props/Barrel"].'),
+  align: z
+    .boolean()
+    .optional()
+    .describe('First turn each node so that its up axis follows the surface under it, such as a crate on a slope, then place it. Default: false, which keeps the rotation.'),
   scene: z
     .string()
     .optional()
@@ -88,7 +94,7 @@ export function createNodeSnapToFloorTool(editor: EditorGateway): BridgeTool<typ
     definition: {
       title: 'Place on the floor',
       description:
-        'Move 3D nodes straight down or up until the bottom of each rests on what is below it, a collision shape or a visible mesh, as Snap Object to Floor in the editor does, as one Undo step. The bottom comes from the collision shapes of the node, or from its meshes when it has none. Use it to put props on uneven ground or on top of other objects.',
+        'Move 3D nodes straight down or up until each touches what is below it, a collision shape or a visible mesh, as one Undo step. A node stops where the first point of its collision shapes, or of its meshes when it has none, meets the surface, so nothing sinks into the ground and a node tilted like a slope lies flat on it. With align, each node is first turned so that its up axis follows the surface under it. Use it to put props on uneven ground, on slopes or on top of other objects.',
       inputSchema: nodeSnapToFloorInput,
       annotations: changingAnnotations({ destructive: false, idempotent: true }),
       alwaysLoad: false,
@@ -107,8 +113,10 @@ function describeSnap(snapped: SnappedNodes): string {
       continue;
     }
     const rise = node.rise ?? 0;
+    const turn = (node.tilt ?? 0) > 0 ? `tilted ${String(node.tilt)}° to the surface below it, ` : '';
     const movement = rise === 0 ? 'already rested' : `moved ${rise < 0 ? 'down' : 'up'} ${String(Math.abs(rise))} m and rests`;
-    lines.push(`${formatNodePath(node.path)} ${movement} on ${formatNodePath(node.on ?? '?')}, now at ${node.position ?? '?'}.`);
+    const rotation = node.rotation === undefined ? '' : ` with rotation_degrees ${node.rotation}`;
+    lines.push(`${formatNodePath(node.path)} ${turn}${movement} on ${formatNodePath(node.on ?? '?')}, now at ${node.position ?? '?'}${rotation}.`);
   }
   return lines.join('\n');
 }

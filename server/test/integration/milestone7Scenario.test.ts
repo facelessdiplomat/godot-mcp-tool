@@ -1,10 +1,14 @@
 import type { ChildProcess } from 'node:child_process';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { lowestCornersOfCube, placementIn } from '../support/placement.js';
 import { editorStartupTimeoutMs, godotBinary, McpSession, startHeadlessEditor, startWindowedEditor, TemporaryProject } from './harness.js';
 
 const windowed = process.env['GODOT_MCP_WINDOW_TESTS'] === '1';
 const hillScene = 'res://hill.tscn';
 const crateCount = 10;
+const crateHalfSize = 0.25;
+const cubeFaceCorners = 4;
+const groundTolerance = 0.01;
 const crateNames = Array.from({ length: crateCount }, (_, index) => `Crate${String(index + 1)}`);
 const vectorPattern = /Vector3\((?<x>-?[\d.e-]+), (?<y>-?[\d.e-]+), (?<z>-?[\d.e-]+)\)/;
 
@@ -128,20 +132,23 @@ describe.skipIf(godotBinary === '')('the milestone 7 scenario: crates on the hil
     project?.remove();
   });
 
-  it('puts every crate on the hill so that its bottom lies within a centimeter of the ground under it', async () => {
-    const snapped = await tools().call('node_snap_to_floor', { paths: crateNames });
+  it('lays every crate flat on the hill, with the four corners of its bottom within a centimeter of the slope', async () => {
+    const snapped = await tools().call('node_snap_to_floor', { paths: crateNames, align: true });
     await tools().call('scene_save');
 
-    expect(snapped.text.split('\n').filter((line) => line.includes('rests on Hill'))).toHaveLength(crateCount);
+    expect(snapped.text.split('\n').filter((line) => line.includes('to the surface below it') && line.includes('rests on Hill'))).toHaveLength(crateCount);
     for (const name of crateNames) {
-      const bounds = await tools().call('node_get_bounds', { path: name });
-      const bottom = vectorIn(bounds.text, 'from ');
-      const center = vectorIn(bounds.text, 'center ');
-      const ground = await tools().call('scene_raycast', { from: [center.x, center.y + 2, center.z], exclude: [name] });
-      const hit = vectorIn(ground.text, ' at ');
+      const properties = await tools().call('node_get_properties', { path: name, names: ['transform'] });
+      const placement = placementIn(properties.text, 'transform');
 
-      expect(ground.text).toContain('hits Hill');
-      expect(Math.abs(bottom.y - hit.y)).toBeLessThan(0.01);
+      expect(placement).toBeDefined();
+      for (const corner of placement === undefined ? [] : lowestCornersOfCube(placement, crateHalfSize, cubeFaceCorners)) {
+        const ground = await tools().call('scene_raycast', { from: [corner.x, corner.y + 1, corner.z], exclude: [name] });
+        const hit = vectorIn(ground.text, ' at ');
+
+        expect(ground.text).toContain('hits Hill');
+        expect(Math.abs(corner.y - hit.y)).toBeLessThan(groundTolerance);
+      }
     }
   });
 

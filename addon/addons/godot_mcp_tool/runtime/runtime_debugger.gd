@@ -3,6 +3,7 @@ extends EditorDebuggerPlugin
 const GodotMcpGameChannel := preload("game_channel.gd")
 const GodotMcpGameState := preload("game_state.gd")
 const GodotMcpLogStore := preload("log_store.gd")
+const GodotMcpReadyMessage := preload("ready_message.gd")
 const GodotMcpRuntimeProtocol := preload("runtime_protocol.gd")
 
 const GAME_SOURCE := "game"
@@ -33,7 +34,7 @@ func _capture(message: String, data: Array, _session_id: int) -> bool:
 					_log_store.append(entry, GAME_SOURCE)
 			return true
 		GodotMcpRuntimeProtocol.READY_MESSAGE:
-			_game.mark_ready(str((payload as Dictionary).get("scene", "")) if payload is Dictionary else "")
+			_game.mark_ready(GodotMcpReadyMessage.scene_of(payload), GodotMcpReadyMessage.is_windowless(payload))
 			return true
 		GodotMcpRuntimeProtocol.RESPONSE_MESSAGE:
 			channel.receive(payload)

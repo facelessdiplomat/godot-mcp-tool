@@ -76,6 +76,16 @@ func test_runs_the_main_scene_and_returns_its_first_output() -> void:
 	assert_eq(((result["output"] as Array)[0] as Dictionary)["message"], "Hello from main")
 
 
+func test_says_whether_the_game_runs_without_a_window() -> void:
+	_launcher.simulate_game = func(_target: String) -> void:
+		_game.mark_ready("res://main.tscn", true)
+	var windowless_run: Dictionary = await _run({"watch_ms": 0})
+	_launcher.simulate_game = _ready_game_printing("")
+	var windowed_run: Dictionary = await _run({"watch_ms": 0})
+	assert_true(windowless_run["windowless"])
+	assert_false(windowed_run["windowless"])
+
+
 func test_marks_its_runs_as_agent_runs() -> void:
 	_launcher.simulate_game = _ready_game_printing("")
 	await _run({"watch_ms": 0})

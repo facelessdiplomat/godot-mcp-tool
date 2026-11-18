@@ -1,5 +1,7 @@
 extends RefCounted
 
+const GodotMcpReadyMessage := preload("ready_message.gd")
+
 const ARGUMENT_PREFIX := "--mcp-log-file="
 
 var _file: FileAccess
@@ -21,8 +23,8 @@ func send_entries(entries: Array) -> void:
 		_write({"type": "log", "entry": entry})
 
 
-func send_ready(scene_path: String) -> void:
-	_write({"type": "ready", "scene": scene_path})
+func send_ready(scene_path: String, windowless: bool) -> void:
+	_write({"type": "ready"}.merged(GodotMcpReadyMessage.build(scene_path, windowless)))
 
 
 func close() -> void:

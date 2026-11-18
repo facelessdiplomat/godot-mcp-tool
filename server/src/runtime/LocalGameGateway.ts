@@ -198,6 +198,7 @@ export class LocalGameGateway implements EditorGateway {
       next_after: page.next_after,
       saved_scenes: [],
       saved_scripts: [],
+      windowless: this.options.headless,
     };
   }
 

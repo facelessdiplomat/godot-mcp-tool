@@ -81,6 +81,7 @@ func execute(params: Dictionary) -> Variant:
 		"next_after": page["next_after"],
 		"saved_scenes": Array(saved_scenes),
 		"saved_scripts": saved_scripts,
+		"windowless": game.windowless,
 	}
 
 

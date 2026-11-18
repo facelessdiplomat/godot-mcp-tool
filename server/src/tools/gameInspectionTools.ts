@@ -159,15 +159,29 @@ export function createGameSetPropertiesTool(game: EditorGateway): BridgeTool<typ
     },
     method: 'game.set_properties',
     responseSchema: updatedGameNodeSchema,
-    present: (updated) => {
+    present: (updated, input) => {
       const node = formatNodePath(updated.path);
-      const report = formatApplyReport(updated);
+      const report = [formatApplyReport(updated), ...(keepsItsWindowSize(updated) ? [windowSizeHint(input.properties['size'])] : [])].join('\n');
       if (updated.applied.length === 0) {
         return errorResult(`No property of ${node} in the running game took the requested value.\n${report}`);
       }
       return textResult(`Updated ${node} in the running game. The change lasts until the game stops; scene files stay as they are.\n${report}`);
     },
   });
+}
+
+const gameWindowPath = '/root';
+const windowSizeProperty = 'size';
+const exampleWindowSize = [1280, 720];
+
+function keepsItsWindowSize(updated: UpdatedGameNode): boolean {
+  const refused = [...updated.rejected.map((rejection) => rejection.name), ...updated.not_applied.map((mismatch) => mismatch.name)];
+  return updated.path === gameWindowPath && refused.includes(windowSizeProperty);
+}
+
+function windowSizeHint(requested: unknown): string {
+  const size = Array.isArray(requested) && requested.length === 2 && requested.every((side) => typeof side === 'number') ? requested : exampleWindowSize;
+  return `The game window keeps the size it started with: to try another size, run the game again with window_size in game_run, such as [${size.join(', ')}].`;
 }
 
 const gameWaitInput = z.object({

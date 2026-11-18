@@ -55,6 +55,19 @@ describe('placement tools', () => {
     );
   });
 
+  it('node_snap_to_floor tilts nodes to the surface when asked to align them', async () => {
+    const editor = new FakeEditorGateway().respondTo('node.snap_to_floor', {
+      scene: 'res://arena.tscn',
+      nodes: [{ path: 'Crate', moved: true, rise: -5.5, on: 'Hill', by: 'collision', position: 'Vector3(1.5, 2.5, -5)', tilt: 36.87, rotation: 'Vector3(0, 0, -36.87)' }],
+      editable_children: [],
+    });
+
+    const text = textOf(await createNodeSnapToFloorTool(editor).execute({ paths: ['Crate'], align: true }));
+
+    expect(editor.requests[0]?.params).toEqual({ paths: ['Crate'], align: true });
+    expect(text).toContain('Crate tilted 36.87° to the surface below it, moved down 5.5 m and rests on Hill, now at Vector3(1.5, 2.5, -5) with rotation_degrees Vector3(0, 0, -36.87).');
+  });
+
   it('node_add_collision names the shapes and compares their size with the mesh', async () => {
     const editor = new FakeEditorGateway().respondTo('node.add_collision', {
       scene: 'res://arena.tscn',

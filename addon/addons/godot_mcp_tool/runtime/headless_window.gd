@@ -7,8 +7,12 @@ const VIEWPORT_WIDTH := "display/window/size/viewport_width"
 const VIEWPORT_HEIGHT := "display/window/size/viewport_height"
 
 
+static func is_windowless() -> bool:
+	return DisplayServer.get_name() == HEADLESS_DISPLAY
+
+
 static func give_project_size(window: Window) -> void:
-	if DisplayServer.get_name() == HEADLESS_DISPLAY:
+	if is_windowless():
 		window.size = project_window_size()
 
 

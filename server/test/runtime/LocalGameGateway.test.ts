@@ -136,9 +136,18 @@ describe('LocalGameGateway', () => {
     mkdirSync(join(projectRoot, 'levels'));
     writeFileSync(join(projectRoot, 'levels', 'arena.tscn'), '[gd_scene format=3]\n');
 
-    await gateway({ headless: true }).request('game.run', { scene: 'res://levels/arena.tscn', watch_ms: 0, stop_after: false });
+    const run = await gateway({ headless: true }).request('game.run', { scene: 'res://levels/arena.tscn', watch_ms: 0, stop_after: false });
 
     expect(launcher.calls[0]?.args.slice(0, 4)).toEqual(['--path', projectRoot, '--headless', 'res://levels/arena.tscn']);
+    expect(run).toMatchObject({ windowless: true });
+  });
+
+  it('says that a game started with a window has one', async () => {
+    launcher.simulate = readyGame([]);
+
+    const run = await gateway().request('game.run', { scene: 'main', watch_ms: 0, stop_after: false });
+
+    expect(run).toMatchObject({ windowless: false });
   });
 
   it('reports a game that exits before it is ready with its last output', async () => {

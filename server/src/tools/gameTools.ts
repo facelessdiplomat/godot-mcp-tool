@@ -41,6 +41,7 @@ const gameRunSchema = z.object({
   next_after: z.number(),
   saved_scenes: z.array(z.string()),
   saved_scripts: z.array(z.string()),
+  windowless: z.boolean().optional(),
 });
 
 type GameRun = z.infer<typeof gameRunSchema>;
@@ -143,6 +144,9 @@ export function createGameRunTool(editor: EditorGateway, cursor: GameOutputCurso
 
 function describeRun(run: GameRun, durationMs: number | undefined, fixedFps: number | undefined): string {
   const lines = [describeOutcome(run, durationMs)];
+  if (run.windowless === true && run.outcome === 'ready' && run.state !== 'stopped') {
+    lines.push('It runs without a window, so game_screenshot cannot show it; check it with game_get_properties, game_get_tree and node_get_bounds.');
+  }
   if (fixedFps !== undefined) {
     lines.push(`Every frame advances the game by exactly 1/${String(fixedFps)} s, however long it takes, so wait and hold for physics frames, not milliseconds.`);
   }

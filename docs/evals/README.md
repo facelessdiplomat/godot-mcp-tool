@@ -209,3 +209,71 @@ under `"properties"`, and the scene tools began to read scenes without the edito
 calls in the second run passed without any: `health-bar-hud` (3 failed calls before), `patrol-between-points` (1),
 `camera-follow` (1) and `playtest-without-a-window` (1), for $1.17 together. In `camera-follow` the agent again set
 `"target": "Player"`, which now works, and in `playtest-without-a-window` it read the main scene without the editor.
+
+### Third full run, 2026-11-18
+
+Claude Opus 5.5 in Claude Code 2.1.318, the same Godot build (`4.8.beta.custom_build.679066724`, without export
+templates), the server and addon of commit `6baf9bc`, one run per scenario: the twenty scenarios of the first runs and
+the twelve of milestones 6–9. For the first twenty, the numbers before the arrows are from the second full run.
+
+| Scenario | Checks | Tool calls | Cost, $ | Time, s |
+|---|---|---|---|---|
+| build-an-arena | 6/6 | 15 → 17 | 0.33 → 0.68 | 54 → 54 |
+| third-person-prototype | 8/8 | 31 → 20 | 0.50 → 0.39 | 116 → 65 |
+| dash-with-a-test | 6/6 | 25 → 23 | 0.43 → 0.40 | 95 → 64 |
+| health-bar-hud | 3/3 | 24 → 23 | 0.34 → 0.33 | 44 → 40 |
+| fix-the-jump-error | 3/3 | 19 → 16 | 0.22 → 0.21 | 40 → 30 |
+| patrol-between-points | 6/6 | 19 → 18 | 0.25 → 0.26 | 41 → 37 |
+| collect-coins | 6/6 | 24 → 22 | 0.35 → 0.35 | 50 → 50 |
+| pause-menu | 4/4 | 20 → 22 | 0.33 → 0.35 | 43 → 42 |
+| camera-follow | 4/4 | 20 → 19 | 0.28 → 0.29 | 48 → 50 |
+| stop-the-slowdown | 4/4 | 26 → 20 | 0.29 → 0.30 | 62 → 56 |
+| gamepad-controls | 8/8 | 10 → 16 | 0.21 → 0.26 | 26 → 38 |
+| extract-an-enemy-scene | 6/6 | 26 → 30 | 0.35 → 0.31 | 35 → 39 |
+| import-a-character | 3/3 | 11 → 7 | 0.21 → 0.21 | 23 → 24 |
+| follow-the-player | 5/5 | 29 → 42 | 0.47 → 0.61 | 102 → 101 |
+| animate-a-door | 3/3 | 15 → 14 | 0.23 → 0.23 | 31 → 23 |
+| character-states | 6/6 | 23 → 18 | 0.34 → 0.32 | 43 → 37 |
+| tidy-the-project | 9/9 | 14 → 17 | 0.20 → 0.24 | 24 → 26 |
+| export-the-game | 3/3 | 3 → 6 | 0.10 → 0.16 | 17 → 19 |
+| find-a-bug-with-breakpoints | 5/5, was 3/5 | 23 → 22 | 0.29 → 0.32 | 51 → 44 |
+| playtest-without-a-window | 6/6 | 12 → 11 | 0.18 → 0.18 | 23 → 22 |
+| paint-one-enemy | 4/4 | 17 | 0.28 | 30 |
+| land-once | 3/3 | 15 | 0.29 | 44 |
+| resume-the-menu | 3/3 | 12 | 0.18 | 24 |
+| crates-on-the-hill | 2/3 | 27 | 0.43 | 65 |
+| footsteps-and-blend | 5/5 | 20 | 0.36 | 49 |
+| hud-at-two-sizes | 3/3 | 26 | 0.46 | 55 |
+| rename-everywhere | 6/6 | 6 | 0.13 | 16 |
+| find-the-slow-function | 2/2 | 11 | 0.19 | 30 |
+| fix-the-water-shader | 5/5 | 13 | 0.20 | 28 |
+| bring-back-the-pillars | 4/4 | 12 | 0.20 | 23 |
+| turn-on-a-plugin | 4/4 | 3 | 0.09 | 8 |
+| exports-for-windows-and-linux | 5/5 | 8 | 0.16 | 27 |
+| **31 of 32 passed** | | **553** | **9.38** | **1261** |
+
+- The first twenty all passed, with 383 tool calls instead of 389, 3 failed calls instead of 7 and 16 tool searches
+  instead of 20, for $6.40 instead of $5.90 and 14 minutes of the agent instead of 16. Most of the extra cost is
+  `build-an-arena`, whose agent took three screenshots, and `follow-the-player`, which ran the game three times.
+- The twelve new ones passed 11 of 12, with 170 tool calls, 7 of them failed, and 12 tool searches, for $2.97 and
+  7 minutes of the agent.
+- `crates-on-the-hill` failed on its own check. The agent tilted every crate by 36.87° so that it lies flat on its
+  slope, saw that `node_snap_to_floor` left the tilted crates 3–4 cm above the slope, and computed their heights
+  itself: all four bottom corners of every crate touch the slope. The check compares the bottom of a crate's bounding
+  box with the ground under its center, which holds only for an upright crate, so it found every tilted crate 3.75 cm
+  too low. `node_snap_to_floor` follows the same rule: it casts one ray from the bottom center of the bounding box.
+- Four calls of `game_screenshot` came in scenarios whose editor runs without a window (`follow-the-player`,
+  `paint-one-enemy`, `crates-on-the-hill` and `fix-the-water-shader`): neither `godot_status` nor `game_run` says
+  that the game has no window.
+- `exports-for-windows-and-linux` sent its two exports in one message before reading that a build without templates
+  can still export packs, then exported packs; `export-the-game` met the missing templates once, as the task expects.
+  `hud-at-two-sizes` tried to set the size of the root window in the running game, which the engine keeps, and then
+  used `content_scale_size`. The other two failed calls were the agent's: a tool name without its server prefix, and
+  an `Edit` whose text appeared twice in the script.
+
+After this run `node_snap_to_floor` began to stop where the first point of a node's own shapes touches the ground and
+got `align`, which first tilts each node to the surface; the check of `crates-on-the-hill` began to measure the four
+corners of each crate's bottom in the running game; `godot_status` and `game_run` began to say when the game has no
+window; and `game_set_properties` began to point to `window_size` of `game_run` when the game window keeps its size.
+The reference solution of `crates-on-the-hill` passes the new check, and by the positions and rotations that the agent
+of this run set, its crates meet it too.

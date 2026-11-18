@@ -53,6 +53,19 @@ describe('GodotStatusTool', () => {
     expect(text).toContain('Godot binary: /opt/godot/godot (from running editor), version 4.8.beta.custom_build.679066724');
   });
 
+  it('says when the editor runs without a window, so that screenshots cannot work', async () => {
+    const tool = new GodotStatusTool({
+      project: foundProject,
+      editor: editorReporting({ connected: true, hello: { ...hello, windowless: true } }),
+      binaryLocator: binaryFromRunningEditor,
+      readVersion: readKnownVersion,
+    });
+
+    expect(await statusText(tool)).toContain(
+      'Editor: connected. Godot 4.8.beta.custom_build.679066724, addon 0.1.0, bridge protocol 1. It runs without a window, and so do the games it starts: game_screenshot and editor_screenshot cannot render there, so check the game with game_get_properties, game_get_tree and node_get_bounds.',
+    );
+  });
+
   it('says how to update an addon whose version differs from the server', async () => {
     const tool = new GodotStatusTool({
       project: foundProject,

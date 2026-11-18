@@ -108,6 +108,7 @@ describe.skipIf(godotBinary === '')('playtesting without the editor or a window'
     const landed = await tools().call('game_wait', { node: 'Player', condition: 'is_on_floor()', timeout_ms: 10_000 });
 
     expect(run.text).toMatch(/^The game is running res:\/\/main\.tscn/);
+    expect(run.text).toContain('It runs without a window, so game_screenshot cannot show it');
     expect(landed.isError).toBe(false);
     expect(landed.text).toMatch(/became true on Player/);
   });

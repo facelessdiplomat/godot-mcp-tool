@@ -25,6 +25,24 @@ static func measure(node: Node) -> Dictionary:
 	return {"aabb": measured, "visual_count": visual_count, "collision_count": collision_count, "visual": visual, "collision": collision}
 
 
+static func oriented_boxes(node: Node) -> Array[Dictionary]:
+	var shape_boxes: Array[Dictionary] = []
+	var geometry_boxes: Array[Dictionary] = []
+	for subtree_node in _subtree(node):
+		if subtree_node is CollisionShape3D and (subtree_node as CollisionShape3D).shape != null:
+			var shape_box := (subtree_node as CollisionShape3D).shape.get_debug_mesh().get_aabb()
+			shape_boxes.append({"transform": GodotMcpSpatialTransforms.global_of(subtree_node), "box": shape_box})
+		elif subtree_node is GeometryInstance3D and not _is_particles(subtree_node):
+			var local_bounds := _local_bounds(subtree_node)
+			if local_bounds.size != Vector3.ZERO:
+				geometry_boxes.append({"transform": GodotMcpSpatialTransforms.global_of(subtree_node), "box": local_bounds})
+	if not shape_boxes.is_empty():
+		return shape_boxes
+	if not geometry_boxes.is_empty():
+		return geometry_boxes
+	return [{"transform": GodotMcpSpatialTransforms.global_of(node), "box": AABB()}]
+
+
 static func _subtree(node: Node) -> Array[Node3D]:
 	var nodes: Array[Node3D] = []
 	if node is Node3D:

@@ -69,7 +69,14 @@ function describeEditor(editorStatus: EditorStatus): string {
   }
   const { hello } = editorStatus;
   const connection = `Editor: connected. Godot ${hello.godotVersion}, addon ${hello.addonVersion}, bridge protocol ${String(hello.protocol)}`;
-  return hello.addonVersion === SERVER_VERSION
-    ? connection
-    : `${connection}. The addon is not the version of this server (${SERVER_VERSION}): close the editor, run npx godot-mcp-tool update-addon in the project folder and open the editor again.`;
+  const notes = [
+    ...(hello.windowless === true ? [windowlessEditorNote] : []),
+    ...(hello.addonVersion === SERVER_VERSION
+      ? []
+      : [`The addon is not the version of this server (${SERVER_VERSION}): close the editor, run npx godot-mcp-tool update-addon in the project folder and open the editor again`]),
+  ];
+  return notes.length === 0 ? connection : `${[connection, ...notes].join('. ')}.`;
 }
+
+const windowlessEditorNote =
+  'It runs without a window, and so do the games it starts: game_screenshot and editor_screenshot cannot render there, so check the game with game_get_properties, game_get_tree and node_get_bounds';

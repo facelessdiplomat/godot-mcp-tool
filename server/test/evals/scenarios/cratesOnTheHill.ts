@@ -1,9 +1,12 @@
 import type { McpSession } from '../../integration/harness.js';
+import { lowestCornersOfCube, placementIn } from '../../support/placement.js';
 import { type CheckResult, checked, gameVector, type Scenario } from '../Scenario.js';
 import { arenaScene, buildPrototype, type Operation } from './fixtures.js';
 
 const crateScenePath = 'res://crate.tscn';
 const crateCount = 10;
+const crateHalfSize = 0.25;
+const cubeFaceCorners = 4;
 const rockSurfaceX = 3 - 0.75;
 const playerRadius = 0.4;
 const groundTolerance = 0.01;
@@ -39,16 +42,20 @@ async function cratePaths(tools: McpSession): Promise<string[]> {
   });
 }
 
-async function restsOnTheHill(tools: McpSession, path: string): Promise<boolean> {
-  const bounds = await tools.call('node_get_bounds', { scene: arenaScene, path });
-  const bottom = vectorAfter(bounds.text, 'from ');
-  const center = vectorAfter(bounds.text, 'center ');
-  if (bottom === undefined || center === undefined) {
+async function liesFlatOnTheHill(tools: McpSession, path: string): Promise<boolean> {
+  const properties = await tools.call('game_get_properties', { path, names: ['global_transform'] });
+  const placement = placementIn(properties.text, 'global_transform');
+  if (placement === undefined) {
     return false;
   }
-  const ground = await tools.call('scene_raycast', { scene: arenaScene, from: [center.x, center.y + 2, center.z], exclude: [path] });
-  const hit = vectorAfter(ground.text, ' at ');
-  return ground.text.includes('hits Hill') && hit !== undefined && Math.abs(bottom.y - hit.y) < groundTolerance;
+  for (const corner of lowestCornersOfCube(placement, crateHalfSize, cubeFaceCorners)) {
+    const ground = await tools.call('scene_raycast', { from: [corner.x, corner.y + 1, corner.z], exclude: [path], in_game: true });
+    const hit = vectorAfter(ground.text, ' at ');
+    if (!ground.text.includes('hits Hill') || hit === undefined || Math.abs(corner.y - hit.y) >= groundTolerance) {
+      return false;
+    }
+  }
+  return true;
 }
 
 export const cratesOnTheHill: Scenario = {
@@ -68,26 +75,26 @@ export const cratesOnTheHill: Scenario = {
         ...Array.from({ length: crateCount }, (_, index) => ({ op: 'node_add', type: crateScenePath, name: `Crate${String(index + 1)}`, properties: { position: [-3.6 + index * 0.8, 8, -5] } })),
       ],
     });
-    await tools.call('node_snap_to_floor', { scene: arenaScene, paths: Array.from({ length: crateCount }, (_, index) => `Crate${String(index + 1)}`) });
+    await tools.call('node_snap_to_floor', { scene: arenaScene, paths: Array.from({ length: crateCount }, (_, index) => `Crate${String(index + 1)}`), align: true });
     await tools.call('scene_save');
   },
   async check({ tools }) {
     const crates = await cratePaths(tools);
-    const resting: string[] = [];
+    await tools.call('game_run');
+    const lyingFlat: string[] = [];
     for (const crate of crates) {
-      if (await restsOnTheHill(tools, crate)) {
-        resting.push(crate);
+      if (await liesFlatOnTheHill(tools, crate)) {
+        lyingFlat.push(crate);
       }
     }
     const checks: CheckResult[] = [
       checked('there are ten crates from res://crate.tscn', crates.length === crateCount, `${String(crates.length)} instances of res://crate.tscn`),
       checked(
-        'every crate rests on the hill within a centimeter',
-        crates.length > 0 && resting.length === crates.length,
-        `${String(resting.length)} of ${String(crates.length)} rest on the hill`,
+        'every crate lies flat on the hill, the corners of its bottom within a centimeter of the slope',
+        crates.length > 0 && lyingFlat.length === crates.length,
+        `${String(lyingFlat.length)} of ${String(crates.length)} lie flat on the hill`,
       ),
     ];
-    await tools.call('game_run');
     await tools.call('game_input', { steps: [{ action: 'move_right', physics_frames: 90 }] });
     const player = await gameVector(tools, 'Player', 'position');
     checks.push(

@@ -37,6 +37,7 @@ describe.skipIf(godotBinary === '')('starting the editor from the server', () =>
       expect(launched.isError).toBe(false);
       expect(launched.text).toMatch(/^Started the Godot editor for .+: Godot 4\.\d+.* with the plugin \d+\.\d+\.\d+, connected after \d+\.\d s\./);
       expect(after.text).toContain('Editor: connected.');
+      expect(after.text).toContain('It runs without a window, and so do the games it starts');
     },
     editorStartupTimeoutMs,
   );

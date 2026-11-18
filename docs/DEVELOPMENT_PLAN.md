@@ -747,7 +747,7 @@ New tools:
 | `node_save_as_scene` | Save a branch as a scene of its own and put an instance in its place, as Save Branch as Scene does; also an operation of `scene_batch_edit` | 6 | W | E |
 | `node_make_local` | Turn an instance into nodes of the scene, as Make Local does; also an operation of `scene_batch_edit` | 6 | W | E |
 | `scene_raycast` | The position, normal and node that a ray hits in the open scene, or in the running game with `in_game` | 7 | R | E/G |
-| `node_snap_to_floor` | Move nodes down until their bounds rest on what is below them, as one Undo step | 7 | W | E |
+| `node_snap_to_floor` | Move nodes down until they touch what is below them, optionally tilted to the surface, as one Undo step | 7 | W | E |
 | `node_add_collision` | A collision for a `MeshInstance3D` built from its mesh: trimesh, convex, several convex shapes, or a box, sphere or capsule fitted to its bounds; also an operation of `scene_batch_edit` | 7 | W | E |
 | `project_create` | A new project in an empty folder: `project.godot`, the addon installed and enabled, a main scene; also the `init` command of the package | 8 | W | C |
 | `test_install_framework` | Install GUT or gdUnit4 at a version that the server pins and enable its plugin; Claude Code asks before every call | 8 | W | C/E |
@@ -1768,7 +1768,7 @@ paints `Enemy2` red through Editable Children and leaves `Enemy1`, `Enemy3` and 
 the selection back with `editor_get_state`, runs the game with collision shapes drawn, opens the pause menu, lists its
 controls and clicks Resume by its path, sees `landed` emitted once in a jump, and with a window shows the jump as a
 strip of four frames. Three new evaluation scenarios, `paint-one-enemy`, `land-once` and `resume-the-menu`, pass with
-their reference solutions; runs with an agent are still to do. Preparing them found two problems, now fixed:
+their reference solutions and with an agent in the third full run. Preparing them found two problems, now fixed:
 
 - A click by path did nothing in a game without a window: the headless display server gives the root window 64×64
   pixels, so every point outside it counts as outside the window, no control is hovered and buttons ignore the press.
@@ -1781,8 +1781,13 @@ their reference solutions; runs with an agent are still to do. Preparing them fo
 
 - [x] Ray casts: `scene_raycast` returns the position, normal, distance and node that a ray hits in the open scene, or
       in the running game with `in_game`, straight down by default or between two points; `node_snap_to_floor` moves
-      nodes down or up until their bottom rests on what is below, as one Undo step, taking the bottom from collision
-      shapes first and meshes second, as the editor's Snap Object to Floor does. The spike answered both questions:
+      nodes down or up until they touch what is below, as one Undo step, measuring from collision shapes first and
+      meshes second. It first followed the editor's Snap Object to Floor, which casts one ray from the middle of the
+      bottom of the bounding box; the third full run showed that this leaves a crate tilted like a slope 3–4 cm in
+      the air, so it now casts from the corners, edge middles and face middles of the faces of each shape's own box
+      that face down, and stops at the first touch; the faces that face up stay out, so a ceiling above a crate does
+      not lift it. `align` first turns each node so that its up axis follows the surface. The spike answered both
+      questions:
       the edited scene's physics space answers `intersect_ray` after one physics frame, also for CSG shapes added just
       before; and meshes without collision are hit through `Mesh.generate_triangle_mesh()` and
       `TriangleMesh.intersect_segment()`, so each hit says whether it met a collision shape or a visible mesh, and the
@@ -1846,8 +1851,11 @@ automated acceptance test `server/test/integration/milestone7Scenario.test.ts`, 
 `scene_raycast`; the walker stops at the rock with its convex collision; the walk cycle calls `_on_footstep` twice a
 second; the blend position is 2 while walking and 0 at the rock; and with a window one image shows the HUD at 16:9 and
 4:3 while `node_get_bounds` places its health bar inside the window. Three new evaluation scenarios,
-`crates-on-the-hill`, `footsteps-and-blend` and `hud-at-two-sizes`, pass with their reference solutions; runs with an
-agent are still to do. Two timing assumptions in older tests with a window gave way under load: the first screenshot
+`crates-on-the-hill`, `footsteps-and-blend` and `hud-at-two-sizes`, pass with their reference solutions. In the third
+full run an agent passed the last two; `crates-on-the-hill` failed on its own check, which took the bottom of the
+bounding box for the bottom of a crate tilted onto the slope. The check and the acceptance test now measure the four
+corners of each crate's bottom, and the reference solution lays the crates with `node_snap_to_floor` and `align`.
+Two timing assumptions in older tests with a window gave way under load: the first screenshot
 of a strip or of an input can come one physics frame after its start, which the labels report truthfully, so the
 tests now accept it.
 
@@ -1897,7 +1905,8 @@ from GitHub: in an empty folder the server creates "Capsule Walk", starts its ed
 a capsule scene and a floor, sees the test of the walking capsule fail while the capsule stands still and pass once it
 walks, with `script_validate` clean in between. `projectCreation.test.ts` covers the server that takes up the new
 project without a restart, and `exportProject.test.ts` exports a pack with a preset that `export_preset_add` wrote
-while no editor ran. Runs with an agent are still to do.
+while no editor ran. In the third full run an agent passed `bring-back-the-pillars`, `turn-on-a-plugin` and
+`exports-for-windows-and-linux`; the scenario in an empty folder has not run with an agent yet.
 
 ### Milestone 9 — Code and debugging
 
@@ -1941,8 +1950,8 @@ Status: done. The scenario passes as the automated acceptance test
 `server/test/integration/milestone9Scenario.test.ts`: `script_rename_symbol` renames `take_damage` in both scripts,
 in the signal connection and in the method track of the scene, with nothing left to check, the game runs without
 errors, and `game_performance` names `plan_routes` first among the slow functions. Two new evaluation scenarios,
-`rename-everywhere` and `find-the-slow-function`, pass with their reference solutions; runs with an agent are still to
-do. Writing the scene part of the rename found that static variables of addon scripts stay `null` in the editor,
+`rename-everywhere` and `find-the-slow-function`, pass with their reference solutions and with an agent in the third
+full run. Writing the scene part of the rename found that static variables of addon scripts stay `null` in the editor,
 because the editor does not run the static initializers of scripts that are not `@tool` (Appendix B).
 
 ### Alongside milestones 6–9 — Platform
@@ -1967,7 +1976,11 @@ because the editor does not run the static initializers of scripts that are not 
       `bring-back-the-pillars`, `turn-on-a-plugin` and `exports-for-windows-and-linux` cover shaders, undo,
       plugins and export presets. Writing `turn-on-a-plugin` found that `plugin_set_enabled` returned before the
       editor wrote `project.godot`, so a game started right after it ran without the plugin's autoload; the addon now
-      saves at once. Left: every run with an agent, which needs `CLAUDE_BIN`.
+      saves at once. The third full run with an agent, on 2026-11-18, passed 31 of 32 scenarios for $9.38
+      ([results](evals/README.md#third-full-run-2026-11-18)); `crates-on-the-hill` failed on its own check. Its
+      findings are fixed: the crate check and `node_snap_to_floor`, `godot_status` and `game_run` saying when there
+      is no window, and `game_set_properties` pointing to `window_size` when the game window keeps its size; runs of
+      the affected scenarios with an agent are still to do. Left: the comparison with an existing server (§13).
 - [ ] Left from milestone 5: the check of the user guides on a fresh project and the publication to the Godot Asset
       Store.
 

@@ -11,6 +11,11 @@ const GodotMcpPlainUndoHistory := preload("res://addons/godot_mcp_tool/scene/pla
 const GodotMcpSceneRaycastCommand := preload("res://addons/godot_mcp_tool/commands/scene/scene_raycast_command.gd")
 const GodotMcpVariantCodec := preload("res://addons/godot_mcp_tool/codec/variant_codec.gd")
 
+const RAMP_POSITION := Vector3(30, 1.5, 0)
+const RAMP_SLOPE := 0.75
+const RAMP_TOP := 3.0
+const SURFACE_TOLERANCE := 0.002
+
 var _scenes: FakeSceneAccess
 var _history: GodotMcpPlainUndoHistory
 var _context: GodotMcpEditingContext
@@ -60,6 +65,25 @@ func _add_crate(crate_name: String, position: Vector3) -> Node3D:
 	crate.position = position
 	(_own(crate, MeshInstance3D.new(), "Mesh") as MeshInstance3D).mesh = BoxMesh.new()
 	return crate
+
+
+func _add_ramp() -> void:
+	var ramp := _own(_root, MeshInstance3D.new(), "Ramp") as MeshInstance3D
+	var prism := PrismMesh.new()
+	prism.size = Vector3(8, RAMP_TOP, 6)
+	ramp.mesh = prism
+	ramp.position = RAMP_POSITION
+
+
+func _ramp_height_at(x: float) -> float:
+	return RAMP_TOP - RAMP_SLOPE * absf(x - RAMP_POSITION.x)
+
+
+func _assert_lies_flat_on_the_ramp(crate: Node3D) -> void:
+	for x in [-0.5, 0.5]:
+		for z in [-0.5, 0.5]:
+			var corner := crate.global_transform * Vector3(x, -0.5, z)
+			assert_almost_eq(corner.y, _ramp_height_at(corner.x), SURFACE_TOLERANCE, "bottom corner at x = %.3f" % corner.x)
 
 
 func _raycast(params: Dictionary) -> Variant:
@@ -123,6 +147,70 @@ func test_says_when_nothing_is_below() -> void:
 	var result: Dictionary = await GodotMcpNodeSnapToFloorCommand.new(_context).execute({"paths": ["Lost"]})
 	assert_false(result["nodes"][0]["moved"])
 	assert_string_contains(result["nodes"][0]["reason"], "nothing below")
+
+
+func test_lays_a_tilted_crate_flat_on_a_slope() -> void:
+	_add_ramp()
+	var crate := _add_crate("Tilted", Vector3(31.5, 8, 0))
+	crate.rotation.z = -atan(RAMP_SLOPE)
+	await get_tree().physics_frame
+	await GodotMcpNodeSnapToFloorCommand.new(_context).execute({"paths": ["Tilted"]})
+	assert_almost_eq(crate.position.y, 2.5, SURFACE_TOLERANCE)
+	_assert_lies_flat_on_the_ramp(crate)
+
+
+func test_rests_an_upright_crate_on_its_uphill_edge_instead_of_sinking_it() -> void:
+	_add_ramp()
+	var crate := _add_crate("Upright", Vector3(32, 8, 0))
+	await get_tree().physics_frame
+	await GodotMcpNodeSnapToFloorCommand.new(_context).execute({"paths": ["Upright"]})
+	assert_almost_eq(crate.position.y, 2.375, SURFACE_TOLERANCE)
+
+
+func test_tilts_a_crate_to_the_slope_when_asked_to_align_it() -> void:
+	_add_ramp()
+	var crate := _add_crate("Aligned", Vector3(28.5, 8, 0))
+	await get_tree().physics_frame
+	var result: Dictionary = await GodotMcpNodeSnapToFloorCommand.new(_context).execute({"paths": ["Aligned"], "align": true})
+	var placed: Dictionary = result["nodes"][0]
+	assert_almost_eq(crate.rotation_degrees.z, rad_to_deg(atan(RAMP_SLOPE)), 0.01)
+	assert_almost_eq(crate.position.y, 2.5, SURFACE_TOLERANCE)
+	_assert_lies_flat_on_the_ramp(crate)
+	assert_almost_eq(float(placed["tilt"]), 36.87, 0.001)
+	assert_eq(placed["rotation"], "Vector3(0, 0, 36.87)")
+	assert_eq(placed["on"], "Ramp")
+
+
+func test_keeps_a_crate_under_a_ceiling_on_the_floor() -> void:
+	var ceiling := _own(_root, StaticBody3D.new(), "Ceiling") as StaticBody3D
+	ceiling.position = Vector3(-6, 1.8, 0)
+	var slab := BoxShape3D.new()
+	slab.size = Vector3(4, 0.2, 4)
+	(_own(ceiling, CollisionShape3D.new(), "Shape") as CollisionShape3D).shape = slab
+	var crate := _add_crate("Indoor", Vector3(-6, 0.6, 0))
+	await get_tree().physics_frame
+	var result: Dictionary = await GodotMcpNodeSnapToFloorCommand.new(_context).execute({"paths": ["Indoor"]})
+	assert_eq(crate.position, Vector3(-6, 0.5, 0))
+	assert_eq(result["nodes"][0]["on"], "Floor")
+
+
+func test_keeps_the_rotation_when_not_asked_to_align() -> void:
+	_add_ramp()
+	var crate := _add_crate("Upright", Vector3(32, 8, 0))
+	await get_tree().physics_frame
+	var result: Dictionary = await GodotMcpNodeSnapToFloorCommand.new(_context).execute({"paths": ["Upright"]})
+	assert_eq(crate.rotation, Vector3.ZERO)
+	assert_false(result["nodes"][0].has("tilt"))
+
+
+func test_undoes_the_tilt_and_the_move_in_one_step() -> void:
+	_add_ramp()
+	var crate := _add_crate("Aligned", Vector3(28.5, 8, 0))
+	await get_tree().physics_frame
+	await GodotMcpNodeSnapToFloorCommand.new(_context).execute({"paths": ["Aligned"], "align": true})
+	assert_true(_history.undo())
+	assert_eq(crate.position, Vector3(28.5, 8, 0))
+	assert_eq(crate.rotation, Vector3.ZERO)
 
 
 func test_casts_in_the_running_game() -> void:

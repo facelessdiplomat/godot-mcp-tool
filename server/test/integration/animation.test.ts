@@ -64,6 +64,7 @@ describe.skipIf(godotBinary === '')('animating a door', () => {
     const opened = await tools().call('game_wait', { condition: 'position.y > 4.4', node: 'Door', timeout_ms: 5000 });
 
     expect(run.text).toMatch(/^The game is running res:\/\/level\.tscn/);
+    expect(run.text).toContain('It runs without a window, so game_screenshot cannot show it');
     expect(opened.text).toMatch(/^"position\.y > 4\.4" became true on Door/);
   });
 
