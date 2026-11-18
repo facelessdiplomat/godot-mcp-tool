@@ -57,7 +57,7 @@ describe.skipIf(godotBinary === '')('the milestone 2 scenario: a third-person pr
     await session?.call('game_stop');
     await session?.close();
     if (project !== undefined) {
-      stopDiscoveredEditor(project.root);
+      await stopDiscoveredEditor(project.root);
       project.remove();
     }
   });

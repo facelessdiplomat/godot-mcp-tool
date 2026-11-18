@@ -1958,7 +1958,8 @@ because the editor does not run the static initializers of scripts that are not 
       the addon as a junction, which Windows allows without extra rights. The first run passed on macOS. On Windows
       the checkout turned files into CRLF, which `.gitattributes` now prevents, and paths that the editor sees, the
       URIs of the language server and the help cache of another system were built with the separators of the host;
-      they now follow Godot's forward slashes or the rules of the target system.
+      they now follow Godot's forward slashes or the rules of the target system. Windows keeps the files of a
+      killed editor locked until the process has ended, so tests now wait for it before removing their project.
 - [ ] An evaluation scenario in `docs/evals/` for every new capability and a third full run; the comparison with an
       existing server (§13), which the results still lack. Done: twelve scenarios for milestones 6–9, each passing
       with its reference solution and failing its checks when left unsolved: `fix-the-water-shader`,

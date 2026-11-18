@@ -133,7 +133,7 @@ describe.skipIf(godotBinary === '')('the milestone 3 scenario: a dash with its G
     await session?.call('game_stop');
     await session?.close();
     if (project !== undefined) {
-      stopDiscoveredEditor(project.root);
+      await stopDiscoveredEditor(project.root);
       project.remove();
     }
   });

@@ -61,7 +61,7 @@ describe.skipIf(godotBinary === '' || !networkTests)('the milestone 8 scenario: 
 
   afterAll(async () => {
     await session?.close();
-    stopDiscoveredEditor(folder);
+    await stopDiscoveredEditor(folder);
     rmSync(folder, { recursive: true, force: true });
   });
 

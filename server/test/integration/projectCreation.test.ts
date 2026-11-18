@@ -22,7 +22,7 @@ describe.skipIf(godotBinary === '')('making a game from scratch in an empty fold
 
   afterAll(async () => {
     await session?.close();
-    stopDiscoveredEditor(folder);
+    await stopDiscoveredEditor(folder);
     rmSync(folder, { recursive: true, force: true });
   });
 

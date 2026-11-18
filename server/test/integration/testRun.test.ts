@@ -66,7 +66,7 @@ describe.skipIf(godotBinary === '')('running GUT tests', () => {
   afterAll(async () => {
     await session?.close();
     if (project !== undefined) {
-      stopDiscoveredEditor(project.root);
+      await stopDiscoveredEditor(project.root);
       project.remove();
     }
   });

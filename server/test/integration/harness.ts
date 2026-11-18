@@ -3,15 +3,20 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync,
 import { createServer } from 'node:net';
 import { homedir, tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
+import { setTimeout as delay } from 'node:timers/promises';
 import { Client } from '@modelcontextprotocol/client';
 import { InMemoryTransport } from '@modelcontextprotocol/server';
 import { DiscoveryFileReader, isProcessAlive } from '../../src/bridge/DiscoveryFileReader.js';
 import { type Application, createApplication } from '../../src/createApplication.js';
+import { isErrnoException } from '../../src/util/errors.js';
 
 export const godotBinary = process.env['GODOT_BIN'] ?? '';
 export const editorStartupTimeoutMs = 120_000;
-const removalRetries = 10;
-const removalRetryDelayMs = 100;
+const removalAttempts = 20;
+const removalRetryDelayMs = 500;
+const lockedFileCodes = new Set(['EBUSY', 'EPERM', 'ENOTEMPTY']);
+const processEndTimeoutMs = 10_000;
+const processEndPollMs = 100;
 
 const repositoryRoot = resolve(import.meta.dirname, '..', '..', '..');
 export const testProjectRoot = join(repositoryRoot, 'test-project');
@@ -98,11 +103,21 @@ async function startEditor(projectRoot: string, extraArguments: readonly string[
   return editorProcess;
 }
 
-export function stopDiscoveredEditor(projectRoot: string): void {
+export async function stopDiscoveredEditor(projectRoot: string): Promise<void> {
   const discovered = new DiscoveryFileReader(projectRoot, isProcessAlive).read();
-  if (discovered.kind === 'found') {
-    process.kill(discovered.endpoint.pid, 'SIGKILL');
+  if (discovered.kind !== 'found') {
+    return;
   }
+  const { pid } = discovered.endpoint;
+  process.kill(pid, 'SIGKILL');
+  const deadline = Date.now() + processEndTimeoutMs;
+  while (isProcessAlive(pid) && Date.now() < deadline) {
+    await delay(processEndPollMs);
+  }
+}
+
+function pauseSync(milliseconds: number): void {
+  Atomics.wait(new Int32Array(new SharedArrayBuffer(Int32Array.BYTES_PER_ELEMENT)), 0, 0, milliseconds);
 }
 
 export interface Position {
@@ -232,7 +247,18 @@ export class TemporaryProject {
   }
 
   remove(): void {
-    rmSync(this.root, { recursive: true, force: true, maxRetries: removalRetries, retryDelay: removalRetryDelayMs });
+    for (let attempt = 1; ; attempt += 1) {
+      try {
+        rmSync(this.root, { recursive: true, force: true });
+        return;
+      } catch (error) {
+        const locked = isErrnoException(error) && lockedFileCodes.has(error.code ?? '');
+        if (!locked || attempt >= removalAttempts) {
+          throw error;
+        }
+        pauseSync(removalRetryDelayMs);
+      }
+    }
   }
 }
 

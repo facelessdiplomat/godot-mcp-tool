@@ -20,7 +20,7 @@ describe.skipIf(godotBinary === '')('starting the editor from the server', () =>
   afterAll(async () => {
     await session?.close();
     if (project !== undefined) {
-      stopDiscoveredEditor(project.root);
+      await stopDiscoveredEditor(project.root);
       project.remove();
     }
   });
