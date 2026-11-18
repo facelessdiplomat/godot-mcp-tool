@@ -27,7 +27,7 @@ Update the engine deliberately: pull `master`, rebuild, rerun `npm test`, `npm r
 | 5 | Can agent runs avoid the pause on script errors, and can a paused game be resumed? | `--ignore-error-breaks` via `_run_scene` prevents the pause. Without it, the raw debugger message `continue` resumes the game, and custom captures keep working while it is paused | A `game_continue` capability is possible; the runtime agent can report state while the game is paused |
 | 6 | Does the addon run in `godot --headless --editor`? | Yes: the bridge starts, writes the discovery file, and the full integration test passes against it | Windowless editor mode is viable for CI and milestone 4 |
 | 7 | Can `--check-only --script` replace the editor for validation? | Not reliably: the exit code is always 0, and references to autoloads are reported as errors | Demoted to a last-resort fallback that parses stderr and filters autoload false positives |
-| 8 | How does Claude Code pass text, `structuredContent` and images to the model? | Text: yes, but several text blocks may reach the model joined without a separator. `alwaysLoad` and the server instructions work. Images: an image block reaches the model as an image, PNG or JPEG, and the text block after it arrives intact. `structuredContent` is not checked: no tool sends it | The new-error summary is appended to the last text block after a blank line. A screenshot is one image block followed by one text block with the size, the notes and the file path |
+| 8 | How does Claude Code pass text, `structuredContent` and images to the model? | Text: yes, but several text blocks may reach the model joined without a separator. `alwaysLoad` and the server instructions work. Images: an image block reaches the model as an image, PNG or JPEG, and the text block after it arrives intact. `structuredContent`: when a result has it, the model gets only its JSON and none of the text blocks, with or without an output schema | The new-error summary is appended to the last text block after a blank line. A screenshot is one image block followed by one text block with the size, the notes and the file path. Tools never return `structuredContent`, which would hide their text from the model |
 | 9 | Does the editor overwrite an agent's edit with a stale unsaved script tab? | Yes, both on `save_all_scenes()` and on running the game (`save_before_running` is on by default). `ScriptEditor.get_unsaved_files()` lists the file beforehand | Conflict detection before saving and running is mandatory in milestone 1 |
 | 10 | Does a symlinked addon work in a separate project? | Yes: `test-project` uses a relative symlink, the editor loads the plugin and imports work | Confirmed |
 | 11 | Can we render from an extra camera in the editor and in the game? | Yes, with a `SubViewport` that shares the scene's `World3D`: 19 ms in the game, 13–44 ms in an unfocused editor with `RenderingServer.force_draw()`. The editor's preview sun and sky belong to that world | Confirmed, with two corrections to the plan (§9.8) |
@@ -138,6 +138,27 @@ Images were checked the same day, after milestone 2 added the screenshot tools, 
   Claude Code adds after saving the image in the session folder, then our text block unchanged.
 - A 1280×724 contact sheet and a 1152×648 game screenshot came through without a size warning.
 
+`structuredContent` and progress notifications were checked on 2026-11-18 with Claude Code 2.1.325, the build that
+the desktop app runs, started headless (`-p` with `--output-format stream-json`) against a throwaway probe server. The
+probe used the same SDK as our server (`@modelcontextprotocol/server` 2.3.1) and logged every message on the wire;
+the client negotiated protocol version `2026-07-28`.
+
+- A result with a text block and `structuredContent` reached the model as the JSON of `structuredContent` alone; the
+  text block was dropped. The same happened when the tool had no `outputSchema`, and a result with
+  `structuredContent` and no content blocks reached the model as that JSON too.
+- Every `tools/call` carries `_meta.progressToken`, a number that grows by one per call, and
+  `_meta["claudecode/toolUseId"]`. The client accepted every notification sent for it: 6 during a 12-second call and
+  14 during a 70-second one.
+- The client hands each notification to its terminal interface as a progress update with `progress`, `total` and
+  `message`, and draws a percentage when `total` is set. This was read in the client's code, not watched on screen:
+  the interactive client first asks whether to trust the folder.
+- The event stream that the desktop app reads (`stream-json` with `--include-partial-messages`, the flags the app
+  passes) carried none of these messages. During the 70-second call it held two `tool_progress` heartbeats that the
+  client makes by itself for any long tool, at 30 and 60 seconds, with the elapsed time only. The desktop app can
+  therefore show how long a call has run, but not what the server reports.
+- The help text of the client's per-server `timeout` setting calls it a hard limit per call that progress
+  notifications do not extend.
+
 ### 9. Stale script overwrite
 
 Sequence: a script is open in the script editor with an unsaved change ("editor B"); the agent writes "agent C" to
@@ -204,9 +225,3 @@ Two traps found on the way:
 - MCP clients start stdio servers with a minimal environment: variables of the parent shell are not inherited, so
   `GODOT_PROJECT_PATH` and `GODOT_BIN` must be passed in the client configuration (`env` in `.mcp.json`, `-e` in MCP
   Inspector).
-
-## Pending
-
-| # | What is left | Needs |
-|---|---|---|
-| 8 | Whether Claude Code gives the model `structuredContent` instead of the text blocks | a tool that returns `structuredContent`; none does yet |

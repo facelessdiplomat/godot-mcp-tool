@@ -1059,9 +1059,9 @@ Our rules:
 - every read tool has limits (`max_depth`, `max_items`, `max_lines`, `cursor`) with conservative defaults; when output
   is truncated, the response says what was cut and how to get the rest;
 - screenshots are fitted to 1280 px by default, and several views share one image;
-- text first: we don't use `structuredContent` by default. According to the Agent SDK docs, when it is present the
-  model receives the JSON instead of the text blocks; this is not confirmed for external stdio servers — a spike
-  will check.
+- text first: we don't use `structuredContent`. When it is present, Claude Code gives the model its JSON instead of
+  the text blocks, with or without an output schema; spike 8 confirmed this for an external stdio server with Claude
+  Code 2.1.325.
 
 ### 9.12 Connection lifecycle
 
@@ -1342,9 +1342,9 @@ Every milestone has a task list and a **done criterion**: a scenario that passes
 - [x] `addon/`: `plugin.cfg`, `plugin.gd` — a TCP server on 127.0.0.1, the discovery file, `hello`/`ping`.
 - [x] `test-project/`: a minimal 3D project with the addon (symlink) and GUT for the addon's tests.
 - [x] Checked over stdio with MCP Inspector; `.mcp.json` at the repository root connects Claude Code to
-      `test-project/`. The check from a Claude Code session itself is still to do.
-- [ ] Spikes — small prototypes; findings go to `docs/spikes.md` together with the pinned engine commit. Done: 1–7 and
-      9–11. Left: 8, which needs a Claude Code session with the server:
+      `test-project/`. From a Claude Code session, `godot_status` answers "Editor: connected. Godot
+      4.8.beta.custom_build.679066724, addon 0.1.2, bridge protocol 1".
+- [x] Spikes — small prototypes; findings go to `docs/spikes.md` together with the pinned engine commit:
   1. `TCPServer.listen(0, "127.0.0.1")` inside an `EditorPlugin`: ephemeral port, polling in `_process`, latency with
      an unfocused window, several clients.
   2. The `EngineDebugger` ⇄ `EditorDebuggerPlugin` channel: round trip, screenshot transfer, several sessions, a game
@@ -1950,8 +1950,9 @@ because the editor does not run the static initializers of scripts that are not 
 - [x] Progress notifications for long calls. Every tool call whose request carries a `progressToken` gets a
       `notifications/progress` every five seconds while it runs, with the elapsed time as progress and a message
       such as "test_run is still working (25 s)", so a client can show that `editor_launch`, `test_run`,
-      `export_project` or a long `game_run` are alive and reset its timeout. Whether Claude Code shows them is still
-      to see in a session.
+      `export_project` or a long `game_run` are alive and reset its timeout. Claude Code 2.1.325 asks for them on
+      every call and passes them to its terminal interface; the desktop app shows only its own heartbeat with the
+      elapsed time every 30 seconds, and progress does not extend a `timeout` set for the server (spike 8).
 - [x] CI on Windows and macOS. The job "Unit tests and an editor" runs the types, the unit tests and the build on
       `windows-2025` and `macos-15`, downloads the official Godot build of the stable version checked against the
       release's `SHA512-SUMS.txt`, and starts the editor from the server (`editorLaunch.test.ts`). Test projects link
