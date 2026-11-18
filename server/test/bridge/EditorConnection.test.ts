@@ -99,12 +99,14 @@ describe('EditorConnection', () => {
     expect(!status.connected && status.reason).toContain('plugin');
   });
 
-  it('explains a discovery file left behind by a stopped editor', async () => {
+  it('explains a discovery file left behind by a stopped editor and leaves the advice to the callers', async () => {
     const { connection } = connectionWith({ kind: 'stale', path: '/projects/game/.godot/godot_mcp_tool/bridge.json', pid: 41234, executablePath: '/opt/godot/godot' }, []);
 
     const status = await connection.status();
 
-    expect(!status.connected && status.reason).toContain('41234');
+    expect(!status.connected && status.reason).toBe(
+      'The Godot editor that wrote /projects/game/.godot/godot_mcp_tool/bridge.json (process 41234) is no longer running.',
+    );
   });
 
   it('explains that the editor of the project was closed', async () => {

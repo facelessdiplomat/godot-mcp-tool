@@ -107,7 +107,7 @@ export class EditorConnection implements EditorSession {
       case 'stale':
         return {
           connected: false,
-          reason: `The discovery file ${discovered.path} belongs to process ${String(discovered.pid)}, which is no longer running. Open the project in the Godot editor again.`,
+          reason: `The Godot editor that wrote ${discovered.path} (process ${String(discovered.pid)}) is no longer running.`,
         };
       case 'closed':
         return { connected: false, reason: 'The Godot editor of this project was closed.' };
