@@ -9,7 +9,7 @@ export type EditedScriptOutcome = { readonly kind: 'silent' } | { readonly kind:
 
 export type ScriptValidation = (projectRoot: string, scriptPath: string) => Promise<ValidationResult>;
 
-const scriptExtension = '.gd';
+const checkedExtensions = ['.gd', '.gdshader'];
 const silent: EditedScriptOutcome = { kind: 'silent' };
 const fileEditSchema = z.object({ tool_input: z.object({ file_path: z.string().min(1) }) });
 
@@ -18,7 +18,7 @@ export class EditedScriptCheck {
 
   async check(hookInput: unknown): Promise<EditedScriptOutcome> {
     const edit = fileEditSchema.safeParse(hookInput);
-    if (!edit.success || !edit.data.tool_input.file_path.endsWith(scriptExtension)) {
+    if (!edit.success || !checkedExtensions.some((extension) => edit.data.tool_input.file_path.endsWith(extension))) {
       return silent;
     }
     const scriptPath = edit.data.tool_input.file_path;
@@ -35,7 +35,7 @@ export class EditedScriptCheck {
       }
       throw error;
     }
-    const problems = validation.reports.flatMap((report) => report.problems);
+    const problems = [...validation.reports, ...(validation.shaderReports ?? [])].flatMap((report) => report.problems);
     if (problems.length === 0) {
       return silent;
     }

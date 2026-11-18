@@ -99,3 +99,12 @@ func test_measures_frames_and_counts_objects() -> void:
 	assert_gt(result["memory_bytes"], 0)
 	assert_true(result.has("orphan_nodes"))
 	assert_true(result.has("draw_calls"))
+
+
+func test_reads_the_custom_monitors_of_the_game() -> void:
+	Performance.add_custom_monitor("game/enemies", func() -> int: return 12)
+	Performance.add_custom_monitor("game/name", func() -> String: return "arena")
+	var result: Dictionary = await GodotMcpGamePerformanceCommand.new(GodotMcpGameScene.new(func() -> Node: return _counter)).execute({"frames": 3})
+	Performance.remove_custom_monitor("game/enemies")
+	Performance.remove_custom_monitor("game/name")
+	assert_eq(result["custom_monitors"], {"game/enemies": {"average": 12.0, "p95": 12.0, "max": 12.0}})

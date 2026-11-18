@@ -109,6 +109,66 @@ describe('node tools', () => {
     expect(textOf(result)).toContain('- speed: CharacterBody3D has no property "speed".');
   });
 
+  it('node_set_properties says when a change inside an instance turned on its editable children', async () => {
+    const editor = new FakeEditorGateway().respondTo('node.set_properties', {
+      scene: 'res://levels/arena.tscn',
+      path: 'Enemy2/Mesh',
+      ...emptyReport,
+      applied: ['material_override'],
+      editable_children: ['Enemy2'],
+    });
+
+    const result = await createNodeSetPropertiesTool(editor).execute({ path: 'Enemy2/Mesh', properties: { material_override: { new: 'StandardMaterial3D' } } });
+
+    expect(textOf(result)).toBe(
+      [
+        'Updated Enemy2/Mesh in res://levels/arena.tscn. The scene has unsaved changes.',
+        'Applied: material_override',
+        'Turned on Editable Children of Enemy2, so that this change inside the instanced scene is saved with this scene.',
+      ].join('\n'),
+    );
+  });
+
+  it('node_add says when adding inside nested instances turned on their editable children', async () => {
+    const editor = new FakeEditorGateway().respondTo('node.add', {
+      scene: 'res://levels/arena.tscn',
+      path: 'Squad/Leader/Mesh/Marker',
+      type: 'Marker3D',
+      ...emptyReport,
+      editable_children: ['Squad', 'Squad/Leader'],
+    });
+
+    const result = await createNodeAddTool(editor).execute({ type: 'Marker3D', name: 'Marker', parent: 'Squad/Leader/Mesh' });
+
+    expect(textOf(result)).toBe(
+      [
+        'Added Squad/Leader/Mesh/Marker (Marker3D) to res://levels/arena.tscn. The scene has unsaved changes.',
+        'Turned on Editable Children of Squad, Squad/Leader, so that this change inside the instanced scenes is saved with this scene.',
+      ].join('\n'),
+    );
+  });
+
+  it('node_set_groups says when a change inside an instance turned on its editable children', async () => {
+    const editor = new FakeEditorGateway().respondTo('node.set_groups', {
+      scene: 'res://levels/arena.tscn',
+      path: 'Enemy2/Hitbox',
+      groups: ['targets'],
+      added: ['targets'],
+      removed: [],
+      unchanged: [],
+      editable_children: ['Enemy2'],
+    });
+
+    const result = await createNodeSetGroupsTool(editor).execute({ path: 'Enemy2/Hitbox', add: ['targets'] });
+
+    expect(textOf(result)).toBe(
+      [
+        'Updated the groups of Enemy2/Hitbox in res://levels/arena.tscn, now: targets. The scene has unsaved changes.',
+        'Turned on Editable Children of Enemy2, so that this change inside the instanced scene is saved with this scene.',
+      ].join('\n'),
+    );
+  });
+
   it('node_set_properties reports a full failure as an error', async () => {
     const editor = new FakeEditorGateway().respondTo('node.set_properties', {
       scene: 'res://levels/arena.tscn',
@@ -186,6 +246,35 @@ describe('node tools', () => {
     expect(textOf(result)).toContain('There are no visual nodes or collision shapes below it, so this is only its position.');
   });
 
+  it('node_get_bounds gives the rectangle of a control and whether it fits the window', async () => {
+    const editor = new FakeEditorGateway().respondTo('node.get_bounds', {
+      scene: 'res://ui/hud.tscn',
+      path: 'Health',
+      type: 'ProgressBar',
+      dimensions: 2,
+      position: 'Vector2(1100, 600)',
+      size: 'Vector2(200, 30)',
+      center: 'Vector2(1200, 615)',
+      end: 'Vector2(1300, 630)',
+      visual_count: 1,
+      collision_count: 0,
+      window: 'Vector2(1152, 648)',
+      inside_window: false,
+    });
+
+    const result = await createNodeGetBoundsTool(editor).execute({ path: 'Health', scene: 'res://ui/hud.tscn' });
+
+    expect(textOf(result)).toBe(
+      [
+        'Health (ProgressBar) in res://ui/hud.tscn, in canvas pixels:',
+        'center Vector2(1200, 615), size Vector2(200, 30)',
+        'from Vector2(1100, 600) to Vector2(1300, 630)',
+        'Measured from 1 visual node.',
+        'It reaches outside the Vector2(1152, 648) window of the project.',
+      ].join('\n'),
+    );
+  });
+
   it('node_find lists the matching nodes with their paths', async () => {
     const editor = new FakeEditorGateway().respondTo('node.find', {
       scene: 'res://levels/arena.tscn',
@@ -207,6 +296,31 @@ describe('node tools', () => {
         'Crate: Node3D [instance res://props/crate.tscn]',
       ].join('\n'),
     );
+  });
+
+  it('node_find searches inside instanced scenes when asked, and says when it did not', async () => {
+    const editor = new FakeEditorGateway()
+      .respondTo('node.find', {
+        scene: 'res://levels/arena.tscn',
+        matches: [{ path: 'Enemy2', type: 'CharacterBody3D', instance: 'res://enemy.tscn', editable_children: true }],
+        total: 1,
+        truncated: false,
+        hidden_instance_nodes: true,
+      })
+      .respondTo('node.find', { scene: 'res://levels/arena.tscn', matches: [{ path: 'Enemy1/Mesh', type: 'MeshInstance3D' }], total: 1, truncated: false });
+
+    const shallow = await createNodeFindTool(editor).execute({ name: 'Enemy*' });
+    const deep = await createNodeFindTool(editor).execute({ type: 'MeshInstance3D', expand_instances: true });
+
+    expect(editor.requests[1]?.params).toEqual({ type: 'MeshInstance3D', max_results: 50, expand_instances: true });
+    expect(textOf(shallow)).toBe(
+      [
+        '1 node in res://levels/arena.tscn matches:',
+        'Enemy2: CharacterBody3D [instance res://enemy.tscn, editable children]',
+        'Nodes inside instanced scenes were not searched; expand_instances: true searches them too.',
+      ].join('\n'),
+    );
+    expect(textOf(deep)).toBe(['1 node in res://levels/arena.tscn matches:', 'Enemy1/Mesh: MeshInstance3D'].join('\n'));
   });
 
   it('node_find says what it looked for when nothing matches', async () => {

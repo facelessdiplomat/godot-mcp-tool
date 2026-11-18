@@ -3,6 +3,7 @@ extends "../command.gd"
 const GodotMcpBoundsReport := preload("../../capture/bounds_report.gd")
 const GodotMcpEditingContext := preload("../../scene/editing_context.gd")
 const GodotMcpGameRequestCommand := preload("../game/game_request_command.gd")
+const GodotMcpHeadlessWindow := preload("../../runtime/headless_window.gd")
 const GodotMcpNodeFactory := preload("../../scene/node_factory.gd")
 const GodotMcpNodeLocator := preload("../../scene/node_locator.gd")
 const GodotMcpParams := preload("../params.gd")
@@ -32,7 +33,7 @@ func execute(params: Dictionary) -> Variant:
 	if resolved is GodotMcpCommandError:
 		return resolved
 	var snapshot := resolved as GodotMcpSceneSnapshot
-	var result: Variant = _measure(snapshot, node_path)
+	var result: Variant = await _measure(snapshot, node_path)
 	snapshot.release()
 	return result
 
@@ -41,9 +42,28 @@ func _measure(snapshot: GodotMcpSceneSnapshot, node_path: String) -> Variant:
 	var node := GodotMcpNodeLocator.find(snapshot.root, node_path)
 	if node == null:
 		return GodotMcpCommandError.new(GodotMcpJsonRpc.NOT_FOUND, "Node \"%s\" not found" % node_path, GodotMcpNodeLocator.not_found_hint(snapshot.root, node_path))
-	var report: Variant = GodotMcpBoundsReport.describe(node, _context.codec)
+	var report: Variant
+	if node is Control and not node.is_inside_tree():
+		report = await _described_in_project_window(snapshot.root, snapshot.root.get_path_to(node))
+	else:
+		report = GodotMcpBoundsReport.describe(node, _context.codec)
 	if report is GodotMcpCommandError:
 		return report
 	var result := {"scene": snapshot.scene_path, "path": GodotMcpNodeLocator.path_of(snapshot.root, node), "type": GodotMcpNodeFactory.display_class(node)}
 	result.merge(report)
 	return result
+
+
+func _described_in_project_window(scene_root: Node, node_path: NodePath) -> Variant:
+	var tree := Engine.get_main_loop() as SceneTree
+	var window := SubViewport.new()
+	window.size = GodotMcpHeadlessWindow.project_window_size()
+	window.render_target_update_mode = SubViewport.UPDATE_DISABLED
+	var copy := scene_root.duplicate()
+	window.add_child(copy)
+	tree.root.add_child(window)
+	await tree.process_frame
+	await tree.process_frame
+	var report: Variant = GodotMcpBoundsReport.describe(copy.get_node(node_path), _context.codec)
+	window.free()
+	return report

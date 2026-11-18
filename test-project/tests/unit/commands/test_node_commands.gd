@@ -194,9 +194,9 @@ func test_measures_the_bounds_of_a_node_in_the_scene() -> void:
 	assert_eq(result["visual_count"], 1)
 
 
-func test_explains_bounds_of_a_node_that_is_not_3d() -> void:
+func test_explains_bounds_of_a_node_that_is_neither_3d_nor_2d() -> void:
 	_add_owned(_root, Node.new(), "Logic")
 	var error: Variant = await GodotMcpNodeGetBoundsCommand.new(_context, null).execute({"path": "Logic"})
 	assert_true(error is GodotMcpCommandError)
-	assert_string_contains((error as GodotMcpCommandError).message, "not a 3D node")
+	assert_string_contains((error as GodotMcpCommandError).message, "neither a 3D nor a 2D node")
 

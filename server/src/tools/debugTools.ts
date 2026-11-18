@@ -24,6 +24,7 @@ export interface GameDebugService {
   changeBreakpoints(change: BreakpointChange): Promise<SourceLine[]>;
   waitForStop(timeoutMs: number): Promise<GameStop | undefined>;
   variables(frame: number): Promise<FrameVariables>;
+  evaluate(expression: string, frame: number): Promise<string>;
   resume(action: ResumeAction, stepTimeoutMs: number): Promise<GameStop | undefined>;
 }
 
@@ -44,7 +45,7 @@ const stopPhrases: Readonly<Record<StopReason, string>> = {
   pause: 'was paused in the debugger',
   unknown: 'is stopped in the debugger',
 };
-const stepPhrases: Readonly<Record<Exclude<ResumeAction, 'continue'>, string>> = { step_over: 'Stepped over', step_into: 'Stepped into' };
+const stepPhrases: Readonly<Record<Exclude<ResumeAction, 'continue'>, string>> = { step_over: 'Stepped over', step_into: 'Stepped into', step_out: 'Stepped out' };
 
 const sourceLineText = z.string().regex(sourceLinePattern, 'Write a breakpoint as "res://path.gd:line", with the line counted from 1, such as "res://player/player.gd:42".');
 
@@ -103,6 +104,11 @@ const debugStateInput = z.object({
     .min(0)
     .default(0)
     .describe('The stack frame whose code and variables to show: 0 is the line where the game stopped, 1 the function that called it, and so on.'),
+  expression: z
+    .string()
+    .min(1)
+    .optional()
+    .describe('A GDScript expression to evaluate in that frame, with its locals and members, such as "health - amount" or "get_node(\'Camera\').position".'),
 });
 
 export function createDebugStateTool(service: GameDebugService, readScript: ScriptReader): Tool<typeof debugStateInput> {
@@ -111,13 +117,13 @@ export function createDebugStateTool(service: GameDebugService, readScript: Scri
     definition: {
       title: 'Debugger state',
       description:
-        'Show where the game stopped in the debugger and why — a breakpoint, a step or an error — with the stack of function calls, the code around the line, and the local variables and members of a stack frame. With wait_ms it first waits for the game to stop, such as after game_input made the player do what reaches the breakpoint. While the game is stopped, game_get_properties still reads nodes, but game_wait, game_input and screenshots need debug_continue first.',
+        'Show where the game stopped in the debugger and why — a breakpoint, a step or an error — with the stack of function calls, the code around the line, and the local variables and members of a stack frame; with expression, also the value of a GDScript expression in that frame. With wait_ms it first waits for the game to stop, such as after game_input made the player do what reaches the breakpoint. While the game is stopped, game_get_properties still reads nodes, but game_wait, game_input and screenshots need debug_continue first.',
       inputSchema: debugStateInput,
       annotations: readingAnnotations,
       alwaysLoad: false,
     },
     execute: (input) =>
-      withParsedInput('debug_state', debugStateInput, input, async ({ wait_ms: waitMs, frame }) => {
+      withParsedInput('debug_state', debugStateInput, input, async ({ wait_ms: waitMs, frame, expression }) => {
         const stop = await service.waitForStop(waitMs);
         if (stop === undefined) {
           return waitMs === 0
@@ -134,7 +140,8 @@ export function createDebugStateTool(service: GameDebugService, readScript: Scri
           ...stop.frames.map((stackFrame) => `- #${String(stackFrame.index)} ${locationOf(stackFrame)}`),
           ...describeCode(shownFrame, readScript),
           ...describeVariables(shownFrame, await service.variables(frame)),
-          'Resume with debug_continue: action "continue", "step_over" or "step_into".',
+          ...(expression === undefined ? [] : [`${expression} = ${await service.evaluate(expression, frame)} (evaluated in #${String(frame)})`]),
+          'Resume with debug_continue: action "continue", "step_over", "step_into" or "step_out".',
         ].join('\n');
       }),
   };
@@ -142,10 +149,10 @@ export function createDebugStateTool(service: GameDebugService, readScript: Scri
 
 const debugContinueInput = z.object({
   action: z
-    .enum(['continue', 'step_over', 'step_into'])
+    .enum(['continue', 'step_over', 'step_into', 'step_out'])
     .default('continue')
     .describe(
-      '"continue" runs the game until the next breakpoint; "step_over" runs the current line and stops at the next one; "step_into" also stops inside the functions that the line calls. Default: "continue".',
+      '"continue" runs the game until the next breakpoint; "step_over" runs the current line and stops at the next one; "step_into" also stops inside the functions that the line calls; "step_out" runs to the end of the current function and stops in the one that called it. Default: "continue".',
     ),
 });
 

@@ -8,13 +8,26 @@ import type { ProcessResult, ProcessRunner, ProcessRunOptions } from '../../src/
 const binaryPath = '/opt/godot/godot';
 
 const engineApi = {
-  classes: [{ name: 'Node', inherits: 'Object', brief_description: 'Base class for all scene objects.', description: '' }],
+  classes: [
+    {
+      name: 'Node',
+      inherits: 'Object',
+      brief_description: 'Base class for all scene objects.',
+      description: '',
+      properties: [{ name: 'name', type: 'StringName', setter: 'set_name', getter: 'get_name', description: 'The name of the node.' }],
+    },
+  ],
   builtin_classes: [],
   utility_functions: [],
   global_enums: [],
 };
 
 const goblinXml = '<class name="Goblin" inherits="CharacterBody3D"><brief_description>A small enemy.</brief_description></class>';
+
+const editorHelp = {
+  gdscript: { name: '@GDScript', brief_description: 'Built-in GDScript annotations.', annotations: [{ name: '@onready', description: 'Mark the following property as assigned when the node is ready.' }] },
+  defaults: { Node: { name: '&""' } },
+};
 
 class FakeGodot implements ProcessRunner {
   readonly calls: string[][] = [];
@@ -27,6 +40,9 @@ class FakeGodot implements ProcessRunner {
     }
     if (args.includes('--dump-extension-api-with-docs') && options.cwd !== undefined) {
       writeFileSync(join(options.cwd, 'extension_api.json'), JSON.stringify(engineApi));
+    }
+    if (args.includes('--script')) {
+      writeFileSync(args.at(-1) ?? '', JSON.stringify(editorHelp));
     }
     const docsFolder = args[args.indexOf('--doctool') + 1];
     if (args.includes('--gdscript-docs') && docsFolder !== undefined) {
@@ -57,6 +73,8 @@ describe('DocsSource', () => {
       cacheDirectory,
       locateBinary: () => Promise.resolve({ found: true, path: binaryPath, source: 'GODOT_BIN' }),
       processRunner: godot,
+      helpCacheCandidates: (binary, versionBranch) => [join(workspace, 'editor-cache', `editor_doc_cache-${versionBranch}.res`), `${binary}-missing.res`],
+      helpDumpScript: '/package/addon/godot_mcp_tool/docs/editor_help_dump.gd',
     });
   }
 
@@ -81,6 +99,21 @@ describe('DocsSource', () => {
     expect(library.find('Node')?.brief).toBe('Base class for all scene objects.');
     expect(godot.callsWith('--dump-extension-api-with-docs')).toBe(1);
     expect(existsSync(join(cacheDirectory, 'docs', '4.8.beta.custom_build.abc1234', 'extension_api.json'))).toBe(true);
+  });
+
+  it('adds the @GDScript page and the default values of properties from the help cache that the editor writes', async () => {
+    const withoutCache = await source().load();
+    mkdirSync(join(workspace, 'editor-cache'));
+    writeFileSync(join(workspace, 'editor-cache', 'editor_doc_cache-4.8.res'), 'cache');
+    const withCache = await source().load();
+    await source().load();
+
+    expect(withoutCache.find('@GDScript')).toBeUndefined();
+    expect(withCache.find('@GDScript')?.methods.map((method) => method.name)).toEqual(['@onready']);
+    expect(withCache.find('Node')?.properties[0]?.defaultValue).toBe('&""');
+    expect(godot.calls.filter((call) => call.includes('--script'))).toEqual([
+      [binaryPath, '--headless', '--script', '/package/addon/godot_mcp_tool/docs/editor_help_dump.gd', '--', join(workspace, 'editor-cache', 'editor_doc_cache-4.8.res'), expect.stringMatching(/editor_help-\d+\.json$/)],
+    ]);
   });
 
   it('shares one load between calls that come at the same time', async () => {
@@ -155,6 +188,8 @@ describe('DocsSource', () => {
       cacheDirectory,
       locateBinary: () => Promise.resolve({ found: false, reason: 'No Godot executable was found.' }),
       processRunner: godot,
+      helpCacheCandidates: () => [],
+      helpDumpScript: '',
     });
 
     await expect(docsSource.load()).rejects.toThrow(DocsUnavailableError);

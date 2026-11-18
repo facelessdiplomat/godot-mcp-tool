@@ -42,6 +42,23 @@ const warningNameBeforeMessage = /^\((?<name>[A-Z][A-Z0-9_]*)\): /;
 
 const responseSchema = z.object({ id: z.number(), result: z.unknown().optional(), error: z.object({ message: z.string() }).optional() });
 const notificationSchema = z.object({ method: z.string(), params: z.unknown().optional() });
+const positionSchema = z.object({ line: z.number().int(), character: z.number().int() });
+const workspaceEditSchema = z
+  .object({ changes: z.record(z.string(), z.array(z.object({ range: z.object({ start: positionSchema, end: positionSchema }), newText: z.string() }))).optional() })
+  .nullable();
+
+export interface SymbolPosition {
+  readonly path: string;
+  readonly line: number;
+  readonly character: number;
+}
+
+export interface LineEdit {
+  readonly line: number;
+  readonly startCharacter: number;
+  readonly endCharacter: number;
+  readonly newText: string;
+}
 const changeWorkspaceSchema = z.object({ path: z.string() });
 const publishedDiagnosticsSchema = z.object({
   uri: z.string(),
@@ -120,6 +137,31 @@ export class LanguageServerClient {
       }
     }
     return results;
+  }
+
+  async rename(scripts: readonly ScriptText[], target: SymbolPosition, newName: string): Promise<Map<string, LineEdit[]>> {
+    const parsed = scripts.map((script) => this.waitForDiagnostics(script.path));
+    for (const script of scripts) {
+      this.notify('textDocument/didOpen', { textDocument: { uri: pathToFileURL(script.path).href, languageId: 'gdscript', version: 1, text: script.text } });
+    }
+    try {
+      await Promise.all(parsed);
+      const workspaceEdit = workspaceEditSchema.parse(
+        await this.request('textDocument/rename', { textDocument: { uri: pathToFileURL(target.path).href }, position: { line: target.line, character: target.character }, newName }),
+      );
+      const edits = new Map<string, LineEdit[]>();
+      for (const [uri, changes] of Object.entries(workspaceEdit?.changes ?? {})) {
+        edits.set(
+          fileURLToPath(uri),
+          changes.map((change) => ({ line: change.range.start.line, startCharacter: change.range.start.character, endCharacter: change.range.end.character, newText: change.newText })),
+        );
+      }
+      return edits;
+    } finally {
+      for (const script of scripts) {
+        this.notify('textDocument/didClose', { textDocument: { uri: pathToFileURL(script.path).href } });
+      }
+    }
   }
 
   close(): void {

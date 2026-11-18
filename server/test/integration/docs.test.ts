@@ -1,5 +1,5 @@
-import { mkdirSync, mkdtempSync, realpathSync, rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { existsSync, mkdirSync, mkdtempSync, realpathSync, rmSync } from 'node:fs';
+import { homedir, tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { godotBinary, McpSession, TemporaryProject } from './harness.js';
@@ -58,7 +58,7 @@ describe.skipIf(godotBinary === '')('the class reference without the editor', ()
       expect(reference.text).toContain('CharacterBody3D — engine class');
       expect(reference.text).toContain('Inherits: PhysicsBody3D < CollisionObject3D < Node3D < Node < Object');
       expect(reference.text).toContain('- move_and_slide() -> bool — ');
-      expect(reference.text).toContain('- velocity: Vector3 — ');
+      expect(reference.text).toMatch(/- velocity: Vector3( = Vector3\(0, 0, 0\))? — /);
     },
     firstCallTimeoutMs,
   );
@@ -82,6 +82,24 @@ describe.skipIf(godotBinary === '')('the class reference without the editor', ()
     expect(goblin.text).toContain('- speed: float = 3.5 — How fast the goblin walks, in meters per second.');
     expect(goblin.text).toContain('- chase(target: Node3D) -> void — Makes the goblin chase `target`.');
   });
+
+  it.skipIf(!existsSync(join(homedir(), 'Library', 'Caches', 'Godot', 'editor_doc_cache-4.8.res')) && !existsSync(join(homedir(), '.cache', 'godot', 'editor_doc_cache-4.8.res')))(
+    'shows the annotations of GDScript and the default values of engine properties from the help of the editor',
+    async () => {
+      const page = await tools().call('docs_class', { name: '@GDScript' });
+      const exportRange = await tools().call('docs_class', { name: '@GDScript', member: '@export_range' });
+      const body = await tools().call('docs_class', { name: 'CharacterBody3D', member: 'floor_max_angle' });
+      const overview = await tools().call('docs_class', { name: 'Node3D' });
+
+      expect(page.text).toContain('@GDScript — annotations and functions of GDScript');
+      expect(page.text).toMatch(/Annotations:\n- @abstract/);
+      expect(page.text).toContain('- preload(path: String) -> Resource');
+      expect(exportRange.text).toMatch(/^@GDScript\.@export_range\(min: float, max: float, step: float = 1\.0, extra_hints: String = "", \.\.\.\)\nAnnotation of @GDScript\./);
+      expect(overview.text).toContain('position: Vector3 = Vector3(0, 0, 0)');
+      expect(body.text).toContain('floor_max_angle');
+    },
+    firstCallTimeoutMs,
+  );
 
   it('searches classes and members', async () => {
     const results = await tools().call('docs_search', { query: 'raycast' });

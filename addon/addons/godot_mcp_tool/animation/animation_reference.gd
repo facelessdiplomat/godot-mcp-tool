@@ -2,6 +2,7 @@ extends RefCounted
 
 const GodotMcpCommandError := preload("../commands/command_error.gd")
 const GodotMcpIndefiniteArticle := preload("../util/indefinite_article.gd")
+const GodotMcpInstancedScenes := preload("../scene/instanced_scenes.gd")
 const GodotMcpJsonRpc := preload("../bridge/json_rpc.gd")
 const GodotMcpNodeFactory := preload("../scene/node_factory.gd")
 const GodotMcpNodeLocator := preload("../scene/node_locator.gd")
@@ -24,6 +25,14 @@ static func find_player(scene_root: Node, player_path: String) -> Variant:
 			"Add an AnimationPlayer with node_add; its tracks animate the nodes under its parent.",
 		)
 	return node
+
+
+static func find_player_to_change(scene_root: Node, player_path: String) -> Variant:
+	var found: Variant = find_player(scene_root, player_path)
+	if found is GodotMcpCommandError:
+		return found
+	var refusal := GodotMcpInstancedScenes.refusal_for_part_of(found, scene_root, "animations")
+	return found if refusal == null else refusal
 
 
 static func parse(full_name: String) -> Variant:

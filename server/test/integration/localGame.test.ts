@@ -13,6 +13,17 @@ const delayedErrorScript = [
   '',
 ].join('\n');
 
+const optionsScript = [
+  'extends Node',
+  '',
+  '',
+  'func _ready() -> void:',
+  '\tprint("collisions=%s paths=%s arguments=%s locale=%s" % [get_tree().debug_collisions_hint, get_tree().debug_paths_hint, OS.get_cmdline_user_args(), TranslationServer.get_locale()])',
+  '',
+].join('\n');
+
+const optionsScene = ['[gd_scene load_steps=2 format=3]', '', '[ext_resource type="Script" path="res://options.gd" id="1_script"]', '', '[node name="Options" type="Node"]', 'script = ExtResource("1_script")', ''].join('\n');
+
 const mainScene = ['[gd_scene load_steps=2 format=3]', '', '[ext_resource type="Script" path="res://main.gd" id="1_script"]', '', '[node name="Main" type="Node"]', 'script = ExtResource("1_script")', ''].join('\n');
 
 describe.skipIf(godotBinary === '')('running the game without the editor', () => {
@@ -30,6 +41,8 @@ describe.skipIf(godotBinary === '')('running the game without the editor', () =>
     project = new TemporaryProject('MCP local game', { mainScene: 'res://main.tscn', withRuntimeAutoload: true });
     project.write('main.gd', delayedErrorScript);
     project.write('main.tscn', mainScene);
+    project.write('options.gd', optionsScript);
+    project.write('options.tscn', optionsScene);
     session = await McpSession.connect(project.root, { GODOT_BIN: godotBinary, GODOT_MCP_HEADLESS: '1' });
   });
 
@@ -58,6 +71,20 @@ describe.skipIf(godotBinary === '')('running the game without the editor', () =>
   it('stops the process', async () => {
     expect((await tools().call('game_stop')).text).toBe('Stopped the game.');
     expect((await tools().call('game_stop')).text).toBe('The game was not running.');
+  });
+
+  it('passes debug drawing, game arguments and the locale to the game', async () => {
+    const run = await tools().call('game_run', {
+      scene: 'res://options.tscn',
+      duration_ms: 300,
+      debug_draw: ['collisions', 'paths'],
+      arguments: ['--level=3'],
+      locale: 'pt_BR',
+    });
+
+    expect(run.text).toContain('collisions=true paths=true');
+    expect(run.text).toContain('--level=3');
+    expect(run.text).toContain('locale=pt_BR');
   });
 
   it('cannot run the current scene without the editor', async () => {

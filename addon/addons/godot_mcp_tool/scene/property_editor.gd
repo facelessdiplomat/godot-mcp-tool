@@ -14,6 +14,9 @@ const ANCHORS_PRESET_PROPERTY := "anchors_preset"
 const LAYOUT_MODE_PROPERTY := "layout_mode"
 const POSITION_LAYOUT_MODE := 0
 const ANCHORS_LAYOUT_MODE := 1
+const PATH_SEPARATOR := ":"
+const BUILT_IN_SEPARATOR := "::"
+const PREFERRED_RESOURCE_CLASSES := ["StandardMaterial3D"]
 
 var _codec: GodotMcpVariantCodec
 
@@ -62,6 +65,9 @@ func describe(object: Object, requested_names: PackedStringArray, include_defaul
 	var names: Array = properties.keys() if requested_names.is_empty() else Array(requested_names)
 	var entries: Array = []
 	for property_name in names:
+		if (property_name as String).contains(PATH_SEPARATOR):
+			entries.append(_describe_path(object, property_name))
+			continue
 		if not properties.has(property_name):
 			entries.append({"name": property_name, "error": _unknown_property_message(object, property_name, properties)})
 			continue
@@ -73,16 +79,19 @@ func describe(object: Object, requested_names: PackedStringArray, include_defaul
 	return entries
 
 
-func plan(object: Object, values: Dictionary) -> Dictionary:
-	var decoding := _decode_all(object, values)
+func plan(object: Object, values: Dictionary, owning_file: String = "") -> Dictionary:
+	var decoding := _decode_all(object, values, owning_file)
 	var decoded: Dictionary = decoding["decoded"]
+	var writes: Dictionary = decoding["writes"]
 	var implied := _layout_implied_by(object, decoded)
 	var changes := GodotMcpChangeSet.new()
 	for property_name in implied:
 		changes.add_do_property(object, property_name, implied[property_name])
 	for property_name in decoded:
-		changes.add_do_property(object, property_name, decoded[property_name])
-		changes.add_undo_property(object, property_name, object.get(property_name))
+		var write: Dictionary = writes[property_name]
+		var holder: Object = write["holder"]
+		changes.add_do_property(holder, write["property"], write["value"])
+		changes.add_undo_property(holder, write["property"], holder.get(write["property"]))
 	for property_name in implied:
 		changes.add_undo_property(object, property_name, object.get(property_name))
 	return {"changes": changes, "decoded": decoded, "rejected": decoding["rejected"]}
@@ -96,14 +105,16 @@ func apply(object: Object, values: Dictionary, history: GodotMcpUndoHistory, act
 	return report(object, planned["decoded"], planned["rejected"])
 
 
-func assign(object: Object, values: Dictionary) -> Dictionary:
-	var decoding := _decode_all(object, values)
+func assign(object: Object, values: Dictionary, owning_file: String = "") -> Dictionary:
+	var decoding := _decode_all(object, values, owning_file)
 	var decoded: Dictionary = decoding["decoded"]
+	var writes: Dictionary = decoding["writes"]
 	var implied := _layout_implied_by(object, decoded)
 	for property_name in implied:
 		object.set(property_name, implied[property_name])
 	for property_name in decoded:
-		object.set(property_name, decoded[property_name])
+		var write: Dictionary = writes[property_name]
+		(write["holder"] as Object).set(write["property"], write["value"])
 	return report(object, decoded, decoding["rejected"])
 
 
@@ -111,7 +122,7 @@ func report(object: Object, decoded: Dictionary, rejected: Array) -> Dictionary:
 	var applied: Array = []
 	var not_applied: Array = []
 	for property_name in decoded:
-		var actual: Variant = object.get(property_name)
+		var actual: Variant = object.get_indexed(NodePath(property_name)) if (property_name as String).contains(PATH_SEPARATOR) else object.get(property_name)
 		if GodotMcpValueComparison.matches(decoded[property_name], actual):
 			applied.append(property_name)
 		else:
@@ -119,11 +130,21 @@ func report(object: Object, decoded: Dictionary, rejected: Array) -> Dictionary:
 	return {"applied": applied, "rejected": rejected, "not_applied": not_applied}
 
 
-func _decode_all(object: Object, values: Dictionary) -> Dictionary:
+func _decode_all(object: Object, values: Dictionary, owning_file: String) -> Dictionary:
 	var properties := settable_properties(object)
 	var decoded := {}
+	var writes := {}
+	var pending := {}
 	var rejected: Array = []
 	for property_name in _ordered_names(values.keys()):
+		if (property_name as String).contains(PATH_SEPARATOR):
+			var path_write: Variant = _decode_path(object, property_name, values[property_name], owning_file, pending)
+			if path_write is String:
+				rejected.append({"name": property_name, "reason": path_write})
+				continue
+			decoded[property_name] = (path_write as Dictionary)["requested"]
+			writes[property_name] = path_write
+			continue
 		if not properties.has(property_name):
 			rejected.append({"name": property_name, "reason": _unknown_property_message(object, property_name, properties)})
 			continue
@@ -132,9 +153,136 @@ func _decode_all(object: Object, values: Dictionary) -> Dictionary:
 			rejected.append({"name": property_name, "reason": outcome.error})
 			continue
 		decoded[property_name] = outcome.value
+		writes[property_name] = {"holder": object, "property": property_name, "value": outcome.value}
+		pending[_pending_key(object, property_name)] = outcome.value
 		if property_name == SCRIPT_PROPERTY and outcome.value is Script:
 			properties.merge(_exported_script_properties(outcome.value))
-	return {"decoded": decoded, "rejected": rejected}
+	return {"decoded": decoded, "writes": writes, "rejected": rejected}
+
+
+func _describe_path(object: Object, path: String) -> Dictionary:
+	var resolved: Variant = _resolve_path(object, path)
+	if resolved is String:
+		return {"name": path, "error": resolved}
+	var holder: Object = resolved["holder"]
+	var property_name: String = resolved["property"]
+	var part: String = resolved["part"]
+	var properties := readable_properties(holder)
+	if not properties.has(property_name):
+		return {"name": path, "error": _unknown_property_message(holder, property_name, properties)}
+	if part.is_empty():
+		var entry := _entry(properties[property_name], holder.get(property_name))
+		entry["name"] = path
+		return entry
+	var value: Variant = holder.get_indexed(NodePath(property_name + PATH_SEPARATOR + part))
+	if value == null:
+		return {"name": path, "error": _missing_part_message(holder.get(property_name), part)}
+	return {"name": path, "type": type_string(typeof(value)), "value": _codec.encode(value)}
+
+
+func _decode_path(object: Object, path: String, value: Variant, owning_file: String, pending: Dictionary) -> Variant:
+	var resolved: Variant = _resolve_path(object, path)
+	if resolved is String:
+		return resolved
+	var sharing := _sharing_problem(path, resolved["resources"], owning_file)
+	if not sharing.is_empty():
+		return sharing
+	var holder: Object = resolved["holder"]
+	var property_name: String = resolved["property"]
+	var part: String = resolved["part"]
+	var properties := settable_properties(holder)
+	if not properties.has(property_name):
+		return _unknown_property_message(holder, property_name, properties)
+	if part.is_empty():
+		var outcome := _codec.decode(value, properties[property_name], holder)
+		if not outcome.is_success:
+			return outcome.error
+		pending[_pending_key(holder, property_name)] = outcome.value
+		return {"holder": holder, "property": property_name, "value": outcome.value, "requested": outcome.value}
+	var part_path := NodePath(property_name + PATH_SEPARATOR + part)
+	var original: Variant = holder.get(property_name)
+	var key := _pending_key(holder, property_name)
+	holder.set(property_name, pending.get(key, original))
+	var current: Variant = holder.get_indexed(part_path)
+	if current == null:
+		holder.set(property_name, original)
+		return _missing_part_message(original, part)
+	var part_property := {"name": path, "type": typeof(current), "hint": PROPERTY_HINT_NONE, "hint_string": "", "usage": PROPERTY_USAGE_DEFAULT}
+	var outcome := _codec.decode(value, part_property, holder)
+	if not outcome.is_success:
+		holder.set(property_name, original)
+		return outcome.error
+	holder.set_indexed(part_path, outcome.value)
+	var combined: Variant = holder.get(property_name)
+	holder.set(property_name, original)
+	pending[key] = combined
+	return {"holder": holder, "property": property_name, "value": combined, "requested": outcome.value}
+
+
+func _resolve_path(object: Object, path: String) -> Variant:
+	var names := path.split(PATH_SEPARATOR)
+	if names.has(""):
+		return "\"%s\" is not a property path; write it like \"mesh:size\" or \"position:y\"" % path
+	var holder := object
+	var resources: Array = []
+	for index in names.size() - 1:
+		var name := names[index]
+		var properties := readable_properties(holder)
+		if not properties.has(name):
+			return _unknown_property_message(holder, name, properties)
+		var value: Variant = holder.get(name)
+		if value is Resource:
+			holder = value
+			resources.append({"path": PATH_SEPARATOR.join(names.slice(0, index + 1)), "resource": value})
+			continue
+		if value == null and int(properties[name]["type"]) == TYPE_OBJECT:
+			return _empty_resource_message(name, names[index + 1], properties[name])
+		if value is Object:
+			return "%s holds %s, whose properties cannot be reached by a path" % [name, (value as Object).get_class()]
+		return {"holder": holder, "property": name, "part": PATH_SEPARATOR.join(names.slice(index + 1)), "resources": resources}
+	return {"holder": holder, "property": names[-1], "part": "", "resources": resources}
+
+
+static func _sharing_problem(path: String, resources: Array, owning_file: String) -> String:
+	if owning_file.is_empty():
+		return ""
+	for reached: Dictionary in resources:
+		var resource: Resource = reached["resource"]
+		var file := resource.resource_path.get_slice(BUILT_IN_SEPARATOR, 0)
+		if file.is_empty() or file == owning_file:
+			continue
+		var name: String = reached["path"]
+		if resource.resource_path.contains(BUILT_IN_SEPARATOR):
+			return "%s comes from %s and is shared by every instance of it, so changing it here would be saved by no scene; give this node its own with {\"%s\": {\"new\": …}} instead, or change it in that scene" % [name, file, name]
+		return "%s is the resource file %s, which other nodes and scenes may use too; change it with resource_set_properties path: \"%s\", or give this node its own with {\"%s\": {\"new\": …}}" % [name, file, file, name]
+	return ""
+
+
+static func _empty_resource_message(name: String, next_name: String, property: Dictionary) -> String:
+	return "%s is empty, so it has no %s yet; create it with its values at once, such as {\"%s\": {\"new\": \"%s\", \"%s\": …}}" % [name, next_name, name, _creatable_class_for(property), next_name]
+
+
+static func _creatable_class_for(property: Dictionary) -> String:
+	var hinted := str(property.get("hint_string", "Resource")).split(",", false)
+	for class_name_text in hinted:
+		if ClassDB.can_instantiate(class_name_text):
+			return class_name_text
+		var subclasses := Array(ClassDB.get_inheriters_from_class(class_name_text)).filter(func(subclass: String) -> bool: return ClassDB.can_instantiate(subclass))
+		for preferred in PREFERRED_RESOURCE_CLASSES:
+			if preferred in subclasses:
+				return preferred
+		if not subclasses.is_empty():
+			subclasses.sort()
+			return subclasses[0]
+	return hinted[-1] if not hinted.is_empty() else "Resource"
+
+
+static func _missing_part_message(value: Variant, part: String) -> String:
+	return "%s has no part \"%s\"" % [type_string(typeof(value)), part]
+
+
+static func _pending_key(holder: Object, property_name: String) -> String:
+	return "%d/%s" % [holder.get_instance_id(), property_name]
 
 
 func _entry(property: Dictionary, value: Variant) -> Dictionary:

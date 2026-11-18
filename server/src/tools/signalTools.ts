@@ -2,6 +2,7 @@ import * as z from 'zod/v4';
 import type { EditorGateway } from '../editor/EditorGateway.js';
 import { changingAnnotations, readingAnnotations } from './annotations.js';
 import { BridgeTool } from './bridge/BridgeTool.js';
+import { editableChildrenSchema, withEditableChildrenSentence } from './formatting/editableChildren.js';
 import { formatNodePath } from './formatting/propertyReports.js';
 import { sceneToChange, sceneToRead } from './parameters.js';
 import { textResult } from './results.js';
@@ -13,6 +14,7 @@ const connectionSchema = z.object({
   method: z.string(),
   flags: z.array(z.string()),
   binds: z.array(z.unknown()),
+  inherited: z.boolean().optional(),
 });
 
 type Connection = z.infer<typeof connectionSchema>;
@@ -32,7 +34,7 @@ type NodeSignals = z.infer<typeof nodeSignalsSchema>;
 
 const signalListSchema = z.union([nodeSignalsSchema, sceneConnectionsSchema]);
 
-export const connectedSignalSchema = connectionSchema.extend({ scene: z.string(), already_connected: z.boolean() });
+export const connectedSignalSchema = connectionSchema.extend({ scene: z.string(), already_connected: z.boolean(), editable_children: editableChildrenSchema });
 
 type ConnectedSignal = z.infer<typeof connectedSignalSchema>;
 
@@ -76,9 +78,13 @@ function describeSceneConnections(list: SceneConnections): string {
 function describeNodeSignals(list: NodeSignals): string {
   const lines = [`Signals of ${formatNodePath(list.path)} (${list.type}) in ${list.scene}:`];
   for (const signal of list.signals) {
-    lines.push(`${signal.name}(${signal.arguments})`, ...signal.connections.map((connection) => `  → ${describeTarget(connection)}`));
+    lines.push(`${signal.name}(${signal.arguments})`, ...signal.connections.map((connection) => `  → ${describeTarget(connection)}${inheritanceNote(connection)}`));
   }
   return lines.join('\n');
+}
+
+function inheritanceNote(connection: Pick<Connection, 'inherited'>): string {
+  return connection.inherited === true ? ' (made by the instanced scene, so only that scene can disconnect it)' : '';
 }
 
 const nodeOfSignal = {
@@ -110,7 +116,11 @@ export function createSignalConnectTool(editor: EditorGateway): BridgeTool<typeo
     method: 'signal.connect',
     responseSchema: connectedSignalSchema,
     present: (connected) =>
-      textResult(connected.already_connected ? `${summarizeConnection(connected)}; nothing changed.` : `${summarizeConnection(connected)} in ${connected.scene}. The scene has unsaved changes.`),
+      textResult(
+        connected.already_connected
+          ? `${summarizeConnection(connected)}; nothing changed.`
+          : withEditableChildrenSentence(`${summarizeConnection(connected)} in ${connected.scene}. The scene has unsaved changes.`, connected.editable_children),
+      ),
   });
 }
 

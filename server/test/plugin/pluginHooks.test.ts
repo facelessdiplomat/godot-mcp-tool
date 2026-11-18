@@ -16,7 +16,7 @@ function scriptChecksAfter(tool: string): z.infer<typeof hookSchema>[] {
 }
 
 describe('the hooks of the Claude Code plugin', () => {
-  it.each(['Write', 'Edit'])('check every GDScript file that %s changes, and only those', (tool) => {
-    expect(scriptChecksAfter(tool).map((hook) => hook.if)).toEqual([`${tool}(*.gd)`]);
+  it.each(['Write', 'Edit'])('check every GDScript file and shader that %s changes, and only those', (tool) => {
+    expect(scriptChecksAfter(tool).map((hook) => hook.if)).toEqual([`${tool}(*.gd)`, `${tool}(*.gdshader)`]);
   });
 });

@@ -56,6 +56,106 @@ describe('scene_batch_edit', () => {
     );
   });
 
+  it('says which operations turned on editable children of an instance', async () => {
+    const editor = new FakeEditorGateway().respondTo('scene.batch_edit', {
+      scene: 'res://levels/arena.tscn',
+      results: [
+        { op: 'node_set_properties', path: 'Enemy2/Mesh', ...emptyReport, applied: ['visible'], editable_children: ['Enemy2'] },
+        { op: 'node_set_groups', path: 'Enemy2/Mesh', groups: ['targets'], added: ['targets'], removed: [], unchanged: [], editable_children: [] },
+        { op: 'node_add', path: 'Enemy2/Mesh/Marker', type: 'Marker3D', ...emptyReport, editable_children: [] },
+        { op: 'signal_connect', from: 'Enemy3/Hitbox', signal: 'body_entered', to: '.', method: '_on_hit', flags: [], binds: [], already_connected: false, editable_children: ['Enemy3'] },
+      ],
+    });
+
+    const result = await createSceneBatchEditTool(editor).execute({
+      operations: [
+        { op: 'node_set_properties', path: 'Enemy2/Mesh', properties: { visible: false } },
+        { op: 'node_set_groups', path: 'Enemy2/Mesh', add: ['targets'] },
+        { op: 'node_add', type: 'Marker3D', name: 'Marker', parent: 'Enemy2/Mesh' },
+        { op: 'signal_connect', from: 'Enemy3/Hitbox', signal: 'body_entered', method: '_on_hit' },
+      ],
+    });
+
+    expect(textOf(result)).toBe(
+      [
+        'Applied 4 operations to res://levels/arena.tscn as one Undo step. The scene has unsaved changes.',
+        '1. Set visible of Enemy2/Mesh; turned on Editable Children of Enemy2',
+        '2. Set the groups of Enemy2/Mesh, now: targets',
+        '3. Added Enemy2/Mesh/Marker (Marker3D)',
+        '4. Connected Enemy3/Hitbox.body_entered to _on_hit() on the scene root; turned on Editable Children of Enemy3',
+        'Editable Children keeps changes inside instanced scenes saved with this scene.',
+      ].join('\n'),
+    );
+  });
+
+  it('summarizes saving a branch as a scene and making an instance local', async () => {
+    const editor = new FakeEditorGateway().respondTo('scene.batch_edit', {
+      scene: 'res://levels/arena.tscn',
+      results: [
+        { op: 'node_save_as_scene', path: 'Enemy', file: 'res://enemies/enemy.tscn', type: 'CharacterBody3D', node_count: 4 },
+        { op: 'node_make_local', path: 'Crate', scene_file: 'res://props/crate.tscn', taken_over: 1 },
+      ],
+    });
+
+    const result = await createSceneBatchEditTool(editor).execute({
+      operations: [
+        { op: 'node_save_as_scene', path: 'Enemy', file: 'res://enemies/enemy.tscn' },
+        { op: 'node_make_local', path: 'Crate' },
+      ],
+    });
+
+    expect(textOf(result)).toBe(
+      [
+        'Applied 2 operations to res://levels/arena.tscn as one Undo step. The scene has unsaved changes.',
+        '1. Saved Enemy as res://enemies/enemy.tscn and put an instance of it in its place',
+        '2. Made Crate local, taking over 1 node from res://props/crate.tscn',
+      ].join('\n'),
+    );
+  });
+
+  it('summarizes collisions added from meshes', async () => {
+    const editor = new FakeEditorGateway().respondTo('scene.batch_edit', {
+      scene: 'res://levels/arena.tscn',
+      results: [
+        {
+          op: 'node_add_collision',
+          path: 'Rock',
+          shapes: [{ path: 'Rock/StaticBody3D/CollisionShape3D', type: 'ConvexPolygonShape3D' }],
+          mesh_size: 'Vector3(2, 1, 2)',
+          collision_size: 'Vector3(2, 1, 2)',
+          editable_children: [],
+        },
+        {
+          op: 'node_add_collision',
+          path: 'Crate2/Mesh',
+          shapes: [
+            { path: 'Crate2/Mesh/StaticBody3D/CollisionShape3D', type: 'ConvexPolygonShape3D' },
+            { path: 'Crate2/Mesh/StaticBody3D/CollisionShape3D2', type: 'ConvexPolygonShape3D' },
+          ],
+          mesh_size: 'Vector3(1, 1, 1)',
+          collision_size: 'Vector3(1, 1, 1)',
+          editable_children: ['Crate2'],
+        },
+      ],
+    });
+
+    const result = await createSceneBatchEditTool(editor).execute({
+      operations: [
+        { op: 'node_add_collision', path: 'Rock', shape: 'convex' },
+        { op: 'node_add_collision', path: 'Crate2/Mesh', shape: 'multiple_convex' },
+      ],
+    });
+
+    expect(textOf(result)).toBe(
+      [
+        'Applied 2 operations to res://levels/arena.tscn as one Undo step. The scene has unsaved changes.',
+        '1. Gave Rock a collision of 1 shape',
+        '2. Gave Crate2/Mesh a collision of 2 shapes; turned on Editable Children of Crate2',
+        'Editable Children keeps changes inside instanced scenes saved with this scene.',
+      ].join('\n'),
+    );
+  });
+
   it('says which values the engine adjusted', async () => {
     const adjustedSize = { name: 'size', expected: 'Vector2(240, 24)', actual: 'Vector2(240, 27)' };
     const editor = new FakeEditorGateway().respondTo('scene.batch_edit', {

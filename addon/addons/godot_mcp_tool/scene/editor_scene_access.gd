@@ -62,3 +62,29 @@ func select_nodes(nodes: Array[Node]) -> void:
 
 func select_file(file_path: String) -> void:
 	EditorInterface.select_file(file_path)
+
+
+func current_selection() -> Array[Node]:
+	var nodes: Array[Node] = []
+	for node in EditorInterface.get_selection().get_top_selected_nodes():
+		nodes.append(node)
+	return nodes
+
+
+func current_file_selection() -> PackedStringArray:
+	return EditorInterface.get_selected_paths()
+
+
+func main_screen_name() -> String:
+	if EditorInterface.get_script_editor().is_visible_in_tree():
+		return "Script"
+	if _is_shown(EditorInterface.get_editor_viewport_3d(0)):
+		return "3D"
+	if _is_shown(EditorInterface.get_editor_viewport_2d()):
+		return "2D"
+	return "other"
+
+
+static func _is_shown(viewport: Viewport) -> bool:
+	var container := viewport.get_parent() as Control if viewport != null else null
+	return container != null and container.is_visible_in_tree()

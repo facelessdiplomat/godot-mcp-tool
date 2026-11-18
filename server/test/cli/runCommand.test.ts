@@ -56,6 +56,20 @@ describe('running a command of the command line', () => {
     expect(output[0]).toBe(`Installed the Godot MCP Tool addon ${SERVER_VERSION} in ${join(projectRoot, 'addons', 'godot_mcp_tool')}.`);
   });
 
+  it('creates a project with the addon in a new folder', async () => {
+    expect(await run(['init', 'capsule-walk'], workspace)).toBe(0);
+
+    expect(output[0]).toMatch(/^Created the Godot project "Capsule Walk" in .*capsule-walk: project\.godot \(Forward\+, Jolt Physics, window 1152×648\)/);
+    expect(output[1]).toBe(`Installed the Godot MCP Tool addon ${SERVER_VERSION} in ${join(workspace, 'capsule-walk', 'addons', 'godot_mcp_tool')}. Its plugin is enabled.`);
+    expect(output[2]).toContain('godot --editor --path');
+  });
+
+  it('refuses to create a project where there is one', async () => {
+    expect(await run(['init'])).toBe(1);
+
+    expect(errors).toEqual([`init failed: ${projectRoot} has a Godot project already.`]);
+  });
+
   it('works on the project folder given after the command', async () => {
     expect(await run(['update-addon', 'game'], workspace)).toBe(1);
     expect(output).toEqual([`The addon is not installed in ${projectRoot}. Install it with: npx godot-mcp-tool install-addon`]);

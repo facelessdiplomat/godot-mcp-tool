@@ -63,6 +63,25 @@ describe('signal tools', () => {
     );
   });
 
+  it('signal_list marks the connections that an instanced scene makes', async () => {
+    const editor = new FakeEditorGateway().respondTo('signal.list', {
+      scene: 'res://main.tscn',
+      path: 'Door/Area',
+      type: 'Area3D',
+      signals: [{ name: 'body_entered', arguments: 'body: Node3D', connections: [{ ...pressedConnection, from: 'Door/Area', signal: 'body_entered', to: 'Door', method: '_on_area_body_entered', inherited: true }] }],
+    });
+
+    const result = await createSignalListTool(editor).execute({ path: 'Door/Area' });
+
+    expect(textOf(result)).toBe(
+      [
+        'Signals of Door/Area (Area3D) in res://main.tscn:',
+        'body_entered(body: Node3D)',
+        '  → _on_area_body_entered() on Door (made by the instanced scene, so only that scene can disconnect it)',
+      ].join('\n'),
+    );
+  });
+
   it('signal_connect reports the new connection', async () => {
     const editor = new FakeEditorGateway().respondTo('signal.connect', { scene: 'res://main.tscn', ...pressedConnection, flags: ['one_shot'], already_connected: false });
 
@@ -70,6 +89,25 @@ describe('signal tools', () => {
 
     expect(editor.requests[0]?.params).toEqual({ from: 'Button', signal: 'pressed', to: '.', method: '_on_button_pressed', deferred: false, one_shot: true });
     expect(textOf(result)).toBe('Connected Button.pressed to _on_button_pressed() on the scene root [one_shot] in res://main.tscn. The scene has unsaved changes.');
+  });
+
+  it('signal_connect says when a connection from inside an instance turned on its editable children', async () => {
+    const editor = new FakeEditorGateway().respondTo('signal.connect', {
+      scene: 'res://main.tscn',
+      ...pressedConnection,
+      from: 'Menu/Start',
+      already_connected: false,
+      editable_children: ['Menu'],
+    });
+
+    const result = await createSignalConnectTool(editor).execute({ from: 'Menu/Start', signal: 'pressed', method: '_on_button_pressed' });
+
+    expect(textOf(result)).toBe(
+      [
+        'Connected Menu/Start.pressed to _on_button_pressed() on the scene root in res://main.tscn. The scene has unsaved changes.',
+        'Turned on Editable Children of Menu, so that this change inside the instanced scene is saved with this scene.',
+      ].join('\n'),
+    );
   });
 
   it('signal_connect says when the connection already exists', async () => {

@@ -47,5 +47,21 @@ func last_action_name() -> String:
 	return _undo_redo.get_current_action_name()
 
 
+func undo_in(_context: Object) -> bool:
+	return _undo_redo.undo()
+
+
+func redo_in(_context: Object) -> bool:
+	return _undo_redo.redo()
+
+
+func next_undo_name(_context: Object) -> String:
+	return _undo_redo.get_current_action_name() if _undo_redo.has_undo() else ""
+
+
+func next_redo_name(_context: Object) -> String:
+	return _undo_redo.get_action_name(_undo_redo.get_current_action() + 1) if _undo_redo.has_redo() else ""
+
+
 func dispose() -> void:
 	_undo_redo.free()

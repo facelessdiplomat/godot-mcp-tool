@@ -207,12 +207,12 @@ export class TemporaryProject {
       ].join('\n'),
     );
     mkdirSync(join(this.root, 'addons'));
-    symlinkSync(addonDirectory, join(this.root, 'addons', 'godot_mcp_tool'));
+    symlinkSync(addonDirectory, join(this.root, 'addons', 'godot_mcp_tool'), 'junction');
     if (options.withTestHelper === true) {
-      symlinkSync(testHelperDirectory, join(this.root, 'addons', 'mcp_test_helper'));
+      symlinkSync(testHelperDirectory, join(this.root, 'addons', 'mcp_test_helper'), 'junction');
     }
     if (options.testFramework !== undefined) {
-      symlinkSync(join(testProjectRoot, 'addons', options.testFramework), join(this.root, 'addons', options.testFramework));
+      symlinkSync(join(testProjectRoot, 'addons', options.testFramework), join(this.root, 'addons', options.testFramework), 'junction');
     }
   }
 

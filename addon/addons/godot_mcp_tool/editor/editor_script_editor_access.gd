@@ -1,6 +1,7 @@
 extends "script_editor_access.gd"
 
 const EXTERNAL_CHANGE_DIALOG_TITLE := "Files have been modified outside Godot"
+const MAXIMUM_SELECTION_LENGTH := 2000
 
 
 func unsaved_files() -> PackedStringArray:
@@ -44,3 +45,19 @@ static func _external_change_dialog() -> ConfirmationDialog:
 		if (dialog as ConfirmationDialog).title == EXTERNAL_CHANGE_DIALOG_TITLE:
 			return dialog
 	return null
+
+
+func current_script_place() -> Dictionary:
+	var script_editor := EditorInterface.get_script_editor()
+	var script := script_editor.get_current_script()
+	if script == null:
+		return {}
+	var place := {"path": script.resource_path}
+	var current_editor := script_editor.get_current_editor()
+	var code := current_editor.get_base_editor() as CodeEdit if current_editor != null else null
+	if code != null:
+		place["line"] = code.get_caret_line() + 1
+		var selection := code.get_selected_text()
+		if not selection.is_empty():
+			place["selection"] = selection.left(MAXIMUM_SELECTION_LENGTH)
+	return place

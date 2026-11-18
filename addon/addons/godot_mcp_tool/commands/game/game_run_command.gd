@@ -36,6 +36,9 @@ func execute(params: Dictionary) -> Variant:
 			return value
 	if params.has("fixed_fps") and (fixed_fps < 1 or fixed_fps > MAXIMUM_FIXED_FPS):
 		return GodotMcpCommandError.new(GodotMcpJsonRpc.INVALID_PARAMS, "\"fixed_fps\" must be from 1 to %d" % MAXIMUM_FIXED_FPS, "Example: 60")
+	var request: Variant = _run_request(params, fixed_fps)
+	if request is GodotMcpCommandError:
+		return request
 	var scene_path: Variant = _resolve_target(target)
 	if scene_path is GodotMcpCommandError:
 		return scene_path
@@ -57,7 +60,7 @@ func execute(params: Dictionary) -> Variant:
 	var stop_count := game.stop_count
 	var first_seq := _runtime.log_store.last_seq + 1
 	var started_msec := Time.get_ticks_msec()
-	game.request_agent_run(GodotMcpRunRequest.new(fixed_fps))
+	game.request_agent_run(request)
 	_play(target, scene_path)
 	await GodotMcpWaiting.until(func() -> bool: return game.ready_count != ready_count or game.stop_count != stop_count or game.state == GodotMcpGameState.PAUSED, startup_timeout_msec)
 	var outcome := _outcome(ready_count, stop_count)
@@ -115,3 +118,27 @@ func _resolve_target(target: String) -> Variant:
 	if not ResourceLoader.exists(target):
 		return GodotMcpSceneResolver.missing_scene_error(target)
 	return target
+
+
+static func _run_request(params: Dictionary, fixed_fps: int) -> Variant:
+	var debug_draw: Variant = GodotMcpParams.text_list(params, "debug_draw")
+	var arguments: Variant = GodotMcpParams.text_list(params, "arguments")
+	var locale: Variant = GodotMcpParams.text(params, "locale")
+	var break_on_error: Variant = GodotMcpParams.flag(params, "break_on_error", false)
+	for value in [debug_draw, arguments, locale, break_on_error]:
+		if value is GodotMcpCommandError:
+			return value
+	for drawing in debug_draw:
+		if not drawing in GodotMcpRunRequest.DEBUG_DRAWINGS:
+			return GodotMcpCommandError.new(GodotMcpJsonRpc.INVALID_PARAMS, "Unknown debug drawing \"%s\"" % drawing, "debug_draw takes %s." % ", ".join(GodotMcpRunRequest.DEBUG_DRAWINGS))
+	var request := GodotMcpRunRequest.new(fixed_fps)
+	request.debug_draw = PackedStringArray(debug_draw)
+	request.arguments = PackedStringArray(arguments)
+	request.locale = locale
+	request.break_on_error = break_on_error
+	if params.has("window_size"):
+		var size: Variant = params["window_size"]
+		if not size is Array or (size as Array).size() != 2 or not (size as Array).all(func(side: Variant) -> bool: return (side is int or side is float) and int(side) > 0):
+			return GodotMcpCommandError.new(GodotMcpJsonRpc.INVALID_PARAMS, "\"window_size\" must be [width, height] in pixels", "Example: [1280, 720]")
+		request.window_size = Vector2i(int(size[0]), int(size[1]))
+	return request

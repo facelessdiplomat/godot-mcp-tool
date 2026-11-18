@@ -7,6 +7,7 @@ import type { ProcessResult, ProcessRunner } from '../process/ProcessRunner.js';
 import { describeError } from '../util/errors.js';
 import type { ClassDoc } from './ClassDoc.js';
 import { DocsLibrary } from './DocsLibrary.js';
+import { type EditorHelp, readEditorHelp, withDefaultValues } from './EditorHelpDocs.js';
 import { readEngineDocs } from './EngineApiDocs.js';
 import { readProjectClassDoc } from './ProjectClassDocs.js';
 
@@ -15,6 +16,8 @@ export interface DocsSourceDependencies {
   readonly cacheDirectory: string;
   readonly locateBinary: () => Promise<BinaryLookup>;
   readonly processRunner: ProcessRunner;
+  readonly helpCacheCandidates: (binaryPath: string, versionBranch: string) => readonly string[];
+  readonly helpDumpScript: string;
 }
 
 export class DocsUnavailableError extends Error {
@@ -37,7 +40,7 @@ const classNamePattern = /^\s*class_name\s+([A-Za-z_][A-Za-z0-9_]*)/m;
 
 export class DocsSource {
   private readonly versions = new Map<string, string>();
-  private engine: { readonly version: string; readonly classes: readonly ClassDoc[] } | undefined;
+  private engine: { readonly version: string; readonly helpKey: string; readonly classes: readonly ClassDoc[] } | undefined;
   private project: { readonly signature: string; readonly classes: readonly ClassDoc[] } | undefined;
   private library: { readonly version: string; readonly signature: string; readonly library: DocsLibrary } | undefined;
   private loading: Promise<DocsLibrary> | undefined;
@@ -83,7 +86,9 @@ export class DocsSource {
   }
 
   private async engineClasses(binaryPath: string, version: string): Promise<readonly ClassDoc[]> {
-    if (this.engine?.version === version) {
+    const helpCache = this.helpCacheOf(binaryPath, version);
+    const helpKey = helpCache === undefined ? '' : `${helpCache.path}@${String(helpCache.modifiedMs)}`;
+    if (this.engine?.version === version && this.engine.helpKey === helpKey) {
       return this.engine.classes;
     }
     const folder = join(this.dependencies.cacheDirectory, 'docs', version.replace(/[^\w.-]/g, '_'));
@@ -98,8 +103,38 @@ export class DocsSource {
         throw new DocsUnavailableError(`${binaryPath} did not write the engine API with its docs: ${lastOutputLines(result)}`);
       }
     }
-    this.engine = { version, classes };
-    return classes;
+    const help = helpCache === undefined ? undefined : await this.editorHelp(binaryPath, folder, helpCache);
+    const documented = help === undefined ? classes : [...withDefaultValues(classes, help.defaults), ...(help.gdscript === undefined ? [] : [help.gdscript])];
+    this.engine = { version, helpKey, classes: documented };
+    return documented;
+  }
+
+  private helpCacheOf(binaryPath: string, version: string): { readonly path: string; readonly modifiedMs: number } | undefined {
+    const versionBranch = /^\d+\.\d+/.exec(version)?.[0];
+    if (versionBranch === undefined) {
+      return undefined;
+    }
+    for (const path of this.dependencies.helpCacheCandidates(binaryPath, versionBranch)) {
+      if (existsSync(path)) {
+        return { path, modifiedMs: Math.round(statSync(path).mtimeMs) };
+      }
+    }
+    return undefined;
+  }
+
+  private async editorHelp(binaryPath: string, folder: string, helpCache: { readonly path: string; readonly modifiedMs: number }): Promise<EditorHelp | undefined> {
+    const helpPath = join(folder, `editor_help-${String(helpCache.modifiedMs)}.json`);
+    if (!existsSync(helpPath)) {
+      mkdirSync(folder, { recursive: true });
+      await this.dependencies.processRunner
+        .run(binaryPath, ['--headless', '--script', this.dependencies.helpDumpScript, '--', helpCache.path, helpPath], { timeoutMs: dumpTimeoutMs, cwd: folder })
+        .catch(() => undefined);
+    }
+    try {
+      return readEditorHelp(JSON.parse(readFileSync(helpPath, 'utf8')));
+    } catch {
+      return undefined;
+    }
   }
 
   private async projectClasses(binaryPath: string, scripts: readonly ProjectScript[], signature: string): Promise<readonly ClassDoc[]> {

@@ -42,3 +42,19 @@ func add_undo_reference(_object: Object) -> void:
 
 func commit(_execute: bool = true) -> void:
 	pass
+
+
+func undo_in(_context: Object) -> bool:
+	return false
+
+
+func redo_in(_context: Object) -> bool:
+	return false
+
+
+func next_undo_name(_context: Object) -> String:
+	return ""
+
+
+func next_redo_name(_context: Object) -> String:
+	return ""

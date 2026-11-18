@@ -95,6 +95,28 @@ func test_refuses_a_fixed_frame_rate_out_of_range() -> void:
 	assert_eq(_launcher.agent_runs.size(), 0)
 
 
+func test_asks_for_debug_drawing_arguments_a_window_size_and_a_locale() -> void:
+	_launcher.simulate_game = _ready_game_printing("")
+	await _run({"watch_ms": 0, "debug_draw": ["collisions", "navigation"], "arguments": ["--level=3"], "window_size": [1280, 720], "locale": "de"})
+	var request := _launcher.agent_runs[0] as GodotMcpRunRequest
+	assert_eq(request.debug_draw, PackedStringArray(["collisions", "navigation"]))
+	assert_eq(request.arguments, PackedStringArray(["--level=3"]))
+	assert_eq(request.window_size, Vector2i(1280, 720))
+	assert_eq(request.locale, "de")
+
+
+func test_refuses_unknown_debug_drawing() -> void:
+	var result: GodotMcpCommandError = await _run({"debug_draw": ["shadows"]})
+	assert_eq(result.code, GodotMcpJsonRpc.INVALID_PARAMS)
+	assert_string_contains(result.message, "shadows")
+	assert_eq(_launcher.agent_runs.size(), 0)
+
+
+func test_refuses_a_window_size_that_is_not_two_sizes() -> void:
+	var result: GodotMcpCommandError = await _run({"window_size": [1280]})
+	assert_eq(result.code, GodotMcpJsonRpc.INVALID_PARAMS)
+	assert_eq(_launcher.agent_runs.size(), 0)
+
 func test_runs_a_given_scene() -> void:
 	_launcher.simulate_game = _ready_game_printing("")
 	await _run({"scene": "res://tests/fixtures/crate.tscn", "watch_ms": 0})

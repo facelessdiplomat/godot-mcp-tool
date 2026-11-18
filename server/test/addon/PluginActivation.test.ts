@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { isPluginEnabled, withPluginEnabled } from '../../src/addon/PluginActivation.js';
+import { isPluginEnabled, isPluginPathEnabled, withPlugin, withPluginEnabled } from '../../src/addon/PluginActivation.js';
 
 const pluginLine = 'enabled=PackedStringArray("res://addons/godot_mcp_tool/plugin.cfg")';
 
@@ -42,5 +42,18 @@ describe('enabling the plugin in project.godot', () => {
     expect(isPluginEnabled(['[editor_plugins]', '', pluginLine, ''].join('\n'))).toBe(true);
     expect(isPluginEnabled(['[editor_plugins]', '', 'enabled=PackedStringArray("res://addons/gut/plugin.cfg")', ''].join('\n'))).toBe(false);
     expect(isPluginEnabled(['[application]', '', 'config/name="Game"', ''].join('\n'))).toBe(false);
+  });
+});
+
+describe('switching other plugins in project.godot', () => {
+  const projectText = ['config_version=5', '', '[editor_plugins]', '', 'enabled=PackedStringArray("res://addons/godot_mcp_tool/plugin.cfg")', ''].join('\n');
+
+  it('adds a plugin to the enabled list and takes it out again', () => {
+    const withGut = withPlugin(projectText, 'res://addons/gut/plugin.cfg', true);
+
+    expect(withGut).toContain('enabled=PackedStringArray("res://addons/godot_mcp_tool/plugin.cfg", "res://addons/gut/plugin.cfg")');
+    expect(isPluginPathEnabled(withGut, 'res://addons/gut/plugin.cfg')).toBe(true);
+    expect(withPlugin(withGut, 'res://addons/gut/plugin.cfg', false)).toBe(projectText);
+    expect(withPlugin(projectText, 'res://addons/gut/plugin.cfg', false)).toBe(projectText);
   });
 });

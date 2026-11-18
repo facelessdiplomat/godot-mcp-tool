@@ -205,3 +205,61 @@ export function createEditorSelectTool(editor: EditorGateway): BridgeTool<typeof
       ),
   });
 }
+
+const editorStateSchema = z.object({
+  scene: z.string(),
+  unsaved: z.boolean(),
+  main_screen: z.string(),
+  selected_nodes: z.array(z.object({ path: z.string(), type: z.string() })),
+  selected_files: z.array(z.string()),
+  script: z.object({ path: z.string().optional(), line: z.number().optional(), selection: z.string().optional() }),
+  open_scenes: z.array(z.string()),
+});
+
+type EditorState = z.infer<typeof editorStateSchema>;
+
+const editorGetStateInput = z.object({});
+
+export function createEditorGetStateTool(editor: EditorGateway): BridgeTool<typeof editorGetStateInput, EditorState> {
+  return new BridgeTool(editor, {
+    name: 'editor_get_state',
+    definition: {
+      title: 'What the editor shows',
+      description:
+        'Show what the user is looking at in the Godot editor: the scene on screen and the main screen (3D, 2D or Script), the nodes selected in the Scene dock, the files selected in the FileSystem dock, the script open in the script editor with the line of its caret and the selected text, and the open scenes. Use it when the user says "this node", "the selected object", "this script" or "here".',
+      inputSchema: editorGetStateInput,
+      annotations: readingAnnotations,
+      alwaysLoad: false,
+    },
+    method: 'editor.get_state',
+    responseSchema: editorStateSchema,
+    present: (state) => textResult(describeEditorState(state)),
+  });
+}
+
+function describeEditorState(state: EditorState): string {
+  const lines: string[] = [];
+  if (state.scene === '') {
+    lines.push('No scene is open in the editor.');
+  } else {
+    const screen = state.main_screen === 'other' || state.main_screen === '' ? 'shows' : `shows the ${state.main_screen} screen with`;
+    lines.push(`The editor ${screen} ${state.scene}${state.unsaved ? ', which has unsaved changes' : ''}.`);
+  }
+  lines.push(
+    state.selected_nodes.length === 0
+      ? 'No node is selected.'
+      : `Selected nodes: ${state.selected_nodes.map((node) => `${formatNodePath(node.path)} (${node.type})`).join(', ')}.`,
+  );
+  if (state.selected_files.length > 0) {
+    lines.push(`Selected files: ${state.selected_files.join(', ')}.`);
+  }
+  if (state.script.path !== undefined) {
+    const caret = state.script.line === undefined ? '' : `, caret on line ${String(state.script.line)}`;
+    const selection = state.script.selection === undefined ? '' : `, selected text: ${JSON.stringify(state.script.selection)}`;
+    lines.push(`Script editor: ${state.script.path}${caret}${selection}.`);
+  }
+  if (state.open_scenes.length > 0) {
+    lines.push(`Open scenes: ${state.open_scenes.join(', ')}.`);
+  }
+  return lines.join('\n');
+}

@@ -1,7 +1,5 @@
 extends "scene_edit.gd"
 
-const DUPLICATE_FLAGS := Node.DUPLICATE_SIGNALS | Node.DUPLICATE_GROUPS | Node.DUPLICATE_SCRIPTS | Node.DUPLICATE_USE_INSTANTIATION
-
 var _scene_root: Node
 var _source_path: String
 var _copy: Node
@@ -36,7 +34,7 @@ func prepare(scene_root: Node, params: Dictionary) -> GodotMcpCommandError:
 	_scene_root = scene_root
 	_source_path = GodotMcpNodeLocator.path_of(scene_root, node)
 	_properties = properties
-	_copy = node.duplicate(DUPLICATE_FLAGS)
+	_copy = node.duplicate(GodotMcpInstancedScenes.EDITOR_DUPLICATE_FLAGS)
 	if not (copy_name as String).is_empty():
 		_copy.name = copy_name
 	action_name = "MCP: Duplicate %s" % node.name
@@ -52,7 +50,7 @@ func prepare(scene_root: Node, params: Dictionary) -> GodotMcpCommandError:
 
 
 func finish() -> Dictionary:
-	var report := _context.properties.assign(_copy, _properties)
+	var report := _context.properties.assign(_copy, _properties, _scene_root.scene_file_path)
 	return {
 		"path": GodotMcpNodeLocator.path_of(_scene_root, _copy),
 		"source": _source_path,

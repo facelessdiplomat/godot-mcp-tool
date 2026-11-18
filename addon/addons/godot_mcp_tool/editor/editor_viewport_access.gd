@@ -1,5 +1,6 @@
 extends RefCounted
 
+const GodotMcpCanvasRenderer := preload("../capture/canvas_renderer.gd")
 const GodotMcpViewRenderer := preload("../capture/view_renderer.gd")
 
 const MAIN_VIEWPORT := 0
@@ -26,6 +27,10 @@ func viewport_size() -> Vector2i:
 
 func renderer() -> GodotMcpViewRenderer:
 	return GodotMcpViewRenderer.new(EditorInterface.get_base_control(), _draw_now)
+
+
+func canvas_renderer() -> GodotMcpCanvasRenderer:
+	return GodotMcpCanvasRenderer.new(EditorInterface.get_base_control(), _draw_now)
 
 
 static func _draw_now() -> void:

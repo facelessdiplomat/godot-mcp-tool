@@ -5,7 +5,12 @@ import { GodotCli } from '../godot/GodotCli.js';
 import { EditedScriptCheck } from '../hooks/EditedScriptCheck.js';
 import { respondToEditedScript } from '../hooks/hookResponse.js';
 import { NodeProcessRunner } from '../process/ProcessRunner.js';
+import { EditorOrHeadlessGateway } from '../editor/EditorOrHeadlessGateway.js';
+import { HeadlessProjectQuery } from '../project/HeadlessProjectQuery.js';
+import { CodeValidator } from '../scripts/CodeValidator.js';
+import { ProjectCreator } from '../project/ProjectCreator.js';
 import { createScriptValidator } from '../scripts/createScriptValidator.js';
+import { ShaderValidator } from '../scripts/ShaderValidator.js';
 import type { ValidationResult } from '../scripts/ScriptValidator.js';
 import { SERVER_NAME, SERVER_VERSION } from '../serverInfo.js';
 import { describeError } from '../util/errors.js';
@@ -47,6 +52,8 @@ export async function runCommand(request: CommandRequest, environment: CommandLi
       return usageErrorExitCode;
     case 'check-edited-script':
       return checkEditedScript(environment, output);
+    case 'init':
+      return createProject(request.projectPath, environment, output);
     default:
       return runProjectCommand(request.kind, request.projectPath, environment, output);
   }
@@ -62,6 +69,39 @@ async function runProjectCommand(command: ProjectCommand, projectPath: string | 
     return report.succeeded ? 0 : failureExitCode;
   } catch (error) {
     output.writeError(`${command} failed: ${describeError(error)}`);
+    return failureExitCode;
+  } finally {
+    context.editor.close();
+  }
+}
+
+async function createProject(folder: string | undefined, environment: CommandLineEnvironment, output: CommandOutput): Promise<number> {
+  const context = createGodotContext(environment);
+  const processRunner = new NodeProcessRunner();
+  const bundleVersion = readAddonVersion(environment.bundledAddonDirectory);
+  try {
+    const created = await new ProjectCreator({
+      workingDirectory: environment.workingDirectory,
+      installAddon: (projectRoot) =>
+        new AddonInstaller({ bundle: { directory: environment.bundledAddonDirectory, version: bundleVersion ?? '' }, isEditorRunning: () => false }).install(projectRoot),
+      readVersionBranch: async () => {
+        const binary = context.binaryLocator.locate();
+        if (!binary.found) {
+          return undefined;
+        }
+        const version = await new GodotCli(processRunner, binary.path).version().catch(() => undefined);
+        return version === undefined ? undefined : `${String(version.major)}.${String(version.minor)}`;
+      },
+    }).create({ path: folder });
+    const [width, height] = created.windowSize;
+    output.write(
+      `Created the Godot project "${created.name}" in ${created.root}: project.godot (Forward+, Jolt Physics, window ${String(width)}×${String(height)}), the main scene ${created.mainScene}, .gitignore, .gitattributes and .editorconfig.`,
+    );
+    output.write(`${created.addon} Its plugin is enabled.`);
+    output.write(`Next: open it in the Godot editor (godot --editor --path ${created.root}), or start Claude Code in ${created.root} and ask for the game.`);
+    return 0;
+  } catch (error) {
+    output.writeError(`init failed: ${describeError(error)}`);
     return failureExitCode;
   } finally {
     context.editor.close();
@@ -89,14 +129,16 @@ async function checkEditedScript(environment: CommandLineEnvironment, output: Co
 async function validateScript(environment: CommandLineEnvironment, projectRoot: string, scriptPath: string): Promise<ValidationResult> {
   const context = createGodotContext(environment, projectRoot);
   try {
-    const validator = createScriptValidator({
+    const processRunner = new NodeProcessRunner();
+    const scripts = createScriptValidator({
       projectRoot,
       editor: context.editor,
       locateGodot: context.locateGodot,
-      processRunner: new NodeProcessRunner(),
+      processRunner,
       languageServerPort: parsePort(environment.variables['GODOT_LSP_PORT']),
     });
-    return await validator.validate([scriptPath]);
+    const shaders = new ShaderValidator(new EditorOrHeadlessGateway(context.editor, new HeadlessProjectQuery({ projectRoot, locateGodot: context.locateGodot, processRunner })));
+    return await new CodeValidator(projectRoot, scripts, shaders).validate([scriptPath]);
   } finally {
     context.editor.close();
   }

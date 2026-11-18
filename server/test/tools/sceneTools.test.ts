@@ -23,6 +23,52 @@ describe('scene tools', () => {
     expect(textOf(result)).toBe('res://levels/arena.tscn\nArena: Node3D');
   });
 
+  it('scene_get_tree marks instances with editable children and says when instances hide their nodes', async () => {
+    const editor = new FakeEditorGateway().respondTo('scene.get_tree', {
+      scene: 'res://levels/arena.tscn',
+      node_count: 4,
+      truncated: false,
+      hidden_instance_nodes: true,
+      root: {
+        name: 'Arena',
+        type: 'Node3D',
+        child_count: 2,
+        children: [
+          { name: 'Enemy1', type: 'CharacterBody3D', instance: 'res://enemy.tscn' },
+          {
+            name: 'Enemy2',
+            type: 'CharacterBody3D',
+            instance: 'res://enemy.tscn',
+            editable_children: true,
+            child_count: 1,
+            children: [{ name: 'Mesh', type: 'MeshInstance3D' }],
+          },
+        ],
+      },
+    });
+
+    const result = await createSceneGetTreeTool(editor).execute({});
+
+    expect(textOf(result)).toBe(
+      [
+        'res://levels/arena.tscn',
+        'Arena: Node3D',
+        '├─ Enemy1: CharacterBody3D [instance res://enemy.tscn]',
+        '└─ Enemy2: CharacterBody3D [instance res://enemy.tscn, editable children]',
+        '   └─ Mesh: MeshInstance3D',
+        'Nodes inside instanced scenes are not shown; expand_instances: true lists them too.',
+      ].join('\n'),
+    );
+  });
+
+  it('scene_get_tree asks for the nodes inside instanced scenes', async () => {
+    const editor = new FakeEditorGateway().respondTo('scene.get_tree', { scene: 'res://levels/arena.tscn', node_count: 1, truncated: false, root: { name: 'Arena', type: 'Node3D' } });
+
+    await createSceneGetTreeTool(editor).execute({ expand_instances: true });
+
+    expect(editor.requests[0]?.params).toEqual({ max_depth: 8, max_nodes: 200, expand_instances: true });
+  });
+
   it('scene_get_tree passes the scene and limits through', async () => {
     const editor = new FakeEditorGateway().respondTo('scene.get_tree', {
       scene: 'res://props/crate.tscn',

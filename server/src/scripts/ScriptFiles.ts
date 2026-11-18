@@ -4,12 +4,19 @@ import { filesInFolder, type ProjectFile, toResourcePath } from '../project/Proj
 
 export type ScriptFile = ProjectFile;
 
+export interface CodeFiles {
+  readonly scripts: readonly ProjectFile[];
+  readonly shaders: readonly ProjectFile[];
+}
+
 export class ScriptPathError extends Error {
   override readonly name = 'ScriptPathError';
 }
 
 const resourcePrefix = 'res://';
 const scriptExtension = '.gd';
+const shaderExtension = '.gdshader';
+const shaderIncludeExtension = '.gdshaderinc';
 const maximumScripts = 200;
 
 export function findScripts(projectRoot: string, inputs: readonly string[]): ScriptFile[] {
@@ -26,6 +33,47 @@ export function findScripts(projectRoot: string, inputs: readonly string[]): Scr
 }
 
 function scriptsAt(projectRoot: string, input: string): ScriptFile[] {
+  const file = existingFileAt(projectRoot, input);
+  if (statSync(file.absolutePath).isDirectory()) {
+    return filesInFolder(projectRoot, file.absolutePath, [scriptExtension]);
+  }
+  if (!file.absolutePath.endsWith(scriptExtension)) {
+    throw new ScriptPathError(`${file.resourcePath} is not a .gd script.`);
+  }
+  return [file];
+}
+
+export function findCodeFiles(projectRoot: string, inputs: readonly string[]): CodeFiles {
+  const scripts = new Map<string, ProjectFile>();
+  const shaders = new Map<string, ProjectFile>();
+  for (const input of inputs) {
+    for (const file of codeFilesAt(projectRoot, input)) {
+      (file.resourcePath.endsWith(shaderExtension) ? shaders : scripts).set(file.resourcePath, file);
+    }
+  }
+  if (scripts.size + shaders.size > maximumScripts) {
+    throw new ScriptPathError(
+      `The paths hold ${String(scripts.size + shaders.size)} scripts and shaders; check at most ${String(maximumScripts)} at a time by naming smaller folders.`,
+    );
+  }
+  return { scripts: [...scripts.values()], shaders: [...shaders.values()] };
+}
+
+function codeFilesAt(projectRoot: string, input: string): ProjectFile[] {
+  const file = existingFileAt(projectRoot, input);
+  if (statSync(file.absolutePath).isDirectory()) {
+    return filesInFolder(projectRoot, file.absolutePath, [scriptExtension, shaderExtension]);
+  }
+  if (file.absolutePath.endsWith(shaderIncludeExtension)) {
+    throw new ScriptPathError(`${file.resourcePath} is a shader include; check a .gdshader file that includes it.`);
+  }
+  if (!file.absolutePath.endsWith(scriptExtension) && !file.absolutePath.endsWith(shaderExtension)) {
+    throw new ScriptPathError(`${file.resourcePath} is not a .gd script or a .gdshader file.`);
+  }
+  return [file];
+}
+
+function existingFileAt(projectRoot: string, input: string): ProjectFile {
   const absolutePath = input.startsWith(resourcePrefix) ? resolve(projectRoot, input.slice(resourcePrefix.length)) : resolve(projectRoot, input);
   const pathInProject = relative(projectRoot, absolutePath);
   if (pathInProject.startsWith('..') || isAbsolute(pathInProject)) {
@@ -35,11 +83,5 @@ function scriptsAt(projectRoot: string, input: string): ScriptFile[] {
   if (!existsSync(absolutePath)) {
     throw new ScriptPathError(`${resourcePath} does not exist.`);
   }
-  if (statSync(absolutePath).isDirectory()) {
-    return filesInFolder(projectRoot, absolutePath, [scriptExtension]);
-  }
-  if (!absolutePath.endsWith(scriptExtension)) {
-    throw new ScriptPathError(`${resourcePath} is not a .gd script.`);
-  }
-  return [{ resourcePath, absolutePath }];
+  return { resourcePath, absolutePath };
 }

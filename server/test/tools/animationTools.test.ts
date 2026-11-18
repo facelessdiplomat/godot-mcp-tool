@@ -100,6 +100,58 @@ describe('animation tools', () => {
     );
   });
 
+  it('animation_get shows method calls and sounds as keys', async () => {
+    const editor = new FakeEditorGateway().respondTo('animation.get', {
+      ...player,
+      animation: {
+        name: 'walk',
+        length: 1,
+        loop: 'linear',
+        tracks: [
+          { path: 'Walker', type: 'method', key_count: 1, keys: [{ time: 0.25, value: '_on_footstep("left")' }] },
+          { path: 'Walker/Footsteps', type: 'audio', key_count: 1, keys: [{ time: 0.25, value: 'res://sounds/step.ogg' }] },
+        ],
+      },
+    });
+
+    const result = await createAnimationGetTool(editor).execute({ player: 'AnimationPlayer', name: 'walk' });
+
+    expect(textOf(result).split('\n').slice(2)).toEqual(['- Walker (method): 0.25 s _on_footstep("left")', '- Walker/Footsteps (audio): 0.25 s res://sounds/step.ogg']);
+  });
+
+  it('animation_set reports the methods it calls and the sounds it plays', async () => {
+    const footsteps = [
+      { type: 'method' as const, path: 'Walker', keys: [{ time: 0.25, method: '_on_footstep', args: ['left'] }, { time: 0.75, method: '_on_footstep', args: ['right'] }] },
+      { type: 'audio' as const, path: 'Walker/Footsteps', keys: [{ time: 0.25, stream: 'res://sounds/step.ogg' }, { time: 0.75, stream: 'res://sounds/step.ogg', start_offset: 0.1 }] },
+      { type: 'method' as const, path: 'Camera', keys: [{ time: 0, method: 'shake' }, { time: 0.5, method: 'shake' }, { time: 1, method: 'shake' }] },
+    ];
+    const editor = new FakeEditorGateway().respondTo('animation.set', {
+      scene: 'res://level.tscn',
+      player: 'AnimationPlayer',
+      name: 'walk',
+      created: true,
+      length: 1,
+      loop: 'linear',
+      tracks: [
+        { type: 'method', path: 'Walker', keys: 2, calls: [{ time: 0.25, call: '_on_footstep("left")' }, { time: 0.75, call: '_on_footstep("right")' }] },
+        { type: 'audio', path: 'Walker/Footsteps', keys: 2, sounds: [{ time: 0.25, stream: 'res://sounds/step.ogg' }, { time: 0.75, stream: 'res://sounds/step.ogg' }] },
+        { type: 'method', path: 'Camera', keys: 3, calls: [{ time: 0, call: 'shake()' }, { time: 0.5, call: 'shake()' }, { time: 1, call: 'shake()' }] },
+      ],
+      rejected: [],
+      reset_tracks: [],
+    });
+
+    const result = await createAnimationSetTool(editor).execute({ player: 'AnimationPlayer', name: 'walk', length: 1, loop: 'linear', tracks: footsteps });
+
+    expect(editor.requests[0]?.params).toEqual({ player: 'AnimationPlayer', name: 'walk', length: 1, loop: 'linear', tracks: footsteps });
+    expect(textOf(result).split('\n').slice(1)).toEqual([
+      '- Walker: calls _on_footstep("left") at 0.25 s; _on_footstep("right") at 0.75 s',
+      '- Walker/Footsteps: plays res://sounds/step.ogg at 0.25 s and 0.75 s',
+      '- Camera: calls shake() at 0 s, 0.5 s and 1 s',
+      'Method tracks call their methods in the running game, not in the editor.',
+    ]);
+  });
+
   it('animation_set names the properties whose current values it keyed in RESET', async () => {
     const editor = new FakeEditorGateway()
       .respondTo('animation.set', {

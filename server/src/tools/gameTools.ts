@@ -60,6 +60,8 @@ const stoppedGameSchema = z.object({ was_running: z.boolean() });
 
 type StoppedGame = z.infer<typeof stoppedGameSchema>;
 
+const debugDrawings = ['collisions', 'navigation', 'paths', 'avoidance'] as const;
+
 const gameRunInput = z.object({
   scene: z
     .string()
@@ -81,6 +83,29 @@ const gameRunInput = z.object({
     .describe(
       'Run with a fixed frame rate, such as 60: every frame advances the game by exactly 1/fps seconds, so runs repeat exactly. Game time then no longer follows the clock, and without a window the game runs as fast as it can, so count waits and holds in physics frames.',
     ),
+  debug_draw: z
+    .array(z.enum(debugDrawings))
+    .optional()
+    .describe(
+      'Draw debug shapes in the game, as the Debug menu of the editor does: "collisions" for collision shapes, "navigation" for navigation meshes, "paths" for Path3D curves, "avoidance" for avoidance radii. Screenshots then show why a body falls through a floor or a path takes a detour.',
+    ),
+  arguments: z
+    .array(z.string())
+    .optional()
+    .describe('Arguments for the game, which its scripts read with OS.get_cmdline_user_args(), such as ["--level=3"].'),
+  window_size: z
+    .tuple([z.number().int().min(64).max(7680), z.number().int().min(64).max(4320)])
+    .optional()
+    .describe('Size of the game window [width, height] in pixels, such as [1280, 720], to check the layout at another size.'),
+  locale: z
+    .string()
+    .regex(/^[a-z]{2,3}([_-][A-Za-z0-9]+)?$/)
+    .optional()
+    .describe('Run the game in this locale, such as "de" or "pt_BR", to check its translations.'),
+  break_on_error: z
+    .boolean()
+    .optional()
+    .describe('Stop the game in the debugger at its first script error, as at a breakpoint, so that debug_state shows the stack and the variables there. Default: false, the game runs on. Needs the editor.'),
 });
 
 export function createGameRunTool(editor: EditorGateway, cursor: GameOutputCursor): BridgeTool<typeof gameRunInput, GameRun> {
@@ -89,7 +114,7 @@ export function createGameRunTool(editor: EditorGateway, cursor: GameOutputCurso
     definition: {
       title: 'Run game',
       description:
-        'Run the game and return its first output: the main scene by default, the scene open in the editor, or a scene by path. Waits until the game is ready, then watches it for a second, or for duration_ms and stops it. Runs from the editor, which saves the open scenes and scripts first; without the editor, starts Godot as a separate process. Script errors do not pause the game; they come with file, line and stack.',
+        'Run the game and return its first output: the main scene by default, the scene open in the editor, or a scene by path. Waits until the game is ready, then watches it for a second, or for duration_ms and stops it. Runs from the editor, which saves the open scenes and scripts first; without the editor, starts Godot as a separate process. Script errors do not pause the game unless break_on_error is set; they come with file, line and stack.',
       inputSchema: gameRunInput,
       annotations: changingAnnotations({ destructive: false, idempotent: false }),
       alwaysLoad: true,
@@ -97,11 +122,16 @@ export function createGameRunTool(editor: EditorGateway, cursor: GameOutputCurso
     },
     method: 'game.run',
     responseSchema: gameRunSchema,
-    params: ({ scene, duration_ms, fixed_fps }) => ({
+    params: ({ scene, duration_ms, fixed_fps, debug_draw, arguments: gameArguments, window_size, locale, break_on_error }) => ({
       scene,
       watch_ms: duration_ms ?? defaultWatchMs,
       stop_after: duration_ms !== undefined,
       ...(fixed_fps === undefined ? {} : { fixed_fps }),
+      ...(debug_draw === undefined ? {} : { debug_draw }),
+      ...(gameArguments === undefined ? {} : { arguments: gameArguments }),
+      ...(window_size === undefined ? {} : { window_size }),
+      ...(locale === undefined ? {} : { locale }),
+      ...(break_on_error === true ? { break_on_error } : {}),
     }),
     timeoutMs: ({ duration_ms }) => runAllowanceMs + (duration_ms ?? defaultWatchMs),
     present: (run, input) => {

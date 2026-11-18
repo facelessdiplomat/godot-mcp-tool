@@ -9,7 +9,7 @@ const animationSummarySchema = z.object({ name: z.string(), length: z.number(), 
 const animationTrackSchema = z.object({
   path: z.string(),
   type: z.string(),
-  interpolation: z.string(),
+  interpolation: z.string().optional(),
   update: z.string().optional(),
   key_count: z.number().int(),
   keys: z.array(z.object({ time: z.number(), value: z.unknown() })),
@@ -33,12 +33,28 @@ const animationChangeSchema = z.object({
   created: z.boolean(),
   length: z.number(),
   loop: z.string(),
-  tracks: z.array(z.object({ path: z.string(), keys: z.number().int(), interpolation: z.string(), update: z.string(), from: z.unknown(), to: z.unknown() })),
+  tracks: z.array(
+    z.union([
+      z.object({ type: z.literal('method'), path: z.string(), keys: z.number().int(), calls: z.array(z.object({ time: z.number(), call: z.string() })) }),
+      z.object({ type: z.literal('audio'), path: z.string(), keys: z.number().int(), sounds: z.array(z.object({ time: z.number(), stream: z.string() })) }),
+      z.object({
+        type: z.literal('value').default('value'),
+        path: z.string(),
+        keys: z.number().int(),
+        interpolation: z.string(),
+        update: z.string(),
+        from: z.unknown(),
+        to: z.unknown(),
+      }),
+    ]),
+  ),
   rejected: z.array(z.object({ path: z.string(), reason: z.string() })),
   reset_tracks: z.array(z.string()).default([]),
 });
 
 type AnimationChange = z.infer<typeof animationChangeSchema>;
+
+type ChangedTrack = AnimationChange['tracks'][number];
 
 const deletedAnimationSchema = z.object({ scene: z.string(), player: z.string(), name: z.string() });
 
@@ -99,7 +115,7 @@ function describeAnimations(description: AnimationDescription): string {
 }
 
 function describeTrack(track: z.infer<typeof animationTrackSchema>): string {
-  const kind = [track.type, track.interpolation, ...(track.update === undefined ? [] : [track.update])].join(', ');
+  const kind = [track.type, ...(track.interpolation === undefined ? [] : [track.interpolation]), ...(track.update === undefined ? [] : [track.update])].join(', ');
   const keys = track.keys.map((key) => `${seconds(key.time)} ${formatValue(key.value)}`).join('; ');
   const more = track.keys.length < track.key_count ? `; … ${String(track.keys.length)} of ${String(track.key_count)} keys shown` : '';
   return `- ${track.path} (${kind}): ${keys}${more}`;
@@ -110,7 +126,8 @@ const keySchema = z.object({
   value: z.unknown().describe('The value, in the formats of node_set_properties, such as [0, 3, 0] for a Vector3 or true for visible.'),
 });
 
-const trackSchema = z.object({
+const valueTrackSchema = z.object({
+  type: z.literal('value').optional().describe('value (default) animates a property; "method" calls methods of a node; "audio" plays sounds through an audio player node.'),
   path: z.string().min(1).describe('Node and property, relative to the parent of the player: "Door:position", "Door:position:y", ".:visible" for the parent itself.'),
   keys: z.array(keySchema).min(1),
   interpolation: z
@@ -123,12 +140,43 @@ const trackSchema = z.object({
     .describe('continuous blends every frame, discrete changes at each key. Default: discrete for values that cannot blend, such as bool and text, continuous otherwise.'),
 });
 
+const methodTrackSchema = z.object({
+  type: z.literal('method'),
+  path: z.string().min(1).describe('The node whose methods are called, relative to the parent of the player, such as "Walker" or "." for the parent itself.'),
+  keys: z
+    .array(
+      z.object({
+        time: z.number().min(0).describe('Seconds from the start of the animation.'),
+        method: z.string().min(1).describe('The method to call, such as "_on_footstep"; it must already exist in the script of the node.'),
+        args: z.array(z.unknown()).optional().describe('Arguments in order, in the formats of node_set_properties, such as ["left"]. Default: none.'),
+      }),
+    )
+    .min(1),
+});
+
+const audioTrackSchema = z.object({
+  type: z.literal('audio'),
+  path: z.string().min(1).describe('An AudioStreamPlayer, AudioStreamPlayer2D or AudioStreamPlayer3D, relative to the parent of the player, such as "Walker/Footsteps".'),
+  keys: z
+    .array(
+      z.object({
+        time: z.number().min(0).describe('Seconds from the start of the animation.'),
+        stream: z.string().min(1).describe('The sound to play, as a res:// path such as "res://sounds/step.ogg".'),
+        start_offset: z.number().min(0).optional().describe('Seconds cut from the start of the sound. Default: 0.'),
+        end_offset: z.number().min(0).optional().describe('Seconds cut from the end of the sound. Default: 0.'),
+      }),
+    )
+    .min(1),
+});
+
+const trackSchema = z.union([valueTrackSchema, methodTrackSchema, audioTrackSchema]);
+
 const animationSetInput = z.object({
   player: playerPath,
   name: animationName,
   length: z.number().positive().optional().describe('Length in seconds. Default: the time of the last key.'),
   loop: z.enum(['none', 'linear', 'pingpong']).optional().describe('none (default) plays once, linear repeats, pingpong goes back and forth.'),
-  tracks: z.array(trackSchema).min(1).describe('One track per animated property, with all its keys.'),
+  tracks: z.array(trackSchema).min(1).describe('One track per animated property, per node whose methods are called and per audio player, each with all its keys.'),
   scene: sceneToUse,
 });
 
@@ -138,7 +186,7 @@ export function createAnimationSetTool(editor: EditorGateway): BridgeTool<typeof
     definition: {
       title: 'Create or replace animation',
       description:
-        'Create or replace an animation of an AnimationPlayer from property tracks, as one Undo step: each track animates one property, such as {"path": "Door:position", "keys": [{"time": 0, "value": [0, 0, 0]}, {"time": 1, "value": [0, 3, 0]}]}, with a node path relative to the parent of the player and values in the formats of node_set_properties. A track the editor cannot use is rejected with the reason and the others are kept. Like the editor, it keys the current value of each newly animated property in the RESET animation, the pose that the other animations and AnimationTree blends start from; without it, a property that only some animations of a state machine animate would blend from zero. An animation plays when a script calls play("name") on the player or when the player\'s autoplay names it; check it in the running game with game_wait and game_get_properties.',
+        'Create or replace an animation of an AnimationPlayer from tracks, as one Undo step: a value track animates one property, such as {"path": "Door:position", "keys": [{"time": 0, "value": [0, 0, 0]}, {"time": 1, "value": [0, 3, 0]}]}, with a node path relative to the parent of the player and values in the formats of node_set_properties; a method track calls methods of a node at given times, such as footsteps: {"type": "method", "path": "Walker", "keys": [{"time": 0.25, "method": "_on_footstep"}]}; an audio track plays sounds through an audio player node: {"type": "audio", "path": "Walker/Footsteps", "keys": [{"time": 0.25, "stream": "res://sounds/step.ogg"}]}. Method tracks call in the running game, not in the editor. A track the editor cannot use is rejected with the reason and the others are kept. Like the editor, it keys the current value of each newly animated property in the RESET animation, the pose that the other animations and AnimationTree blends start from; without it, a property that only some animations of a state machine animate would blend from zero. An animation plays when a script calls play("name") on the player or when the player\'s autoplay names it; check it in the running game with game_wait and game_get_properties.',
       inputSchema: animationSetInput,
       annotations: changingAnnotations({ destructive: true, idempotent: true }),
       alwaysLoad: false,
@@ -152,16 +200,15 @@ export function createAnimationSetTool(editor: EditorGateway): BridgeTool<typeof
       }
       const verb = change.created ? 'Created' : 'Replaced';
       const summary = `${verb} the animation ${change.name} (${seconds(change.length)}, loop ${change.loop}) of ${change.player} in ${change.scene} as one Undo step; the scene has unsaved changes.`;
-      const tracks = change.tracks.map(
-        (track) => `- ${track.path}: ${String(track.keys)} ${track.keys === 1 ? 'key' : 'keys'} from ${formatValue(track.from)} to ${formatValue(track.to)}, ${track.interpolation}, ${track.update}`,
-      );
+      const tracks = change.tracks.map(describeChangedTrack);
       const reset =
         change.reset_tracks.length === 0
           ? []
           : [
               `Keyed the current ${change.reset_tracks.length === 1 ? 'value' : 'values'} of ${change.reset_tracks.join(', ')} in RESET, the pose that the other animations and AnimationTree blends start from.`,
             ];
-      return textResult([summary, ...tracks, ...rejected, ...reset].join('\n'));
+      const methodNote = change.tracks.some((track) => track.type === 'method') ? ['Method tracks call their methods in the running game, not in the editor.'] : [];
+      return textResult([summary, ...tracks, ...rejected, ...reset, ...methodNote].join('\n'));
     },
   });
 }
@@ -182,6 +229,30 @@ export function createAnimationDeleteTool(editor: EditorGateway): BridgeTool<typ
     responseSchema: deletedAnimationSchema,
     present: (deleted) => textResult(`Deleted the animation ${deleted.name} of ${deleted.player} in ${deleted.scene} as one Undo step; the scene has unsaved changes.`),
   });
+}
+
+function describeChangedTrack(track: ChangedTrack): string {
+  switch (track.type) {
+    case 'method':
+      return `- ${track.path}: calls ${describeTimedKeys(track.calls.map((call) => ({ time: call.time, text: call.call })))}`;
+    case 'audio':
+      return `- ${track.path}: plays ${describeTimedKeys(track.sounds.map((sound) => ({ time: sound.time, text: sound.stream })))}`;
+    case 'value':
+      return `- ${track.path}: ${String(track.keys)} ${track.keys === 1 ? 'key' : 'keys'} from ${formatValue(track.from)} to ${formatValue(track.to)}, ${track.interpolation}, ${track.update}`;
+  }
+}
+
+function describeTimedKeys(keys: readonly { readonly time: number; readonly text: string }[]): string {
+  const timesByText = new Map<string, number[]>();
+  for (const key of keys) {
+    timesByText.set(key.text, [...(timesByText.get(key.text) ?? []), key.time]);
+  }
+  return [...timesByText].map(([text, times]) => `${text} at ${listTimes(times)}`).join('; ');
+}
+
+function listTimes(times: readonly number[]): string {
+  const texts = times.map(seconds);
+  return texts.length === 1 ? texts.join('') : `${texts.slice(0, -1).join(', ')} and ${texts.at(-1) ?? ''}`;
 }
 
 function seconds(value: number): string {

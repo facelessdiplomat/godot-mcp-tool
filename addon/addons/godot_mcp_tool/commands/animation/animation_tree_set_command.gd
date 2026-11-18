@@ -4,6 +4,7 @@ const GodotMcpAnimationReference := preload("../../animation/animation_reference
 const GodotMcpChangeSet := preload("../../scene/change_set.gd")
 const GodotMcpEditingContext := preload("../../scene/editing_context.gd")
 const GodotMcpIndefiniteArticle := preload("../../util/indefinite_article.gd")
+const GodotMcpInstancedScenes := preload("../../scene/instanced_scenes.gd")
 const GodotMcpNodeFactory := preload("../../scene/node_factory.gd")
 const GodotMcpNodeLocator := preload("../../scene/node_locator.gd")
 const GodotMcpParams := preload("../params.gd")
@@ -76,7 +77,8 @@ static func _find_tree(scene_root: Node, tree_path: String) -> Variant:
 			"%s is %s, not an AnimationTree" % [tree_path, GodotMcpIndefiniteArticle.before(GodotMcpNodeFactory.display_class(node))],
 			"Add an AnimationTree with node_add next to the AnimationPlayer whose animations it blends.",
 		)
-	return node
+	var refusal := GodotMcpInstancedScenes.refusal_for_part_of(node, scene_root, "state machine")
+	return node if refusal == null else refusal
 
 
 static func _player_for(scene_root: Node, tree: AnimationTree, player_path: String) -> Variant:

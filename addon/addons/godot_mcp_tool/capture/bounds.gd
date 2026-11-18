@@ -22,7 +22,7 @@ static func measure(node: Node) -> Dictionary:
 	var measured := visual if visual_count > 0 else collision
 	if visual_count == 0 and collision_count == 0:
 		measured = AABB(GodotMcpSpatialTransforms.global_of(node).origin, Vector3.ZERO)
-	return {"aabb": measured, "visual_count": visual_count, "collision_count": collision_count}
+	return {"aabb": measured, "visual_count": visual_count, "collision_count": collision_count, "visual": visual, "collision": collision}
 
 
 static func _subtree(node: Node) -> Array[Node3D]:

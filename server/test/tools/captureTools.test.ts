@@ -38,6 +38,28 @@ describe('capture tools', () => {
     );
   });
 
+  it('game_screenshot takes a strip of frames as one labelled image', async () => {
+    const editor = new FakeEditorGateway().respondTo('game.screenshot', {
+      path: '/captures/moments-1-001.png',
+      width: 1280,
+      height: 724,
+      original_width: 1280,
+      original_height: 724,
+      scene: 'res://levels/arena.tscn',
+      views: [],
+      moments: ['frame 0', 'frame 5', 'frame 10'],
+    });
+
+    const result = await createGameScreenshotTool(editor, () => Buffer.from('png')).execute({ frames: 3, every_physics_frames: 5 });
+
+    expect(editor.requests[0]?.params).toEqual({ frames: 3, every_physics_frames: 5, max_size: 1280, format: 'png' });
+    expect(editor.requests[0]?.options?.timeoutMs).toBeGreaterThan(30_000);
+    expect(result.content[1]).toEqual({
+      type: 'text',
+      text: 'Screenshots of the running game (res://levels/arena.tscn) at frame 0; frame 5; frame 10, in one labelled image, 1280×724.\nSaved to /captures/moments-1-001.png',
+    });
+  });
+
   it('game_screenshot forwards the views and names them in order', async () => {
     const game = new FakeEditorGateway().respondTo('game.screenshot', {
       ...gameCapture,
@@ -133,5 +155,54 @@ describe('capture tools', () => {
     const result = await createEditorScreenshotTool(editor, readPng).execute({ views: [{ preset: 'front', target: 'Player' }] });
 
     expect(textOf(result)).toBe('View of res://levels/arena.tscn, 1280×720: front of Player.\nSaved to /captures/editor-1-002.png');
+  });
+
+  it('editor_screenshot poses the scene at times of an animation', async () => {
+    const editor = new FakeEditorGateway().respondTo('editor.screenshot', {
+      ...gameCapture,
+      path: '/captures/editor-1-003.png',
+      width: 1280,
+      height: 724,
+      original_width: 1280,
+      original_height: 724,
+      views: ['front of Hero'],
+      moments: ['walk at 0 s', 'walk at 0.25 s', 'walk at 0.5 s', 'walk at 0.75 s'],
+    });
+
+    const result = await createEditorScreenshotTool(editor, readPng).execute({
+      views: [{ preset: 'front', target: 'Hero' }],
+      animation: { player: 'Hero/AnimationPlayer', name: 'walk' },
+    });
+
+    expect(editor.requests[0]?.params).toEqual({
+      views: [{ preset: 'front', target: 'Hero' }],
+      animation: { player: 'Hero/AnimationPlayer', name: 'walk' },
+      max_size: 1280,
+      format: 'png',
+    });
+    expect(textOf(result)).toBe(
+      'Poses of res://levels/arena.tscn from front of Hero at walk at 0 s; walk at 0.25 s; walk at 0.5 s; walk at 0.75 s, in one labelled image, 1280×724. The animated values are back as they were.\nSaved to /captures/editor-1-003.png',
+    );
+  });
+
+  it('editor_screenshot renders a UI scene at several window sizes', async () => {
+    const editor = new FakeEditorGateway().respondTo('editor.screenshot', {
+      ...gameCapture,
+      scene: 'res://ui/hud.tscn',
+      path: '/captures/editor-1-004.png',
+      width: 1280,
+      height: 360,
+      original_width: 3368,
+      original_height: 1080,
+      views: [],
+      sizes: ['1920×1080 (16:9)', '1440×1080 (4:3)'],
+    });
+
+    const result = await createEditorScreenshotTool(editor, readPng).execute({ sizes: [[1920, 1080], [1440, 1080]] });
+
+    expect(editor.requests[0]?.params).toEqual({ sizes: [[1920, 1080], [1440, 1080]], max_size: 1280, format: 'png' });
+    expect(textOf(result)).toBe(
+      'Render of res://ui/hud.tscn at 1920×1080 (16:9); 1440×1080 (4:3), laid out like the game window with the stretch settings of the project, in one labelled image, 1280×360 (scaled down from 3368×1080).\nSaved to /captures/editor-1-004.png',
+    );
   });
 });

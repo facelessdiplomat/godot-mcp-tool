@@ -20,6 +20,7 @@ export class FakeLanguageServer {
   otherWorkspace: string | undefined;
   answerOpenedFiles = true;
   diagnose: (text: string) => FakeDiagnostic[] = () => [];
+  renameEdits: (params: Record<string, unknown>) => unknown = () => ({ changes: {} });
   private readonly server: Server;
   private readonly sockets = new Set<Socket>();
 
@@ -69,6 +70,10 @@ export class FakeLanguageServer {
         socket.write(encodeContentLengthMessage({ jsonrpc: '2.0', method: 'gdscript_client/changeWorkspace', params: { path: this.otherWorkspace } }));
       }
       socket.write(encodeContentLengthMessage({ jsonrpc: '2.0', id: message.id, result: { capabilities: {} } }));
+      return;
+    }
+    if (message.method === 'textDocument/rename') {
+      socket.write(encodeContentLengthMessage({ jsonrpc: '2.0', id: message.id, result: this.renameEdits(message.params ?? {}) }));
       return;
     }
     if (message.method === 'textDocument/didOpen' && this.answerOpenedFiles) {

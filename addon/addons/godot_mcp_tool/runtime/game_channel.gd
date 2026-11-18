@@ -8,13 +8,25 @@ const STOPPED_IN_THE_DEBUGGER_MESSAGE := "The game stopped in the debugger befor
 const STOPPED_IN_THE_DEBUGGER_HINT := "debug_state shows where it stopped; debug_continue resumes the game, and the rest of this call plays out then."
 
 var _send: Callable
+var _send_debugger_command: Callable
+var _toggle_profiler: Callable
 var _next_request_id := 1
 var _answers := {}
 var _frame_waiting_ids := {}
 
 
-func _init(send: Callable) -> void:
+func _init(send: Callable, send_debugger_command: Callable = func(_command: String) -> bool: return false, toggle_profiler: Callable = func(_profiler: String, _enabled: bool, _options: Array) -> bool: return false) -> void:
 	_send = send
+	_send_debugger_command = send_debugger_command
+	_toggle_profiler = toggle_profiler
+
+
+func toggle_profiler(profiler: String, enabled: bool, options: Array) -> bool:
+	return _toggle_profiler.call(profiler, enabled, options)
+
+
+func send_debugger_command(command: String) -> bool:
+	return _send_debugger_command.call(command)
 
 
 func request(method: String, params: Dictionary, timeout_msec: int, waits_for_frames := false) -> Variant:

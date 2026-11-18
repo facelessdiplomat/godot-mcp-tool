@@ -42,7 +42,7 @@ export class GodotStatusTool implements Tool<typeof inputSchema> {
 
   private describeProject(): string {
     const { project } = this.dependencies;
-    return project.found ? `Project: ${project.root} (from ${project.source})` : `Project: not found. ${project.reason}`;
+    return project.found ? `Project: ${project.root} (from ${project.source})` : `Project: not found. ${project.reason} To make a game from scratch, create a project with project_create.`;
   }
 
   private async describeBinary(editorStatus: EditorStatus): Promise<string> {

@@ -11,6 +11,9 @@ const OPERATIONS := {
 	"node_reparent": preload("../../scene/edits/node_move.gd"),
 	"node_duplicate": preload("../../scene/edits/node_duplication.gd"),
 	"node_set_groups": preload("../../scene/edits/group_change.gd"),
+	"node_save_as_scene": preload("../../scene/edits/branch_extraction.gd"),
+	"node_make_local": preload("../../scene/edits/instance_localization.gd"),
+	"node_add_collision": preload("../../scene/edits/collision_addition.gd"),
 	"signal_connect": preload("../../scene/edits/signal_connection.gd"),
 	"signal_disconnect": preload("../../scene/edits/signal_disconnection.gd"),
 }
@@ -46,6 +49,7 @@ func execute(params: Dictionary) -> Variant:
 		var problem := scene_edit.prepare(scene_root, operation)
 		if problem != null:
 			scene_edit.changes.release_created()
+			scene_edit.discard_outside_changes()
 			return _abandon(index, _operation_name(operation), problem, applied)
 		scene_edit.changes.apply()
 		applied.append(scene_edit)
@@ -75,6 +79,7 @@ func _abandon(index: int, operation_name: String, problem: GodotMcpCommandError,
 		applied[position].changes.revert()
 	for edit in applied:
 		edit.changes.release_created()
+		edit.discard_outside_changes()
 	var label := "Operation %d" % (index + 1) if operation_name.is_empty() else "Operation %d (%s)" % [index + 1, operation_name]
 	return GodotMcpCommandError.new(problem.code, "%s: %s. Nothing was changed." % [label, problem.message.trim_suffix(".")], problem.hint)
 

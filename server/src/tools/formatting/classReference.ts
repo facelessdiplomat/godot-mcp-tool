@@ -1,6 +1,7 @@
 import { bbcodeToMarkdown, summarize } from '../../docs/BbcodeMarkdown.js';
 import { type ClassDoc, type EnumDoc, globalScopeName, type MethodDoc, type ParameterDoc, type PropertyDoc, type SignalDoc } from '../../docs/ClassDoc.js';
 import { type DocsLibrary, descriptionOf, type MemberEntry, type MemberMatch, propertyAccessors, type SearchHit } from '../../docs/DocsLibrary.js';
+import { gdscriptPageName } from '../../docs/EditorHelpDocs.js';
 
 const memberSummaryLength = 110;
 const enumValueSummaryLength = 200;
@@ -57,7 +58,12 @@ function renderOverview(library: DocsLibrary, classDoc: ClassDoc, layout: Overvi
   const sections = [
     section('Constructors', classDoc.constructors.map((constructor) => line(constructorSignature(constructor), constructor.description)), layout),
     section('Properties', classDoc.properties.map((property) => line(propertySignature(property), property.description)), layout),
-    section(classDoc.name === globalScopeName ? 'Functions' : 'Methods', methods.map((method) => line(methodSignature(method), method.description)), layout),
+    section('Annotations', methods.filter(isAnnotation).map((annotation) => line(annotationSignature(annotation), annotation.description)), layout),
+    section(
+      classDoc.name === globalScopeName || classDoc.name === gdscriptPageName ? 'Functions' : 'Methods',
+      methods.filter((method) => !isAnnotation(method)).map((method) => line(methodSignature(method), method.description)),
+      layout,
+    ),
     section('Signals', classDoc.signals.map((signal) => line(signalSignature(signal), signal.description)), layout),
     section('Enums', classDoc.enums.map((enumeration) => `- ${enumOverview(enumeration)}`), layout),
     section('Constants', classDoc.constants.map((constant) => line(`${constant.name} = ${constant.value}`, constant.description)), layout),
@@ -119,6 +125,9 @@ function kindOf(classDoc: ClassDoc): string {
   if (classDoc.name === globalScopeName) {
     return 'global scope';
   }
+  if (classDoc.name === gdscriptPageName) {
+    return 'annotations and functions of GDScript';
+  }
   switch (classDoc.origin) {
     case 'builtin':
       return 'built-in type';
@@ -146,7 +155,10 @@ function searchKindOf(classDoc: ClassDoc): string {
 function memberKindOf(owner: ClassDoc, entry: MemberEntry): string {
   switch (entry.kind) {
     case 'method':
-      return owner.name === globalScopeName ? 'Function' : 'Method';
+      if (isAnnotation(entry.doc)) {
+        return 'Annotation';
+      }
+      return owner.name === globalScopeName || owner.name === gdscriptPageName ? 'Function' : 'Method';
     case 'property':
       return 'Property';
     case 'signal':
@@ -167,7 +179,7 @@ function ownerLabelOf(owner: ClassDoc, entry: MemberEntry): string {
 function signatureOf(entry: MemberEntry): string {
   switch (entry.kind) {
     case 'method':
-      return methodSignature(entry.doc);
+      return isAnnotation(entry.doc) ? annotationSignature(entry.doc) : methodSignature(entry.doc);
     case 'property':
       return propertySignature(entry.doc);
     case 'signal':
@@ -194,6 +206,18 @@ function searchSignatureOf(entry: MemberEntry): string {
 function methodSignature(method: MethodDoc): string {
   const qualifiers = method.qualifiers.length === 0 ? '' : ` ${method.qualifiers.join(' ')}`;
   return `${method.name}(${parametersText(method.parameters)})${qualifiers} -> ${method.returnType}`;
+}
+
+function isAnnotation(method: MethodDoc): boolean {
+  return method.name.startsWith('@');
+}
+
+function annotationSignature(annotation: MethodDoc): string {
+  const takesMore = annotation.qualifiers.includes('vararg');
+  if (annotation.parameters.length === 0 && !takesMore) {
+    return annotation.name;
+  }
+  return `${annotation.name}(${[parametersText(annotation.parameters), ...(takesMore ? ['...'] : [])].filter((part) => part !== '').join(', ')})`;
 }
 
 function constructorSignature(constructor: MethodDoc): string {

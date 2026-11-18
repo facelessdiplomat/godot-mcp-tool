@@ -9,7 +9,7 @@ import type { ProcessResult, ProcessRunner } from '../process/ProcessRunner.js';
 import { ExportDestination } from './ExportDestination.js';
 import { ExportError } from './ExportError.js';
 import { type ExportOutput, readExportOutput } from './ExportOutput.js';
-import { type ExportPreset, readExportPresets } from './ExportPresets.js';
+import { type ExportPreset, exportPlatformFacts, type PlatformFacts, readExportPresets } from './ExportPresets.js';
 
 export type ExportMode = 'release' | 'debug' | 'pack';
 
@@ -45,26 +45,12 @@ export interface ProjectExporterDependencies {
   readonly now: () => number;
 }
 
-interface PlatformFacts {
-  readonly folder: string;
-  readonly exampleFile: string;
-  readonly sconsPlatform: string;
-}
-
 const presetsFileName = 'export_presets.cfg';
 const ignoreFileName = '.gdignore';
 const packExtension = '.pck';
 const officialBuild = 'official';
 const unsavedFilesTimeoutMs = 5_000;
 const modeArguments: Readonly<Record<ExportMode, string>> = { release: '--export-release', debug: '--export-debug', pack: '--export-pack' };
-const platformFacts: Readonly<Record<string, PlatformFacts>> = {
-  macOS: { folder: 'macos', exampleFile: 'game.zip', sconsPlatform: 'macos' },
-  'Windows Desktop': { folder: 'windows', exampleFile: 'game.exe', sconsPlatform: 'windows' },
-  Linux: { folder: 'linux', exampleFile: 'game.x86_64', sconsPlatform: 'linuxbsd' },
-  Web: { folder: 'web', exampleFile: 'index.html', sconsPlatform: 'web' },
-  Android: { folder: 'android', exampleFile: 'game.apk', sconsPlatform: 'android' },
-  iOS: { folder: 'ios', exampleFile: 'game.ipa', sconsPlatform: 'ios' },
-};
 const unsavedFilesSchema = z.object({ scenes: z.array(z.string()), scripts: z.array(z.string()) });
 
 export class ProjectExporter {
@@ -184,7 +170,7 @@ function outputPathFor(preset: ExportPreset, request: ExportRequest): string {
 
 function factsOf(platform: string): PlatformFacts {
   const name = platform.toLowerCase().replace(/[^a-z0-9]+/g, '_');
-  return platformFacts[platform] ?? { folder: name, exampleFile: 'game.zip', sconsPlatform: name };
+  return exportPlatformFacts[platform] ?? { folder: name, exampleFile: 'game.zip', sconsPlatform: name, extension: '.zip' };
 }
 
 function describeErrors(output: ExportOutput, result: ProcessResult): string[] {

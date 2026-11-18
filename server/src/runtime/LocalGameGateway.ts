@@ -64,9 +64,16 @@ const runParamsSchema = z.object({
   watch_ms: z.number().int().min(0).default(1000),
   stop_after: z.boolean().default(false),
   fixed_fps: z.number().int().min(1).max(1000).optional(),
+  debug_draw: z.array(z.enum(['collisions', 'navigation', 'paths', 'avoidance'])).default([]),
+  window_size: z.tuple([z.number().int().positive(), z.number().int().positive()]).optional(),
+  locale: z.string().optional(),
+  arguments: z.array(z.string()).default([]),
+  break_on_error: z.boolean().default(false),
 });
 
 type RunParams = z.infer<typeof runParamsSchema>;
+
+const debugDrawFlags = { collisions: '--debug-collisions', navigation: '--debug-navigation', paths: '--debug-paths', avoidance: '--debug-avoidance' } as const;
 
 const outputParamsSchema = z.object({
   after: z.number().int().default(-1),
@@ -153,6 +160,9 @@ export class LocalGameGateway implements EditorGateway {
   }
 
   private async run(params: RunParams): Promise<unknown> {
+    if (params.break_on_error) {
+      throw new BridgeRequestError('Stopping at the first error needs the debugger of the Godot editor, and the game runs without it', invalidParamsCode, 'Start the editor with editor_launch and run the game again.', undefined);
+    }
     const { projectRoot, records, binaryPath } = this.prepareRun(params.scene);
     await this.stop();
     this.beginRun(records);
@@ -230,8 +240,12 @@ export class LocalGameGateway implements EditorGateway {
       projectRoot,
       ...(this.options.headless ? ['--headless'] : []),
       ...(params.fixed_fps === undefined ? [] : ['--fixed-fps', String(params.fixed_fps)]),
+      ...params.debug_draw.map((drawing) => debugDrawFlags[drawing]),
+      ...(params.window_size === undefined ? [] : ['--resolution', `${String(params.window_size[0])}x${String(params.window_size[1])}`]),
+      ...(params.locale === undefined ? [] : ['--language', params.locale]),
       ...(params.scene === 'main' ? [] : [params.scene]),
       '--',
+      ...params.arguments,
       `--mcp-log-file=${logFile}`,
       `--mcp-port=${String(port)}`,
     ];

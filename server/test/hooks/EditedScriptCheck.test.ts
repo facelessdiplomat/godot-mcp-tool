@@ -75,6 +75,26 @@ describe('checking a script that Claude just wrote or edited', () => {
     expect(outcome).toMatchObject({ kind: 'problems', hasErrors: false });
   });
 
+  it('checks an edited shader and reports its error', async () => {
+    const shaderPath = join(projectRoot, 'water.gdshader');
+    writeFileSync(shaderPath, 'shader_type spatial;\n');
+    validation = () =>
+      Promise.resolve({
+        method: 'check-only',
+        reports: [],
+        shaderReports: [{ resourcePath: 'res://water.gdshader', problems: [{ line: 4, severity: 'error', message: 'Expected a ";".' }] }],
+      });
+
+    const outcome = await check(editOf(shaderPath));
+
+    expect(checked).toEqual([{ projectRoot, scriptPath: shaderPath }]);
+    expect(outcome).toEqual({
+      kind: 'problems',
+      hasErrors: true,
+      report: ["1 error in 1 of 1 shader (compiled by Godot's shader compiler, which stops at the first error of each shader).", 'res://water.gdshader', '  4 error: Expected a ";".'].join('\n'),
+    });
+  });
+
   it('leaves files that are not scripts alone', async () => {
     writeFileSync(join(projectRoot, 'level.tscn'), '[gd_scene format=3]\n');
 

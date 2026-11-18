@@ -52,6 +52,17 @@ const playedInputSchema = z.object({
   paused: z.boolean(),
   game_frame: z.number(),
   reads: z.array(inputReadSchema).optional(),
+  clicked: z.array(z.object({ step: z.number(), path: z.string(), at: z.array(z.number()) })).optional(),
+  signals: z
+    .array(
+      z.object({
+        node: z.string(),
+        signal: z.string(),
+        emissions: z.array(z.object({ step: z.number(), physics_frames: z.number(), arguments: z.array(z.unknown()) })),
+      }),
+    )
+    .optional(),
+  failed_step: z.object({ step: z.number(), error: z.string() }).optional(),
   screenshot: captureSchema.optional(),
   screenshot_error: z.string().optional(),
 });
@@ -199,9 +210,41 @@ const mouseMotionStep = z.strictObject({
 });
 
 const clickStep = z.strictObject({
-  click: pointInView.describe('Click at [x, y] in pixels of the game view, as in game screenshots.'),
+  click: z
+    .union([pointInView, z.string().min(1)])
+    .describe('Click at [x, y] in pixels of the game view, as in game screenshots, or on the middle of a visible Control by its path, such as "Menu/Resume".'),
   button: z.enum(['left', 'right', 'middle']).optional().describe('The mouse button. Default: left.'),
   double: z.boolean().optional().describe('Double-click.'),
+  state: z
+    .enum(['tap', 'down', 'up'])
+    .optional()
+    .describe('"tap" (default) clicks; "down" presses the button and keeps it held, so that mouse_motion steps drag; "up" releases it.'),
+});
+
+const wheelStep = z.strictObject({
+  wheel: z.enum(['up', 'down', 'left', 'right']).describe('Turn the mouse wheel, such as to zoom a camera or scroll a list.'),
+  at: pointInView.optional().describe('Where the mouse is, [x, y] in pixels of the game view. Default: where it already is.'),
+  clicks: z.number().int().min(1).max(20).optional().describe('How many notches to turn. Default: 1.'),
+});
+
+const finger = z.number().int().min(0).max(9).optional().describe('Which finger, from 0 to 9, for gestures with several fingers. Default: 0.');
+
+const touchStep = z.strictObject({
+  touch: pointInView.describe('Touch the screen at [x, y] in pixels of the game view.'),
+  finger,
+  state: pressState,
+  ...holdDuration,
+});
+
+const touchDragStep = z.strictObject({
+  touch_drag: pointInView.describe('Drag a finger that is down by [dx, dy] pixels of the game view.'),
+  finger,
+});
+
+const screenshotStep = z.strictObject({
+  screenshot: z
+    .literal(true)
+    .describe('Take a screenshot at this moment; up to 6 screenshots of one input, the final one included, come back as one labelled image.'),
 });
 
 const textStep = z.strictObject({ text: z.string().min(1).describe('Type this text, as into a focused LineEdit.') });
@@ -227,10 +270,14 @@ const inputStep = z.union([
   joypadMotionStep,
   mouseMotionStep,
   clickStep,
+  wheelStep,
+  touchStep,
+  touchDragStep,
   textStep,
   waitMillisecondsStep,
   waitPhysicsFramesStep,
   readStep,
+  screenshotStep,
 ]);
 
 type InputStep = z.infer<typeof inputStep>;
@@ -248,6 +295,16 @@ const gameInputInput = z.object({
     .boolean()
     .default(false)
     .describe('Take a screenshot of the game window right after the last step, as game_screenshot does, so that it shows the moment the input ends.'),
+  watch_signals: z
+    .array(
+      z.strictObject({
+        node: z.string().optional().describe('The node that emits the signal, such as "Player". Default: the current scene root.'),
+        signal: z.string().min(1).describe('The signal, such as "landed".'),
+      }),
+    )
+    .max(10)
+    .optional()
+    .describe('Signals to watch while the input plays; the result lists every emission with its step, physics frame and arguments, such as to check that "landed" is emitted exactly once.'),
 });
 
 export function createGameInputTool(game: EditorGateway, readCapture: CaptureReader): BridgeTool<typeof gameInputInput, PlayedInput> {
@@ -256,7 +313,7 @@ export function createGameInputTool(game: EditorGateway, readCapture: CaptureRea
     definition: {
       title: 'Play input into the game',
       description:
-        'Play input into the running game step by step: hold input actions, keys, gamepad buttons and sticks, move and click the mouse, type text, wait, and read nodes at exact moments with read steps, such as the height of a jump 10 physics frames after the press, which a later call would miss. A hold of N physics frames lasts exactly N frames of the game. While game_pause holds the game, the input plays it only for its holds and waits, then pauses it again. Also check the result with game_get_properties or a screenshot right after the last step (screenshot: true). Actions must exist in the project when the game starts. Needs a game started with game_run, with or without the editor.',
+        'Play input into the running game step by step: hold input actions, keys, gamepad buttons and sticks, move, click, drag and scroll the mouse, click a Control by its path, touch and drag fingers, type text, wait, and read nodes or take screenshots at exact moments, such as the height of a jump 10 physics frames after the press, which a later call would miss. A hold of N physics frames lasts exactly N frames of the game. While game_pause holds the game, the input plays it only for its holds and waits, then pauses it again. Also check the result with game_get_properties or a screenshot right after the last step (screenshot: true). Actions must exist in the project when the game starts. Needs a game started with game_run, with or without the editor.',
       inputSchema: gameInputInput,
       annotations: changingAnnotations({ destructive: false, idempotent: false }),
       alwaysLoad: true,
@@ -264,7 +321,9 @@ export function createGameInputTool(game: EditorGateway, readCapture: CaptureRea
     method: 'game.input',
     responseSchema: playedInputSchema,
     timeoutMs: ({ steps, screenshot }) =>
-      inputAllowanceMs + (screenshot ? screenshotAllowanceMs : 0) + steps.reduce((total, step) => total + estimatedDurationMs(step), 0),
+      inputAllowanceMs +
+      (screenshot || steps.some((step) => 'screenshot' in step) ? screenshotAllowanceMs : 0) +
+      steps.reduce((total, step) => total + estimatedDurationMs(step), 0),
     present: (played) => presentPlayedInput(played, readCapture),
   });
 }
@@ -287,7 +346,13 @@ function estimatedDurationMs(step: InputStep): number {
   if ('read' in step) {
     return 0;
   }
-  if ('action' in step || 'key' in step || 'joypad_button' in step || 'joypad_motion' in step) {
+  if ('screenshot' in step) {
+    return screenshotAllowanceMs;
+  }
+  if ('wheel' in step) {
+    return framesToMs((step.clicks ?? 1) * tapPhysicsFrames);
+  }
+  if ('action' in step || 'key' in step || 'joypad_button' in step || 'joypad_motion' in step || 'touch' in step) {
     return step.ms ?? framesToMs(step.physics_frames ?? tapPhysicsFrames);
   }
   return framesToMs(tapPhysicsFrames);
@@ -301,7 +366,12 @@ function describePlayedInput(played: PlayedInput): string {
   const lines = [
     `Played ${String(played.steps)} input ${played.steps === 1 ? 'step' : 'steps'} in ${String(played.waited_ms)} ms (${describePhysicsFrames(played.physics_frames)}).`,
     ...(played.reads ?? []).flatMap(describeRead),
+    ...(played.clicked ?? []).map((click) => `Step ${String(click.step)} clicked ${click.path} at [${click.at.join(', ')}].`),
+    ...(played.signals ?? []).map(describeWatchedSignal),
   ];
+  if (played.failed_step !== undefined) {
+    lines.push(`Stopped at step ${String(played.failed_step.step)}: ${played.failed_step.error}. The later steps did not run.`);
+  }
   if (played.released.length > 0) {
     lines.push(`Released at the end: ${played.released.join(', ')}.`);
   }
@@ -319,6 +389,18 @@ function describePlayedInput(played: PlayedInput): string {
   return lines.join('\n');
 }
 
+function describeWatchedSignal(watched: NonNullable<PlayedInput['signals']>[number]): string {
+  const name = `${watched.node === '.' ? 'The scene root' : watched.node}.${watched.signal}`;
+  if (watched.emissions.length === 0) {
+    return `${name} was not emitted.`;
+  }
+  const moments = watched.emissions.map((emission) => {
+    const emittedArguments = emission.arguments.length === 0 ? '' : ` with ${JSON.stringify(emission.arguments)}`;
+    return `in step ${String(emission.step)} after ${describePhysicsFrames(emission.physics_frames)}${emittedArguments}`;
+  });
+  return `${name} was emitted ${String(watched.emissions.length)} ${watched.emissions.length === 1 ? 'time' : 'times'}: ${moments.join('; ')}.`;
+}
+
 function describeRead(read: InputRead): string[] {
   const moment = `Step ${String(read.step)}, after ${describePhysicsFrames(read.physics_frames)}`;
   if ('error' in read) {
@@ -333,6 +415,12 @@ function describePhysicsFrames(count: number): string {
 
 function releaseStepFor(heldLabel: string): string {
   const [kind, ...nameParts] = heldLabel.split(' ');
+  if (kind === 'mouse') {
+    return `{"click": [x, y], "button": "${nameParts.join(' ')}", "state": "up"}`;
+  }
+  if (kind === 'touch') {
+    return `{"touch": [x, y], "finger": ${nameParts.join(' ')}, "state": "up"}`;
+  }
   return kind !== undefined && labelledStepKinds.includes(kind) && nameParts.length > 0
     ? `{"${kind}": "${nameParts.join(' ')}", "state": "up"}`
     : `{"action": "${heldLabel}", "state": "up"}`;

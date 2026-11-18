@@ -19,3 +19,7 @@ func files_changed_outside() -> PackedStringArray:
 
 func breakpoints() -> PackedStringArray:
 	return PackedStringArray()
+
+
+func current_script_place() -> Dictionary:
+	return {}

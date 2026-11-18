@@ -6,6 +6,7 @@ var changed_outside := PackedStringArray()
 var reload_count := 0
 var breakpoint_lines := PackedStringArray()
 var while_reloading := Callable()
+var script_place := {}
 
 
 func unsaved_files() -> PackedStringArray:
@@ -28,3 +29,7 @@ func files_changed_outside() -> PackedStringArray:
 
 func breakpoints() -> PackedStringArray:
 	return breakpoint_lines
+
+
+func current_script_place() -> Dictionary:
+	return script_place

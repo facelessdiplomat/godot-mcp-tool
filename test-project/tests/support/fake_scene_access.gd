@@ -9,6 +9,7 @@ var selected_nodes: Array[Node] = []
 var selected_file := ""
 var reloaded_paths := PackedStringArray()
 var while_saving := Callable()
+var main_screen := "3D"
 
 
 func edited_scene_root() -> Node:
@@ -76,3 +77,15 @@ func release() -> void:
 	if edited_root != null:
 		edited_root.free()
 		edited_root = null
+
+
+func current_selection() -> Array[Node]:
+	return selected_nodes
+
+
+func current_file_selection() -> PackedStringArray:
+	return PackedStringArray([selected_file]) if not selected_file.is_empty() else PackedStringArray()
+
+
+func main_screen_name() -> String:
+	return main_screen

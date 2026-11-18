@@ -58,7 +58,7 @@ const resourceGetInput = z.object({
   names: z
     .array(z.string())
     .optional()
-    .describe('Properties to read, such as ["albedo_color", "roughness"]. Default: every property whose value differs from its default.'),
+    .describe('Properties to read, such as ["albedo_color", "roughness"], or paths such as "next_pass:albedo_color". Default: every property whose value differs from its default.'),
   include_defaults: z.boolean().default(false).describe('Without names, also list properties at their default values. The list gets long.'),
 });
 

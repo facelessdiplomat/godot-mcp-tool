@@ -94,3 +94,30 @@ describe.skipIf(godotBinary === '' || hostExportPlatform === undefined)('exporti
     expect(refused.text).toContain('../game.pck is outside the project.');
   });
 });
+
+describe.skipIf(godotBinary === '' || hostExportPlatform === undefined)('exporting with a preset that export_preset_add wrote', () => {
+  const platform = hostExportPlatform ?? { name: '', folder: '', file: '' };
+  let project: TemporaryProject | undefined;
+  let session: McpSession | undefined;
+
+  beforeAll(async () => {
+    project = new TemporaryProject('MCP preset', { mainScene: 'res://main.tscn' });
+    project.write('main.tscn', mainScene);
+    session = await McpSession.connect(project.root, { GODOT_BIN: godotBinary });
+  });
+
+  afterAll(async () => {
+    await session?.close();
+    project?.remove();
+  });
+
+  it('exports the game data with a preset added while no editor runs', async () => {
+    const added = await session?.call('export_preset_add', { platform: platform.name });
+    const exported = await session?.call('export_project', { mode: 'pack' });
+
+    expect(added?.text).toContain(`Added the export preset "${platform.name}" (${platform.name}) to export_presets.cfg`);
+    expect(exported?.isError).toBe(false);
+    expect(exported?.text).toContain(`Exported the preset "${platform.name}" (${platform.name}, pack)`);
+    expect(existsSync(project?.path(`build/${platform.folder}/mcp-preset.pck`) ?? '')).toBe(true);
+  }, 180_000);
+});

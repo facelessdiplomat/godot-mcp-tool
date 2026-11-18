@@ -17,6 +17,14 @@ You need Godot 4.7 or newer, Node.js 22 or newer and Claude Code.
    npx godot-mcp-tool install-addon
    ```
 
+   To start a game from scratch instead, create a project with the addon in a new folder:
+
+   ```bash
+   npx godot-mcp-tool init my-game
+   ```
+
+   Claude Code started in an empty folder can do the same with the tool `project_create`.
+
 2. Install the Claude Code plugin:
 
    ```bash

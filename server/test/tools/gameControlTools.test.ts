@@ -91,4 +91,35 @@ describe('game control tools', () => {
     expect(text).toContain('Rendering: none, the game runs without a window');
     expect(text).toContain('orphan nodes: 25 (nodes out of the tree that were never freed, often a leak)');
   });
+
+  it('game_performance names the functions that took the most script time and the custom monitors', async () => {
+    const editor = new FakeEditorGateway().respondTo('game.performance', {
+      ...measurement,
+      custom_monitors: { 'game/enemies': { average: 12, p95: 12, max: 14 } },
+      profiled: true,
+      functions: [
+        { script: 'res://enemy.gd', line: 42, function: 'Enemy.find_path', calls: 1200, self_ms: 85.3, total_ms: 90.1 },
+        { script: 'res://world.gd', line: 10, function: '_process', calls: 60, self_ms: 2, total_ms: 92.1 },
+      ],
+    });
+
+    const text = textOf(await createGamePerformanceTool(editor).execute({}));
+
+    expect(text.split('\n').slice(-5)).toEqual([
+      'Custom monitors: game/enemies average 12, worst 14',
+      'Functions that took the most script time of their own over these frames:',
+      '- Enemy.find_path (res://enemy.gd:42): 85.3 ms in 1200 calls, 90.1 ms with what it calls',
+      '- _process (res://world.gd:10): 2.0 ms in 60 calls, 92.1 ms with what it calls',
+      'Look at the first one before the others: its own code takes the time, not the functions it calls.',
+    ]);
+  });
+
+  it('game_performance says when it could not time the functions', async () => {
+    const editor = new FakeEditorGateway().respondTo('game.performance', { ...measurement, profiled: false, functions: [] });
+
+    const text = textOf(await createGamePerformanceTool(editor).execute({}));
+
+    expect(text.split('\n').at(-1)).toBe('Function times: not measured; they need a game started from the editor, whose debugger profiles its scripts.');
+  });
 });
+

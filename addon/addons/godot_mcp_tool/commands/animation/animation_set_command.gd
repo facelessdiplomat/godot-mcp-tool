@@ -42,7 +42,7 @@ func execute(params: Dictionary) -> Variant:
 	if resolved is GodotMcpCommandError:
 		return resolved
 	var scene_root := resolved as Node
-	var found: Variant = GodotMcpAnimationReference.find_player(scene_root, player_path)
+	var found: Variant = GodotMcpAnimationReference.find_player_to_change(scene_root, player_path)
 	if found is GodotMcpCommandError:
 		return found
 	var player := found as AnimationPlayer
@@ -68,7 +68,8 @@ func execute(params: Dictionary) -> Variant:
 	var stored := [[(reference as GodotMcpAnimationReference).library_name, (reference as GodotMcpAnimationReference).animation_name, planner.build(planned["tracks"], planned["length"], loop_mode)]]
 	if result["name"] != RESET_NAME:
 		var previous_reset := player.get_animation(RESET_NAME) if player.has_animation(RESET_NAME) else null
-		var reset_tracks := (planned["tracks"] as Array).filter(func(track: Dictionary) -> bool: return previous_reset == null or previous_reset.find_track(NodePath(track["path"]), Animation.TYPE_VALUE) == -1)
+		var value_tracks := (planned["tracks"] as Array).filter(func(track: Dictionary) -> bool: return GodotMcpAnimationTrackPlanner.is_value_track(track))
+		var reset_tracks := value_tracks.filter(func(track: Dictionary) -> bool: return previous_reset == null or previous_reset.find_track(NodePath(track["path"]), Animation.TYPE_VALUE) == -1)
 		if not reset_tracks.is_empty():
 			result["reset_tracks"] = reset_tracks.map(func(track: Dictionary) -> String: return track["path"])
 			stored.append([DEFAULT_LIBRARY, RESET_NAME, planner.build_reset(previous_reset, reset_tracks)])

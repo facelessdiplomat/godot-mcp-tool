@@ -4,7 +4,19 @@ import { changingAnnotations, readingAnnotations } from './annotations.js';
 import { BridgeTool } from './bridge/BridgeTool.js';
 import { errorResult, textResult } from './results.js';
 
-const stateSchema = z.object({ name: z.string(), animation: z.string().optional(), type: z.string().optional() });
+const blendPositionSchema = z.union([z.number(), z.array(z.number())]);
+
+const stateSchema = z.object({
+  name: z.string(),
+  animation: z.string().optional(),
+  type: z.string().optional(),
+  blend: z.array(z.object({ animation: z.string().optional(), type: z.string().optional(), at: blendPositionSchema })).optional(),
+  min: blendPositionSchema.optional(),
+  max: blendPositionSchema.optional(),
+  parameter: z.string().optional(),
+});
+
+type State = z.infer<typeof stateSchema>;
 
 const transitionSchema = z.object({
   from: z.string(),
@@ -87,9 +99,25 @@ function describeTree(tree: AnimationTreeDescription): string {
   return lines.join('\n');
 }
 
+const blendPositionInput = z.union([z.number(), z.tuple([z.number(), z.number()])]);
+
 const stateInput = z.object({
   name: z.string().min(1).describe('Name of the state, such as "walk".'),
-  animation: z.string().min(1).describe('The animation of the AnimationPlayer that the state plays, such as "walk".'),
+  animation: z.string().min(1).optional().describe('The animation of the AnimationPlayer that the state plays, such as "walk". Give either animation or blend.'),
+  blend: z
+    .array(
+      z.object({
+        animation: z.string().min(1).describe('An animation of the AnimationPlayer, such as "run".'),
+        at: blendPositionInput.describe('Where the animation plays fully: a number, such as the speed 6, or [x, y] in a two-dimensional blend, such as [1, 0] for strafing right.'),
+      }),
+    )
+    .min(2)
+    .optional()
+    .describe(
+      'Blend animations by a parameter instead of playing one: [{"animation": "walk", "at": 2}, {"animation": "run", "at": 6}] blends walking and running by speed (BlendSpace1D); points at [x, y] blend in two dimensions (BlendSpace2D), which needs three points that are not on one line. Scripts set the position with parameters/<state>/blend_position.',
+    ),
+  min: blendPositionInput.optional().describe('The lowest blend position, a number or [x, y] like the points. Default: the lowest point.'),
+  max: blendPositionInput.optional().describe('The highest blend position, a number or [x, y] like the points. Default: the highest point.'),
 });
 
 const transitionInput = z.object({
@@ -120,7 +148,9 @@ const animationTreeSetInput = z.object({
   states: z
     .array(stateInput)
     .min(1)
-    .describe('The states, each playing one animation of the AnimationPlayer, such as [{"name": "idle", "animation": "idle"}, {"name": "walk", "animation": "walk"}].'),
+    .describe(
+      'The states, each playing one animation of the AnimationPlayer or blending several, such as [{"name": "idle", "animation": "idle"}, {"name": "move", "blend": [{"animation": "walk", "at": 2}, {"animation": "run", "at": 6}]}].',
+    ),
   transitions: z
     .array(transitionInput)
     .optional()
@@ -134,7 +164,7 @@ export function createAnimationTreeSetTool(editor: EditorGateway): BridgeTool<ty
     definition: {
       title: 'Set up animation state machine',
       description:
-        'Set up an AnimationTree as a state machine, as one Undo step: states that each play an animation of the AnimationPlayer, and transitions between them, such as {"from": "Start", "to": "idle"} and {"from": "idle", "to": "walk", "condition": "moving", "xfade": 0.2}. It replaces the tree root; states or transitions the editor cannot use are rejected with the reason and the rest are kept. Scripts switch states by setting conditions, such as $AnimationTree.set("parameters/conditions/moving", true), or with travel("walk") on parameters/playback. In the running game, set a condition with game_set_properties on the AnimationTree and wait for a state with game_wait and the condition get("parameters/playback").get_current_node() == "walk".',
+        'Set up an AnimationTree as a state machine, as one Undo step: states that each play an animation of the AnimationPlayer or blend several by a parameter, such as walking and running by speed, and transitions between them, such as {"from": "Start", "to": "idle"} and {"from": "idle", "to": "walk", "condition": "moving", "xfade": 0.2}. It replaces the tree root; states or transitions the editor cannot use are rejected with the reason and the rest are kept. Scripts switch states by setting conditions, such as $AnimationTree.set("parameters/conditions/moving", true), or with travel("walk") on parameters/playback. In the running game, set a condition with game_set_properties on the AnimationTree and wait for a state with game_wait and the condition get("parameters/playback").get_current_node() == "walk".',
       inputSchema: animationTreeSetInput,
       annotations: changingAnnotations({ destructive: true, idempotent: true }),
       alwaysLoad: false,
@@ -150,6 +180,7 @@ export function createAnimationTreeSetTool(editor: EditorGateway): BridgeTool<ty
         [
           `Set up the state machine of ${change.tree} in ${change.scene} with animations from ${change.player} as one Undo step; the scene has unsaved changes.`,
           describeStates(change.states),
+          ...blendPositionHint(change.states),
           ...describeTransitions(change.transitions),
           ...change.warnings.map((warning) => `Warning: ${warning}`),
           ...rejected,
@@ -159,8 +190,33 @@ export function createAnimationTreeSetTool(editor: EditorGateway): BridgeTool<ty
   });
 }
 
-function describeStates(states: readonly z.infer<typeof stateSchema>[]): string {
-  return `States: ${states.map((state) => `${state.name} (${state.animation === undefined ? (state.type ?? 'state') : `animation ${state.animation}`})`).join(', ')}`;
+function describeStates(states: readonly State[]): string {
+  return `States: ${states.map((state) => `${state.name} (${describeStateContent(state)})`).join(', ')}`;
+}
+
+function describeStateContent(state: State): string {
+  if (state.animation !== undefined) {
+    return `animation ${state.animation}`;
+  }
+  if (state.blend === undefined) {
+    return state.type ?? 'state';
+  }
+  const points = state.blend.map((point) => `${point.animation ?? point.type ?? 'a node'} at ${formatPosition(point.at)}`);
+  const pointList = points.length === 1 ? points.join('') : `${points.slice(0, -1).join(', ')} and ${points.at(-1) ?? ''}`;
+  const limits = state.min === undefined || state.max === undefined ? '' : `, from ${formatPosition(state.min)} to ${formatPosition(state.max)}`;
+  return `blends ${pointList} by ${state.parameter ?? 'its blend_position'}${limits}`;
+}
+
+function formatPosition(position: number | readonly number[]): string {
+  return typeof position === 'number' ? String(position) : `[${position.join(', ')}]`;
+}
+
+function blendPositionHint(states: readonly State[]): string[] {
+  const blended = states.find((state) => state.parameter !== undefined);
+  if (blended?.parameter === undefined) {
+    return [];
+  }
+  return [`Set a blend position from a script, such as $AnimationTree.set("${blended.parameter}", velocity.length()), or in the running game with game_set_properties on the AnimationTree.`];
 }
 
 function describeTransitions(transitions: readonly Transition[]): string[] {

@@ -10,14 +10,17 @@ export interface McpServerSettings {
   readonly tools: readonly Tool[];
   readonly resources?: readonly McpResource[] | undefined;
   readonly prompts?: readonly McpPrompt[] | undefined;
+  readonly progressIntervalMs?: number | undefined;
 }
 
 const resourceMimeType = 'text/plain';
+const defaultProgressIntervalMs = 5_000;
+const millisecondsPerSecond = 1000;
 
 export function createMcpServer(settings: McpServerSettings): McpServer {
   const server = new McpServer({ name: settings.name, version: settings.version }, { instructions: settings.instructions });
   for (const tool of settings.tools) {
-    registerTool(server, tool);
+    registerTool(server, tool, settings.progressIntervalMs ?? defaultProgressIntervalMs);
   }
   for (const resource of settings.resources ?? []) {
     registerResource(server, resource);
@@ -28,7 +31,7 @@ export function createMcpServer(settings: McpServerSettings): McpServer {
   return server;
 }
 
-function registerTool(server: McpServer, tool: Tool): void {
+function registerTool(server: McpServer, tool: Tool, progressIntervalMs: number): void {
   const { title, description, inputSchema, annotations, alwaysLoad, requiresUserInteraction } = tool.definition;
   const meta = {
     ...(alwaysLoad ? { 'anthropic/alwaysLoad': true } : {}),
@@ -43,8 +46,32 @@ function registerTool(server: McpServer, tool: Tool): void {
       annotations,
       ...(Object.keys(meta).length > 0 ? { _meta: meta } : {}),
     },
-    (input) => tool.execute(input),
+    (input, context) => withProgressReports(tool.name, context.mcpReq, progressIntervalMs, () => tool.execute(input)),
   );
+}
+
+interface ProgressChannel {
+  readonly _meta?: { readonly progressToken?: string | number | undefined } | undefined;
+  notify(notification: { method: 'notifications/progress'; params: { progressToken: string | number; progress: number; message: string } }): Promise<void>;
+}
+
+async function withProgressReports<Result>(toolName: string, request: ProgressChannel, intervalMs: number, work: () => Promise<Result>): Promise<Result> {
+  const progressToken = request._meta?.progressToken;
+  if (progressToken === undefined) {
+    return work();
+  }
+  const startedAt = Date.now();
+  const timer = setInterval(() => {
+    const elapsedMs = Date.now() - startedAt;
+    void request
+      .notify({ method: 'notifications/progress', params: { progressToken, progress: elapsedMs, message: `${toolName} is still working (${String(Math.round(elapsedMs / millisecondsPerSecond))} s)` } })
+      .catch(() => undefined);
+  }, intervalMs);
+  try {
+    return await work();
+  } finally {
+    clearInterval(timer);
+  }
 }
 
 function registerResource(server: McpServer, resource: McpResource): void {

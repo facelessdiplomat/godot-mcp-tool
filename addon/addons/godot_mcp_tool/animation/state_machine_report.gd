@@ -34,7 +34,39 @@ static func _states(machine: AnimationNodeStateMachine) -> Array:
 static func _state(name: String, node: AnimationNode) -> Dictionary:
 	if node is AnimationNodeAnimation:
 		return {"name": name, "animation": str((node as AnimationNodeAnimation).animation)}
+	if node is AnimationNodeBlendSpace1D or node is AnimationNodeBlendSpace2D:
+		return _blend_state(name, node)
 	return {"name": name, "type": node.get_class()}
+
+
+static func _blend_state(name: String, blend_space: AnimationRootNode) -> Dictionary:
+	var points: Array = []
+	for index in blend_space.get_blend_point_count():
+		var point_node: AnimationRootNode = blend_space.get_blend_point_node(index)
+		var point := {"at": _rounded_position(blend_space.get_blend_point_position(index))}
+		if point_node is AnimationNodeAnimation:
+			point["animation"] = str((point_node as AnimationNodeAnimation).animation)
+		else:
+			point["type"] = point_node.get_class()
+		points.append(point)
+	return {
+		"name": name,
+		"type": blend_space.get_class(),
+		"blend": points,
+		"min": _rounded_position(blend_space.min_space),
+		"max": _rounded_position(blend_space.max_space),
+		"parameter": GodotMcpStateMachinePlan.parameter_of(name),
+	}
+
+
+static func _rounded_position(position: Variant) -> Variant:
+	if position is Vector2:
+		return [_rounded((position as Vector2).x), _rounded((position as Vector2).y)]
+	return _rounded(position)
+
+
+static func _rounded(value: float) -> float:
+	return roundf(value * DECIMAL_SCALE) / DECIMAL_SCALE
 
 
 static func _transitions(machine: AnimationNodeStateMachine) -> Array:
@@ -46,7 +78,7 @@ static func _transitions(machine: AnimationNodeStateMachine) -> Array:
 			"to": str(machine.get_transition_to(index)),
 			"advance": _name_of(GodotMcpStateMachinePlan.ADVANCE_MODES, transition.advance_mode),
 			"switch": _name_of(GodotMcpStateMachinePlan.SWITCH_MODES, transition.switch_mode),
-			"xfade": roundf(transition.xfade_time * DECIMAL_SCALE) / DECIMAL_SCALE,
+			"xfade": _rounded(transition.xfade_time),
 		}
 		if not str(transition.advance_condition).is_empty():
 			entry["condition"] = str(transition.advance_condition)

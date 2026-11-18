@@ -5,26 +5,33 @@ import { counted } from './counting.js';
 const listedNames = 10;
 
 export function formatValidation(result: ValidationResult): string {
-  const via = result.method === 'language server' ? "the editor's language server" : 'godot --check-only, which finds errors but not warnings';
-  const withProblems = result.reports.filter((report) => report.problems.length > 0);
-  const fine = result.reports.filter((report) => report.problems.length === 0).map((report) => report.resourcePath);
+  const shaderReports = result.shaderReports ?? [];
   const lines: string[] = [];
-  if (withProblems.length === 0) {
-    lines.push(`No problems in ${counted(result.reports.length, 'script')}: ${listNames(fine)} (checked with ${via}).`);
-  } else {
-    const problems = withProblems.flatMap((report) => report.problems);
-    lines.push(`${describeCounts(problems)} in ${String(withProblems.length)} of ${counted(result.reports.length, 'script')} (checked with ${via}).`);
+  if (result.reports.length > 0 || shaderReports.length === 0) {
+    const via = result.method === 'language server' ? "the editor's language server" : 'godot --check-only, which finds errors but not warnings';
+    const fallback = result.fallbackReason === undefined ? [] : [`The language server was not used: ${result.fallbackReason}`];
+    lines.push(...describeChecked(result.reports, 'script', `checked with ${via}`, `checked with ${via}`, fallback));
   }
-  if (result.fallbackReason !== undefined) {
-    lines.push(`The language server was not used: ${result.fallbackReason}`);
-  }
-  if (withProblems.length > 0) {
-    lines.push(...withProblems.flatMap(describeReport));
-    if (fine.length > 0) {
-      lines.push(`No problems: ${listNames(fine)}`);
-    }
+  if (shaderReports.length > 0) {
+    const compiler = "compiled by Godot's shader compiler";
+    lines.push(...describeChecked(shaderReports, 'shader', compiler, `${compiler}, which stops at the first error of each shader`, []));
   }
   return lines.join('\n');
+}
+
+function describeChecked(reports: readonly ScriptReport[], noun: string, how: string, howWithProblems: string, notes: readonly string[]): string[] {
+  const withProblems = reports.filter((report) => report.problems.length > 0);
+  const fine = reports.filter((report) => report.problems.length === 0).map((report) => report.resourcePath);
+  if (withProblems.length === 0) {
+    return [`No problems in ${counted(reports.length, noun)}: ${listNames(fine)} (${how}).`, ...notes];
+  }
+  const problems = withProblems.flatMap((report) => report.problems);
+  return [
+    `${describeCounts(problems)} in ${String(withProblems.length)} of ${counted(reports.length, noun)} (${howWithProblems}).`,
+    ...notes,
+    ...withProblems.flatMap(describeReport),
+    ...(fine.length > 0 ? [`No problems: ${listNames(fine)}`] : []),
+  ];
 }
 
 function describeReport(report: ScriptReport): string[] {
@@ -32,7 +39,8 @@ function describeReport(report: ScriptReport): string[] {
 }
 
 function describePlace(problem: ScriptProblem): string {
-  return problem.column === undefined ? String(problem.line) : `${String(problem.line)}:${String(problem.column)}`;
+  const file = problem.file === undefined ? '' : `${problem.file}:`;
+  return problem.column === undefined ? `${file}${String(problem.line)}` : `${file}${String(problem.line)}:${String(problem.column)}`;
 }
 
 function describeCounts(problems: readonly ScriptProblem[]): string {

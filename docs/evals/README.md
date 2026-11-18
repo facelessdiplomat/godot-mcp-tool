@@ -35,6 +35,18 @@ When running one, record whether it passed, the number of tool calls and the tok
 | [export-the-game.md](export-the-game.md) | `export_project` |
 | [find-a-bug-with-breakpoints.md](find-a-bug-with-breakpoints.md) | `debug_breakpoints`, `debug_state`, `debug_continue` |
 | [playtest-without-a-window.md](playtest-without-a-window.md) | the game tools without the editor, `GODOT_MCP_HEADLESS` |
+| [paint-one-enemy.md](paint-one-enemy.md) | changes inside an instanced scene, `expand_instances` |
+| [land-once.md](land-once.md) | `watch_signals` in `game_input`, frame strips |
+| [resume-the-menu.md](resume-the-menu.md) | `controls` in `game_get_tree`, clicks on a Control by its path |
+| [crates-on-the-hill.md](crates-on-the-hill.md) | `node_add_collision`, `node_snap_to_floor`, `scene_raycast` |
+| [footsteps-and-blend.md](footsteps-and-blend.md) | method tracks in `animation_set`, blend states in `animation_tree_set` |
+| [hud-at-two-sizes.md](hud-at-two-sizes.md) | UI scenes in `editor_screenshot` at several sizes, `node_get_bounds` of controls |
+| [rename-everywhere.md](rename-everywhere.md) | `script_rename_symbol` across scripts, signal connections and method tracks |
+| [find-the-slow-function.md](find-the-slow-function.md) | function times in `game_performance` |
+| [fix-the-water-shader.md](fix-the-water-shader.md) | shaders in `script_validate`, one error at a time |
+| [bring-back-the-pillars.md](bring-back-the-pillars.md) | `editor_undo` across an action that must stay |
+| [turn-on-a-plugin.md](turn-on-a-plugin.md) | `plugin_set_enabled` and a plugin that adds an autoload |
+| [exports-for-windows-and-linux.md](exports-for-windows-and-linux.md) | `export_preset_add`, packs with `export_project` |
 
 ## Running them
 

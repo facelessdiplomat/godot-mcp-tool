@@ -1,15 +1,16 @@
 extends RefCounted
 
 const GodotMcpNodeFactory := preload("node_factory.gd")
+const GodotMcpSceneView := preload("scene_view.gd")
 
 var node_count := 0
 var truncated := false
 
-var _include_unowned_children: bool
+var _view: GodotMcpSceneView
 
 
-func _init(include_unowned_children: bool = false) -> void:
-	_include_unowned_children = include_unowned_children
+func _init(view: GodotMcpSceneView = null) -> void:
+	_view = view
 
 
 func describe(scene_root: Node, max_depth: int, max_nodes: int) -> Dictionary:
@@ -32,19 +33,17 @@ static func traits_of(node: Node, scene_root: Node) -> Dictionary:
 	return traits
 
 
-static func owned_children(node: Node, scene_root: Node) -> Array[Node]:
-	var children: Array[Node] = []
-	for child in node.get_children():
-		if child.owner == scene_root:
-			children.append(child)
-	return children
+static func editing_traits_of(node: Node, view: GodotMcpSceneView) -> Dictionary:
+	return {"editable_children": true} if view.has_editable_children(node) else {}
 
 
 func _describe_node(node: Node, scene_root: Node, depth: int, max_depth: int, max_nodes: int) -> Dictionary:
 	node_count += 1
 	var description := {"name": str(node.name)}
 	description.merge(traits_of(node, scene_root))
-	var children := node.get_children() if _include_unowned_children else owned_children(node, scene_root)
+	if _view != null:
+		description.merge(editing_traits_of(node, _view))
+	var children := node.get_children() if _view == null else _view.children_of(node)
 	if children.is_empty():
 		return description
 	description["child_count"] = children.size()

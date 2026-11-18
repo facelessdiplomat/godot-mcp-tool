@@ -25,7 +25,7 @@ func execute(params: Dictionary) -> Variant:
 	if loaded is GodotMcpCommandError:
 		return loaded
 	var resource := loaded as Resource
-	var planned := _context.properties.plan(resource, properties)
+	var planned := _context.properties.plan(resource, properties, resource_path)
 	var changes: GodotMcpChangeSet = planned["changes"]
 	if not changes.is_empty():
 		_context.history.record("MCP: Set properties of %s" % (resource_path as String).get_file(), resource, [changes])

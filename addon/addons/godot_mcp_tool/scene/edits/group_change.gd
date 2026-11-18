@@ -45,6 +45,8 @@ func prepare(scene_root: Node, params: Dictionary) -> GodotMcpCommandError:
 		_removed.append(group)
 		changes.add_do_call(node, &"remove_from_group", [group])
 		changes.add_undo_call(node, &"add_to_group", [group, true])
+	if not changes.is_empty():
+		_save_changes_inside_instances(node, scene_root)
 	action_name = "MCP: Set groups of %s" % node.name
 	return null
 
@@ -56,6 +58,7 @@ func finish() -> Dictionary:
 		"added": _added,
 		"removed": _removed,
 		"unchanged": _unchanged,
+		"editable_children": _editable_children,
 	}
 
 

@@ -13,6 +13,10 @@ func _init(scripts: GodotMcpScriptEditorAccess) -> void:
 	_scripts = scripts
 
 
+func current_script_place() -> Dictionary:
+	return _scripts.current_script_place()
+
+
 func prepare_for_saving() -> Variant:
 	await _scripts.reload_open_files()
 	var conflicting := _full_paths(_scripts.files_changed_outside())

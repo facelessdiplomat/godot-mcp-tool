@@ -89,7 +89,33 @@ const goblin = classDoc({
   properties: [{ name: 'speed', type: 'float', defaultValue: '3.5', description: 'How fast it walks.' }],
 });
 
-const library = new DocsLibrary([node, node3d, characterBody, vector3, globalScope, goblin]);
+const gdscriptPage: ClassDoc = {
+  name: '@GDScript',
+  origin: 'builtin',
+  brief: 'Built-in GDScript constants, functions, and annotations.',
+  description: '',
+  constructors: [],
+  properties: [],
+  methods: [
+    {
+      name: '@export_range',
+      returnType: 'void',
+      qualifiers: ['vararg'],
+      description: 'Export an [int] or [float] property as a range value.',
+      parameters: [
+        { name: 'min', type: 'float' },
+        { name: 'max', type: 'float' },
+        { name: 'step', type: 'float', defaultValue: '1.0' },
+      ],
+    },
+    { name: 'preload', returnType: 'Resource', qualifiers: [], description: 'Returns a [Resource] from the filesystem.', parameters: [{ name: 'path', type: 'String' }] },
+  ],
+  signals: [],
+  constants: [],
+  enums: [],
+};
+
+const library = new DocsLibrary([node, node3d, characterBody, vector3, globalScope, goblin, gdscriptPage]);
 const provider = { load: () => Promise.resolve(library) };
 
 describe('docs_class', () => {
@@ -173,6 +199,16 @@ describe('docs_class', () => {
     const text = textOf(await tool.execute({ name: 'lerp' }));
 
     expect(text).toBe('@GlobalScope.lerp(from: Variant) -> Variant\nFunction of @GlobalScope.\n\nLinearly interpolates.');
+  });
+
+  it('shows the annotations and functions of GDScript, and an annotation in full', async () => {
+    const page = textOf(await tool.execute({ name: '@GDScript' }));
+    const annotation = textOf(await tool.execute({ name: '@GDScript', member: '@export_range' }));
+
+    expect(page).toContain('@GDScript — annotations and functions of GDScript');
+    expect(page).toContain('Annotations:\n- @export_range(min: float, max: float, step: float = 1.0, ...) — Export an `int` or `float` property as a range value.');
+    expect(page).toContain('Functions:\n- preload(path: String) -> Resource — Returns a `Resource` from the filesystem.');
+    expect(annotation).toBe('@GDScript.@export_range(min: float, max: float, step: float = 1.0, ...)\nAnnotation of @GDScript.\n\nExport an `int` or `float` property as a range value.');
   });
 
   it('keeps the reference of a large class within the size of one answer', async () => {

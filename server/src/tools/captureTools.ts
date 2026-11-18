@@ -22,6 +22,8 @@ export const captureSchema = z.object({
   original_height: z.number(),
   scene: z.string(),
   views: z.array(z.string()),
+  moments: z.array(z.string()).optional(),
+  sizes: z.array(z.string()).optional(),
   note: z.string().optional(),
 });
 
@@ -63,7 +65,20 @@ const imageSettings = {
   format: z.enum(['png', 'jpeg']).default('png').describe('png (default), or jpeg for a smaller file.'),
 };
 
-const gameScreenshotInput = z.object({ views: viewsParameter('the game window'), ...imageSettings });
+const gameScreenshotInput = z.object({
+  views: viewsParameter('the game window'),
+  frames: z
+    .number()
+    .int()
+    .min(2)
+    .max(6)
+    .optional()
+    .describe(
+      'Instead of one moment, take this many screenshots of the game window, every_physics_frames apart, as one labelled image, to see motion such as a jump, an animation or a camera move. While game_pause holds the game, it plays exactly those frames and pauses again.',
+    ),
+  every_physics_frames: z.number().int().min(1).max(600).optional().describe('Physics frames between the screenshots of frames. Default: 5.'),
+  ...imageSettings,
+});
 
 export function createGameScreenshotTool(game: EditorGateway, readCapture: CaptureReader): BridgeTool<typeof gameScreenshotInput, Capture> {
   return new BridgeTool(game, {
@@ -71,19 +86,46 @@ export function createGameScreenshotTool(game: EditorGateway, readCapture: Captu
     definition: {
       title: 'Game screenshot',
       description:
-        'See the running game: a screenshot of its window with the UI, or renders of its 3D world from other angles that leave the game camera alone. Returns the image and the path of its file. Pixel positions in a screenshot of the window are the positions that game_input clicks use. Needs a game started with game_run that has a window, with or without the editor.',
+        'See the running game: a screenshot of its window with the UI, a strip of frames a given number of physics frames apart, or renders of its 3D world from other angles that leave the game camera alone. Returns the image and the path of its file. Pixel positions in a screenshot of the window are the positions that game_input clicks use. Needs a game started with game_run that has a window, with or without the editor.',
       inputSchema: gameScreenshotInput,
       annotations: readingAnnotations,
       alwaysLoad: false,
     },
     method: 'game.screenshot',
     responseSchema: captureSchema,
-    timeoutMs: screenshotAllowanceMs,
+    timeoutMs: ({ frames, every_physics_frames }) =>
+      screenshotAllowanceMs + (frames === undefined ? 0 : frames * screenshotAllowanceMs + Math.ceil((frames * (every_physics_frames ?? 5) * 1000) / 60)),
     present: (capture, input) => presentCapture(capture, describeGameCapture(capture, input.views === undefined), readCapture),
   });
 }
 
-const editorScreenshotInput = z.object({ views: viewsParameter('the editor camera'), ...imageSettings });
+const editorScreenshotInput = z.object({
+  views: viewsParameter('the editor camera'),
+  animation: z
+    .strictObject({
+      player: z.string().min(1).describe('Path of the AnimationPlayer relative to the scene root, such as "Hero/AnimationPlayer".'),
+      name: z.string().min(1).describe('The animation to pose, such as "walk".'),
+      times: z
+        .array(z.number().min(0))
+        .min(1)
+        .max(6)
+        .optional()
+        .describe('Seconds from the start of the animation to pose the scene at. Default: four times spread over the animation, such as 0, 0.25, 0.5 and 0.75 of a looping one.'),
+    })
+    .optional()
+    .describe(
+      'Render the poses of an animation at given times without running the game, one labelled image per time in one picture, from the editor camera or from one given view. Method calls and sounds of the animation stay silent, and the animated values are put back afterwards.',
+    ),
+  sizes: z
+    .array(z.tuple([z.number().int().min(1).max(7680), z.number().int().min(1).max(7680)]))
+    .min(1)
+    .max(6)
+    .optional()
+    .describe(
+      'For a UI or 2D scene, the window sizes to render it at, such as [[1920, 1080], [1440, 1080]] for 16:9 and 4:3 in one labelled image; the layout follows the stretch mode and aspect of the project. Default: the window size of the project.',
+    ),
+  ...imageSettings,
+});
 
 export function createEditorScreenshotTool(editor: EditorGateway, readCapture: CaptureReader): BridgeTool<typeof editorScreenshotInput, Capture> {
   return new BridgeTool(editor, {
@@ -91,7 +133,7 @@ export function createEditorScreenshotTool(editor: EditorGateway, readCapture: C
     definition: {
       title: 'Editor screenshot',
       description:
-        'Render the 3D scene open in the editor from the editor camera or from given views, without the grid and gizmos; the editor camera stays where it is. Check placement and scale from more than one side, such as ["front", "top", "iso"]. The lighting is the editor preview, so check the final look with game_screenshot. Needs the editor with a window.',
+        'Render the 3D scene open in the editor from the editor camera or from given views, without the grid and gizmos; the editor camera stays where it is. Check placement and scale from more than one side, such as ["front", "top", "iso"]. With animation, render the poses of an animation at several times, such as the steps of a walk cycle. A UI or 2D scene, such as a HUD or a menu, renders as the game window would show it, at the window size of the project or at given sizes, such as 16:9 and 4:3 side by side. The lighting of 3D scenes is the editor preview, so check the final look with game_screenshot. Needs the editor with a window.',
       inputSchema: editorScreenshotInput,
       annotations: readingAnnotations,
       alwaysLoad: false,
@@ -121,6 +163,9 @@ export function presentCapture(capture: Capture, summary: string, readCapture: C
 
 export function describeGameCapture(capture: Capture, showsWindow: boolean): string {
   const game = capture.scene === '' ? 'the running game' : `the running game (${capture.scene})`;
+  if (capture.moments !== undefined && capture.moments.length > 0) {
+    return `Screenshots of ${game} at ${capture.moments.join('; ')}, in one labelled image, ${describeSize(capture)}.`;
+  }
   if (!showsWindow) {
     return describeViews(capture, game);
   }
@@ -132,6 +177,13 @@ export function describeGameCapture(capture: Capture, showsWindow: boolean): str
 
 function describeEditorCapture(capture: Capture, fromEditorCamera: boolean): string {
   const scene = capture.scene === '' ? 'the unsaved scene open in the editor' : capture.scene;
+  if (capture.sizes !== undefined && capture.sizes.length > 0) {
+    const sheet = capture.sizes.length > 1 ? ', in one labelled image' : '';
+    return `Render of ${scene} at ${capture.sizes.join('; ')}, laid out like the game window with the stretch settings of the project${sheet}, ${describeSize(capture)}.`;
+  }
+  if (capture.moments !== undefined && capture.moments.length > 0) {
+    return `Poses of ${scene} from ${capture.views.join(', ')} at ${capture.moments.join('; ')}, in one labelled image, ${describeSize(capture)}. The animated values are back as they were.`;
+  }
   return fromEditorCamera ? `Render of ${scene} from the editor camera, without the grid and gizmos, ${describeSize(capture)}.` : describeViews(capture, scene);
 }
 

@@ -10,6 +10,7 @@ describe('the command line', () => {
     expect(parseCommandLine(['install-addon'])).toEqual({ kind: 'install-addon', projectPath: undefined });
     expect(parseCommandLine(['update-addon', '../game'])).toEqual({ kind: 'update-addon', projectPath: '../game' });
     expect(parseCommandLine(['doctor', '/projects/game'])).toEqual({ kind: 'doctor', projectPath: '/projects/game' });
+    expect(parseCommandLine(['init', 'capsule-walk'])).toEqual({ kind: 'init', projectPath: 'capsule-walk' });
   });
 
   it('takes the check that the hook of the Claude Code plugin runs, without arguments', () => {

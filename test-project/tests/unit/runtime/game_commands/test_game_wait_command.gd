@@ -101,3 +101,31 @@ func test_holds_the_game_on_the_frame_where_the_condition_became_true() -> void:
 	assert_eq(result["physics_frames"], 3)
 	assert_eq(counter.get("ticks"), target)
 	assert_true(get_tree().paused)
+
+
+func _emit_later(node: Node, signal_name: StringName, physics_frames: int, arguments: Array) -> void:
+	for frame in physics_frames:
+		await _time.physics_frame_ended
+	node.emit_signal.callv([signal_name] + arguments)
+
+
+func test_waits_until_a_node_emits_a_signal_and_returns_its_arguments() -> void:
+	_player.add_user_signal("landed", [{"name": "height", "type": TYPE_FLOAT}])
+	_emit_later(_player, &"landed", 3, [2.5])
+	var result: Dictionary = await _command.execute({"signal": "landed", "node": "Player"})
+	assert_true(result["emitted"])
+	assert_eq(result["arguments"], [2.5])
+	assert_between(result["physics_frames"], 2, 4)
+
+
+func test_says_when_a_signal_was_not_emitted_in_time() -> void:
+	_player.add_user_signal("landed")
+	var result: Dictionary = await _command.execute({"signal": "landed", "node": "Player", "timeout_ms": 50})
+	assert_false(result["emitted"])
+	assert_eq(_player.get_signal_connection_list(&"landed").size(), 0)
+
+
+func test_names_similar_signals_of_the_node() -> void:
+	var error: Variant = await _command.execute({"signal": "visibility_chnged", "node": "Player"})
+	assert_true(error is GodotMcpCommandError)
+	assert_string_contains((error as GodotMcpCommandError).hint, "visibility_changed")

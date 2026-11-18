@@ -1,11 +1,12 @@
 extends "../command.gd"
 
 const GodotMcpEditingContext := preload("../../scene/editing_context.gd")
+const GodotMcpInstancedScenes := preload("../../scene/instanced_scenes.gd")
 const GodotMcpNodeFactory := preload("../../scene/node_factory.gd")
 const GodotMcpNodeLocator := preload("../../scene/node_locator.gd")
 const GodotMcpParams := preload("../params.gd")
 const GodotMcpSceneSnapshot := preload("../../scene/scene_snapshot.gd")
-const GodotMcpSceneTreeDescriber := preload("../../scene/scene_tree_describer.gd")
+const GodotMcpSceneView := preload("../../scene/scene_view.gd")
 const GodotMcpSignalCatalog := preload("../../scene/signal_catalog.gd")
 
 var _context: GodotMcpEditingContext
@@ -32,9 +33,10 @@ func execute(params: Dictionary) -> Variant:
 
 func _scene_connections(snapshot: GodotMcpSceneSnapshot) -> Dictionary:
 	var connections: Array = []
-	for node in _saved_nodes(snapshot.root, snapshot.root):
+	for node in GodotMcpSceneView.new(snapshot.root).nodes_under(snapshot.root):
 		for connection in GodotMcpSignalCatalog.saved_connections(node):
-			connections.append(GodotMcpSignalCatalog.describe_connection(snapshot.root, node, connection, _context.codec))
+			if not GodotMcpInstancedScenes.is_inherited(connection):
+				connections.append(GodotMcpSignalCatalog.describe_connection(snapshot.root, node, connection, _context.codec))
 	return {"scene": snapshot.scene_path, "connections": connections}
 
 
@@ -49,10 +51,3 @@ func _node_signals(snapshot: GodotMcpSceneSnapshot, node_path: String) -> Varian
 		)
 		signals.append({"name": str(description["name"]), "arguments": GodotMcpSignalCatalog.arguments_text(description), "connections": connections})
 	return {"scene": snapshot.scene_path, "path": GodotMcpNodeLocator.path_of(snapshot.root, node), "type": GodotMcpNodeFactory.display_class(node), "signals": signals}
-
-
-static func _saved_nodes(node: Node, scene_root: Node) -> Array[Node]:
-	var nodes: Array[Node] = [node]
-	for child in GodotMcpSceneTreeDescriber.owned_children(node, scene_root):
-		nodes.append_array(_saved_nodes(child, scene_root))
-	return nodes

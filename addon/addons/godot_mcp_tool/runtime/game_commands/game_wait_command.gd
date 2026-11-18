@@ -3,12 +3,13 @@ extends "../../commands/command.gd"
 const GodotMcpGameScene := preload("game_scene.gd")
 const GodotMcpGameTime := preload("../game_time.gd")
 const GodotMcpParams := preload("../../commands/params.gd")
+const GodotMcpSignalWatch := preload("../signal_watch.gd")
 const GodotMcpVariantCodec := preload("../../codec/variant_codec.gd")
 
 const DEFAULT_TIMEOUT_MSEC := 10_000
 const MAXIMUM_TIMEOUT_MSEC := 60_000
 const MAXIMUM_FRAMES := 36_000
-const WAIT_KINDS := ["frames", "physics_frames", "ms", "condition"]
+const WAIT_KINDS := ["frames", "physics_frames", "ms", "condition", "signal"]
 
 var _scene: GodotMcpGameScene
 var _codec: GodotMcpVariantCodec
@@ -26,8 +27,8 @@ func execute(params: Dictionary) -> Variant:
 	if requested_kinds.size() != 1:
 		return GodotMcpCommandError.new(
 			GodotMcpJsonRpc.INVALID_PARAMS,
-			"Pass exactly one of frames, physics_frames, ms or condition",
-			"Example: {\"condition\": \"is_on_floor()\", \"node\": \"Player\"} or {\"physics_frames\": 60}",
+			"Pass exactly one of frames, physics_frames, ms, condition or signal",
+			"Example: {\"condition\": \"is_on_floor()\", \"node\": \"Player\"}, {\"signal\": \"died\", \"node\": \"Enemy\"} or {\"physics_frames\": 60}",
 		)
 	var waited: Variant = await _wait(requested_kinds[0], params)
 	if waited is Dictionary:
@@ -67,7 +68,36 @@ func _wait(kind: String, params: Dictionary) -> Variant:
 				await tree.process_frame
 			_time.hold_again_if(was_held)
 			return {"waited_ms": Time.get_ticks_msec() - started_msec}
+	if kind == "signal":
+		return await _wait_for_signal(params, started_msec)
 	return await _wait_for_condition(params, started_msec)
+
+
+func _wait_for_signal(params: Dictionary, started_msec: int) -> Variant:
+	var signal_name: Variant = GodotMcpParams.required_text(params, "signal", "\"died\"")
+	var node_path: Variant = GodotMcpParams.text(params, "node", ".")
+	var timeout_msec: Variant = GodotMcpParams.whole_number(params, "timeout_ms", DEFAULT_TIMEOUT_MSEC)
+	for value in [signal_name, node_path, timeout_msec]:
+		if value is GodotMcpCommandError:
+			return value
+	var node: Variant = _scene.resolve(node_path)
+	if node is GodotMcpCommandError:
+		return node
+	if not (node as Node).has_signal(signal_name):
+		return GodotMcpCommandError.new(GodotMcpJsonRpc.NOT_FOUND, "%s has no signal \"%s\"" % [node_path, signal_name], GodotMcpSignalWatch.missing_signal_hint(node, signal_name))
+	var watch := GodotMcpSignalWatch.new(node, node_path, signal_name, _time, _codec)
+	watch.start()
+	var physics_frames := 0
+	var was_held := _time.let_run()
+	while watch.emissions.is_empty() and Time.get_ticks_msec() - started_msec < clampi(timeout_msec, 0, MAXIMUM_TIMEOUT_MSEC):
+		await _time.physics_frame_ended
+		physics_frames += 1
+	_time.hold_again_if(was_held)
+	watch.stop()
+	var waited := {"emitted": not watch.emissions.is_empty(), "physics_frames": physics_frames, "waited_ms": Time.get_ticks_msec() - started_msec}
+	if not watch.emissions.is_empty():
+		waited["arguments"] = (watch.emissions[0] as Dictionary)["arguments"]
+	return waited
 
 
 func _wait_for_condition(params: Dictionary, started_msec: int) -> Variant:

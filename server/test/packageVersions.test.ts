@@ -31,7 +31,7 @@ describe('the version of the package', () => {
     expect({
       plugin: pluginManifest.version,
       server: startedPackageVersions(join(pluginDirectory, '.mcp.json')),
-      hook: startedPackageVersions(join(pluginDirectory, 'hooks', 'hooks.json')),
-    }).toEqual({ plugin: packageVersion, server: [packageVersion], hook: [packageVersion, packageVersion] });
+      hooks: [...new Set(startedPackageVersions(join(pluginDirectory, 'hooks', 'hooks.json')))],
+    }).toEqual({ plugin: packageVersion, server: [packageVersion], hooks: [packageVersion] });
   });
 });

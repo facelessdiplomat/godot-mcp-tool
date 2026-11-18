@@ -25,6 +25,27 @@ const sceneUsing = (scriptPath: string, rootName: string): string =>
     '',
   ].join('\n');
 
+const optionsScript = [
+  'extends Node',
+  '',
+  '',
+  'func _ready() -> void:',
+  '\tprint("collisions=%s navigation=%s arguments=%s locale=%s" % [get_tree().debug_collisions_hint, get_tree().debug_navigation_hint, OS.get_cmdline_user_args(), TranslationServer.get_locale()])',
+  '',
+].join('\n');
+
+const signalScript = [
+  'extends Node',
+  '',
+  'signal finished(code: int)',
+  '',
+  '',
+  'func _ready() -> void:',
+  '\tawait get_tree().create_timer(2.5).timeout',
+  '\tfinished.emit(5)',
+  '',
+].join('\n');
+
 async function pause(milliseconds: number): Promise<void> {
   await new Promise((resolveDelay) => setTimeout(resolveDelay, milliseconds));
 }
@@ -47,6 +68,10 @@ describe.skipIf(godotBinary === '')('running the game from the editor', () => {
     project.write('main.tscn', sceneUsing('res://main.gd', 'Main'));
     project.write('broken.gd', 'extends Node\n\nfunc _ready() -> void\n\tprint("never")\n');
     project.write('broken.tscn', sceneUsing('res://broken.gd', 'Broken'));
+    project.write('options.gd', optionsScript);
+    project.write('signals.gd', signalScript);
+    project.write('signals.tscn', sceneUsing('res://signals.gd', 'Signals'));
+    project.write('options.tscn', sceneUsing('res://options.gd', 'Options'));
     editorProcess = await startHeadlessEditor(project.root);
     session = await McpSession.connect(project.root);
   }, editorStartupTimeoutMs + 30_000);
@@ -97,6 +122,28 @@ describe.skipIf(godotBinary === '')('running the game from the editor', () => {
     expect(run.text).toMatch(/^The game ran res:\/\/main\.tscn for 500 ms after it was ready and was stopped\./);
     expect(run.text).toContain('Arena loaded');
     expect(run.text).not.toContain('queue_free');
+  });
+
+  it('passes debug drawing, game arguments and the locale to the game', async () => {
+    const run = await tools().call('game_run', {
+      scene: 'res://options.tscn',
+      duration_ms: 500,
+      debug_draw: ['collisions', 'navigation'],
+      arguments: ['--level=3'],
+      locale: 'de',
+    });
+
+    expect(run.text).toContain('collisions=true navigation=true');
+    expect(run.text).toContain('--level=3');
+    expect(run.text).toContain('locale=de');
+  });
+
+  it('waits for a signal of the running game and shows its arguments', async () => {
+    await tools().call('game_run', { scene: 'res://signals.tscn' });
+
+    const waited = await tools().call('game_wait', { signal: 'finished', timeout_ms: 5000 });
+
+    expect(waited.text).toMatch(/^The scene root emitted finished after \d+ ms \(\d+ physics frames\) with \[5\]\./);
   });
 
   it('shows why a scene with a broken script misbehaves', async () => {

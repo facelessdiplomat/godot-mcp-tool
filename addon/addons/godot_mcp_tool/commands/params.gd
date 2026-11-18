@@ -61,5 +61,14 @@ static func text_list(params: Dictionary, key: String) -> Variant:
 	return value
 
 
+static func point(params: Dictionary, key: String) -> Variant:
+	var value: Variant = params.get(key)
+	if value == null:
+		return null
+	if not value is Array or (value as Array).size() != 3 or not (value as Array).all(func(component: Variant) -> bool: return component is int or component is float):
+		return _invalid(key, "[x, y, z]")
+	return Vector3(value[0], value[1], value[2])
+
+
 static func _invalid(key: String, expected: String) -> GodotMcpCommandError:
 	return GodotMcpCommandError.new(GodotMcpJsonRpc.INVALID_PARAMS, "\"%s\" must be %s" % [key, expected])

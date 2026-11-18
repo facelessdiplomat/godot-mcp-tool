@@ -17,7 +17,7 @@ var _active_session_id := -1
 func _init(game: GodotMcpGameState, log_store: GodotMcpLogStore) -> void:
 	_game = game
 	_log_store = log_store
-	channel = GodotMcpGameChannel.new(_send_request)
+	channel = GodotMcpGameChannel.new(_send_request, _send_debugger_command, _toggle_profiler)
 
 
 func _has_capture(capture: String) -> bool:
@@ -62,4 +62,20 @@ func _send_request(payload: Dictionary) -> bool:
 	if session == null or not session.is_active():
 		return false
 	session.send_message(GodotMcpRuntimeProtocol.REQUEST_MESSAGE, [payload])
+	return true
+
+
+func _send_debugger_command(command: String) -> bool:
+	var session := get_session(_active_session_id) if _active_session_id >= 0 else null
+	if session == null or not session.is_active():
+		return false
+	session.send_message(command, [])
+	return true
+
+
+func _toggle_profiler(profiler: String, enabled: bool, options: Array) -> bool:
+	var session := get_session(_active_session_id) if _active_session_id >= 0 else null
+	if session == null or not session.is_active():
+		return false
+	session.toggle_profiler(profiler, enabled, options)
 	return true

@@ -1,11 +1,6 @@
 import type { CallToolResult } from '@modelcontextprotocol/server';
 import { describe, expect, it } from 'vitest';
-import {
-  createEditorSelectTool,
-  createProjectInfoTool,
-  createProjectSettingsGetTool,
-  createProjectSettingsSetTool,
-} from '../../src/tools/projectTools.js';
+import { createEditorGetStateTool, createEditorSelectTool, createProjectInfoTool, createProjectSettingsGetTool, createProjectSettingsSetTool } from '../../src/tools/projectTools.js';
 import { FakeEditorGateway } from '../support/FakeEditorGateway.js';
 
 function textOf(result: CallToolResult): string {
@@ -114,6 +109,37 @@ describe('project tools', () => {
     const text = textOf(await createProjectInfoTool(editor).execute({}));
 
     expect(text).toContain(['Global classes of the project: none', 'Global classes from addons: gut (10); look one up with docs_class'].join('\n'));
+  });
+
+  it('editor_get_state says what the user is looking at in the editor', async () => {
+    const editor = new FakeEditorGateway()
+      .respondTo('editor.get_state', {
+        scene: 'res://levels/arena.tscn',
+        unsaved: true,
+        main_screen: '3D',
+        selected_nodes: [
+          { path: 'Enemy2', type: 'CharacterBody3D' },
+          { path: 'Enemy2/Mesh', type: 'MeshInstance3D' },
+        ],
+        selected_files: ['res://materials/ice.tres'],
+        script: { path: 'res://enemy.gd', line: 42, selection: 'velocity.y = 5' },
+        open_scenes: ['res://levels/arena.tscn', 'res://enemy.tscn'],
+      })
+      .respondTo('editor.get_state', { scene: '', unsaved: false, main_screen: 'other', selected_nodes: [], selected_files: [], script: {}, open_scenes: [] });
+
+    const busy = textOf(await createEditorGetStateTool(editor).execute({}));
+    const empty = textOf(await createEditorGetStateTool(editor).execute({}));
+
+    expect(busy).toBe(
+      [
+        'The editor shows the 3D screen with res://levels/arena.tscn, which has unsaved changes.',
+        'Selected nodes: Enemy2 (CharacterBody3D), Enemy2/Mesh (MeshInstance3D).',
+        'Selected files: res://materials/ice.tres.',
+        'Script editor: res://enemy.gd, caret on line 42, selected text: "velocity.y = 5".',
+        'Open scenes: res://levels/arena.tscn, res://enemy.tscn.',
+      ].join('\n'),
+    );
+    expect(empty).toBe(['No scene is open in the editor.', 'No node is selected.'].join('\n'));
   });
 
   it('editor_select names what it selected', async () => {

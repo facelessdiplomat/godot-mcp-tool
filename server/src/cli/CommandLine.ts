@@ -1,4 +1,4 @@
-export type ProjectCommand = 'install-addon' | 'update-addon' | 'doctor';
+export type ProjectCommand = 'init' | 'install-addon' | 'update-addon' | 'doctor';
 
 export type CommandLineRequest =
   | { readonly kind: 'serve' }
@@ -8,7 +8,7 @@ export type CommandLineRequest =
   | { readonly kind: 'version' }
   | { readonly kind: 'invalid'; readonly reason: string };
 
-const projectCommands: readonly ProjectCommand[] = ['install-addon', 'update-addon', 'doctor'];
+const projectCommands: readonly ProjectCommand[] = ['init', 'install-addon', 'update-addon', 'doctor'];
 const hookCommand = 'check-edited-script';
 const helpArguments = new Set(['--help', '-h', 'help']);
 const versionArguments = new Set(['--version', '-v']);
@@ -19,10 +19,11 @@ export const usage = [
   'Without a command, godot-mcp-tool runs the MCP server that connects Claude Code to the Godot editor.',
   '',
   'Commands:',
+  '  init [folder]          Create a Godot project with the addon enabled in an empty or new folder',
   '  install-addon [folder]  Copy the addon into the Godot project and enable its plugin',
   '  update-addon [folder]   Replace the addon of the project with the version of this package',
   '  doctor [folder]         Check Node.js, Godot, the addon, the plugin and the connection to the editor',
-  '  check-edited-script    Check the .gd file named in the Claude Code hook input on standard input;',
+  '  check-edited-script    Check the .gd or .gdshader file named in the Claude Code hook input on standard input;',
   '                         the hook of the Claude Code plugin runs it after Claude writes or edits a file',
   '',
   'The project folder is the folder with project.godot. By default it is GODOT_PROJECT_PATH, or the',

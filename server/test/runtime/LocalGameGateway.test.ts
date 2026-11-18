@@ -88,12 +88,47 @@ describe('LocalGameGateway', () => {
     expect(launcher.calls[0]?.workingDirectory).toBe(projectRoot);
   });
 
+  it('refuses to stop at the first error without the debugger of the editor', async () => {
+    launcher.simulate = readyGame([]);
+
+    await expect(gateway().request('game.run', { scene: 'main', watch_ms: 0, stop_after: false, break_on_error: true })).rejects.toThrow('needs the debugger of the Godot editor');
+    expect(launcher.calls).toEqual([]);
+  });
+
   it('runs with a fixed frame rate on request', async () => {
     launcher.simulate = readyGame([]);
 
     await gateway().request('game.run', { scene: 'main', watch_ms: 0, stop_after: false, fixed_fps: 60 });
 
     expect(launcher.calls[0]?.args.slice(0, 6)).toEqual(['--path', projectRoot, '--fixed-fps', '60', '--', `--mcp-log-file=${join(projectRoot, '.godot', 'godot_mcp_tool', 'local_game.ndjson')}`]);
+  });
+
+  it('passes debug drawing, the window size, the locale and the game arguments to Godot', async () => {
+    launcher.simulate = readyGame([]);
+
+    await gateway().request('game.run', {
+      scene: 'main',
+      watch_ms: 0,
+      stop_after: false,
+      debug_draw: ['collisions', 'paths'],
+      window_size: [800, 600],
+      locale: 'pt_BR',
+      arguments: ['--level=3'],
+    });
+
+    expect(launcher.calls[0]?.args.slice(0, 11)).toEqual([
+      '--path',
+      projectRoot,
+      '--debug-collisions',
+      '--debug-paths',
+      '--resolution',
+      '800x600',
+      '--language',
+      'pt_BR',
+      '--',
+      '--level=3',
+      `--mcp-log-file=${join(projectRoot, '.godot', 'godot_mcp_tool', 'local_game.ndjson')}`,
+    ]);
   });
 
   it('runs a given scene, without a window when asked', async () => {

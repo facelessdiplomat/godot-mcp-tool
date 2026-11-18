@@ -1,7 +1,7 @@
 import { statSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 
-export type ProjectSource = 'command line' | 'GODOT_PROJECT_PATH' | 'CLAUDE_PROJECT_DIR' | 'working directory';
+export type ProjectSource = 'command line' | 'GODOT_PROJECT_PATH' | 'CLAUDE_PROJECT_DIR' | 'working directory' | 'project_create';
 
 export type ProjectLookup =
   | { readonly found: true; readonly root: string; readonly source: ProjectSource }
@@ -14,9 +14,14 @@ export class ProjectLocator {
     private readonly variables: Readonly<Record<string, string | undefined>>,
     private readonly workingDirectory: string,
     private readonly commandLinePath?: string,
+    private readonly createdRoot?: string,
   ) {}
 
   locate(): ProjectLookup {
+    if (this.createdRoot !== undefined && containsProjectFile(this.createdRoot)) {
+      return { found: true, root: this.createdRoot, source: 'project_create' };
+    }
+
     if (this.commandLinePath !== undefined) {
       const commandLineRoot = resolve(this.workingDirectory, this.commandLinePath);
       return containsProjectFile(commandLineRoot)

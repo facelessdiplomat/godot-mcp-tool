@@ -6,6 +6,34 @@ const mainScript = ['extends Node3D', '', '', 'func _on_start_pressed() -> void:
 
 const mainScene = ['[gd_scene load_steps=2 format=3]', '', '[ext_resource type="Script" path="res://main.gd" id="1_main"]', '', '[node name="Main" type="Node3D"]', 'script = ExtResource("1_main")', ''].join('\n');
 
+const crateScene = [
+  '[gd_scene load_steps=2 format=3]',
+  '',
+  '[sub_resource type="BoxMesh" id="BoxMesh_crate"]',
+  '',
+  '[node name="Crate" type="Node3D"]',
+  '',
+  '[node name="Mesh" type="MeshInstance3D" parent="."]',
+  'mesh = SubResource("BoxMesh_crate")',
+  '',
+].join('\n');
+
+const doorScript = ['extends Node3D', '', '', 'func _on_area_body_entered(_body: Node3D) -> void:', '\tpass', ''].join('\n');
+
+const doorScene = [
+  '[gd_scene load_steps=2 format=3]',
+  '',
+  '[ext_resource type="Script" path="res://door.gd" id="1_door"]',
+  '',
+  '[node name="Door" type="Node3D"]',
+  'script = ExtResource("1_door")',
+  '',
+  '[node name="Area" type="Area3D" parent="."]',
+  '',
+  '[connection signal="body_entered" from="Area" to="." method="_on_area_body_entered"]',
+  '',
+].join('\n');
+
 describe.skipIf(godotBinary === '')('editing the structure and the signals of a scene', () => {
   let project: TemporaryProject | undefined;
   let editorProcess: ChildProcess | undefined;
@@ -37,6 +65,9 @@ describe.skipIf(godotBinary === '')('editing the structure and the signals of a 
     project = new TemporaryProject('MCP scene editing', { withTestHelper: true, mainScene: 'res://main.tscn' });
     project.write('main.gd', mainScript);
     project.write('main.tscn', mainScene);
+    project.write('crate.tscn', crateScene);
+    project.write('door.gd', doorScript);
+    project.write('door.tscn', doorScene);
     editorProcess = await startHeadlessEditor(project.root);
     session = await McpSession.connect(project.root);
     helper = new EditorTestHelper(project);
@@ -147,4 +178,109 @@ describe.skipIf(godotBinary === '')('editing the structure and the signals of a 
     expect(disconnected.text).toContain('Disconnected Start.pressed from _on_start_pressed() on the scene root');
     expect(savedScene()).not.toContain('from="Start"');
   });
+
+  it('saves a change inside an instanced scene for that instance only, and undoes it in one step', async () => {
+    await tools().call('scene_batch_edit', {
+      operations: [
+        { op: 'node_add', type: 'res://crate.tscn', name: 'Crate1' },
+        { op: 'node_add', type: 'res://crate.tscn', name: 'Crate2' },
+      ],
+    });
+    const changed = await tools().call('node_set_properties', { path: 'Crate2/Mesh', properties: { visible: false } });
+    await tools().call('scene_save');
+    const savedWithTheChange = savedScene();
+    const undone = await editorHelper().request('undo_in_edited_scene');
+    await tools().call('scene_save');
+
+    expect(changed.text).toContain('Turned on Editable Children of Crate2, so that this change inside the instanced scene is saved with this scene.');
+    expect(savedWithTheChange).toContain('[editable path="Crate2"]');
+    expect(savedWithTheChange).toMatch(/\[node name="Mesh" parent="Crate2"[^\]]*\]\nvisible = false/);
+    expect(savedWithTheChange).not.toContain('parent="Crate1"');
+    expect(undone).toEqual({ undone: true, action: 'MCP: Set properties of Mesh' });
+    expect(savedScene()).not.toContain('[editable path="Crate2"]');
+    expect(savedScene()).not.toContain('visible = false');
+  });
+
+  it('refuses to disconnect a connection that an instanced scene makes', async () => {
+    await tools().call('node_add', { type: 'res://door.tscn', name: 'Door' });
+    const refused = await tools().call('signal_disconnect', { from: 'Door/Area', signal: 'body_entered', to: 'Door', method: '_on_area_body_entered' });
+
+    expect(refused.isError).toBe(true);
+    expect(refused.text).toContain('Door/Area.body_entered is connected to Door._on_area_body_entered() by res://door.tscn, so this scene cannot remove the connection');
+  });
+
+  it('lists the nodes inside instanced scenes when asked', async () => {
+    const shallow = await tools().call('scene_get_tree');
+    const deep = await tools().call('scene_get_tree', { expand_instances: true });
+
+    expect(shallow.text).toContain('Nodes inside instanced scenes are not shown; expand_instances: true lists them too.');
+    expect(shallow.text).not.toContain('Mesh: MeshInstance3D');
+    expect(deep.text).toContain('Mesh: MeshInstance3D');
+    expect(deep.text).toContain('Area: Area3D');
+  });
+
+  it('saves a branch as a scene of its own, keeps its connections, and undoes it in one step', async () => {
+    const saved = await tools().call('node_save_as_scene', { path: 'Goal2', file: 'res://props/goal.tscn' });
+    await tools().call('scene_save');
+    const savedWithTheInstance = savedScene();
+    const goalScene = project === undefined ? '' : project.read('props/goal.tscn');
+    const undone = await editorHelper().request('undo_in_edited_scene');
+    await tools().call('scene_save');
+
+    expect(saved.isError).toBe(false);
+    expect(saved.text).toContain('Saved Goal2 and its 1 child node as res://props/goal.tscn');
+    expect(goalScene).toMatch(/\[node name="Goal2" type="Area3D"[^\]]*\]/);
+    expect(goalScene).toMatch(/\[node name="Shape" type="CollisionShape3D" parent="\."[^\]]*\]/);
+    expect(savedWithTheInstance).toMatch(/\[node name="Goal2" parent="\."[^\]]* instance=ExtResource\("[^"]+"\)[^\]]*\]\ntransform = Transform3D\(1, 0, 0, 0, 1, 0, 0, 0, 1, -5, 0, 0\)/);
+    expect(savedWithTheInstance).toContain('[connection signal="body_entered" from="Goal2" to="." method="_on_body_entered"]');
+    expect(undone).toEqual({ undone: true, action: 'MCP: Save Goal2 as res://props/goal.tscn' });
+    expect(savedScene()).not.toMatch(/\[node name="Goal2"[^\]]*instance=/);
+    expect(savedScene()).toMatch(/\[node name="Shape" type="CollisionShape3D" parent="Goal2"[^\]]*\]/);
+  });
+
+  it('changes one property of a built-in resource by its path and refuses a resource of an instanced scene', async () => {
+    const changed = await tools().call('node_set_properties', { path: 'Player/Shape', properties: { 'shape:radius': 0.4 } });
+    const refused = await tools().call('node_set_properties', { path: 'Crate1/Mesh', properties: { 'mesh:size': [3, 3, 3] } });
+    await tools().call('scene_save');
+
+    expect(changed.text).toContain('Applied: shape:radius');
+    expect(savedScene()).toMatch(/\[sub_resource type="CapsuleShape3D"[^\]]*\]\nradius = 0\.4/);
+    expect(refused.isError).toBe(true);
+    expect(refused.text).toContain('mesh comes from res://crate.tscn');
+  });
+
+  it('reads back what is selected in the editor', async () => {
+    await tools().call('editor_select', { nodes: ['Player', 'Floor'] });
+
+    const state = await tools().call('editor_get_state');
+
+    expect(state.text).toContain('res://main.tscn');
+    expect(state.text).toContain('Selected nodes: Player (CharacterBody3D), Floor (CSGBox3D).');
+  });
+
+  it('makes an instance local together with the connections its scene made', async () => {
+    const made = await tools().call('node_make_local', { path: 'Door' });
+    await tools().call('scene_save');
+
+    expect(made.text).toContain('Made Door local in res://main.tscn: it and its 1 node from res://door.tscn now belong to this scene');
+    expect(savedScene()).toMatch(/\[node name="Area" type="Area3D" parent="Door"[^\]]*\]/);
+    expect(savedScene()).toContain('[connection signal="body_entered" from="Door/Area" to="Door" method="_on_area_body_entered"]');
+    expect(savedScene()).not.toContain('path="res://door.tscn"');
+  });
+
+  it('takes back its own changes with editor_undo, does them again with editor_redo, and stops at a change of the user', async () => {
+    await tools().call('node_set_properties', { path: 'Player', properties: { position: [1, 2, 3] } });
+    await tools().call('node_set_properties', { path: 'Player', properties: { position: [4, 5, 6] } });
+
+    const undone = await tools().call('editor_undo', { count: 2 });
+    const afterUndo = await tools().call('node_get_properties', { path: 'Player', names: ['position'] });
+    const redone = await tools().call('editor_redo');
+    const afterRedo = await tools().call('node_get_properties', { path: 'Player', names: ['position'] });
+
+    expect(undone.text).toContain('Undid 2 actions in res://main.tscn: MCP: ');
+    expect(redone.text).toContain('Redid 1 action in res://main.tscn: MCP: ');
+    expect(afterRedo.text).toContain('position = Vector3(1, 2, 3)');
+    expect(afterUndo.text).not.toContain('position = Vector3(1, 2, 3)');
+  });
 });
+

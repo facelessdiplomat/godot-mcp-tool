@@ -89,4 +89,35 @@ describe.skipIf(godotBinary === '')('bounds and screenshots without a window', (
     expect(played.text).toContain('Played 1 input step in');
     expect(played.text).toContain('No screenshot: The game runs without a window');
   });
+
+  it('casts rays at collision shapes and meshes in the editor and in the game', async () => {
+    const onFloor = await tools().call('scene_raycast', { scene: 'res://main.tscn', from: [-3, 10, -3] });
+    const onCrate = await tools().call('scene_raycast', { scene: 'res://main.tscn', from: [4, 10, 0] });
+    const inGame = await tools().call('scene_raycast', { from: [-3, 10, -3], in_game: true });
+
+    expect(onFloor.text).toContain('hits Floor (CSGBox3D) at Vector3(-3, 0, -3), 10 m away');
+    expect(onCrate.text).toContain('hits Crate (MeshInstance3D) at Vector3(4, 2, 0)');
+    expect(onCrate.text).toContain('It hit the visible mesh, which has no collision shape there.');
+    expect(inGame.text).toContain('hits Floor');
+  });
+
+  it('places a lifted crate back on the floor as one Undo step', async () => {
+    await tools().call('node_set_properties', { scene: 'res://main.tscn', path: 'Crate', properties: { position: [4, 6, 0] } });
+
+    const snapped = await tools().call('node_snap_to_floor', { scene: 'res://main.tscn', paths: ['Crate'] });
+    const crate = await tools().call('node_get_properties', { scene: 'res://main.tscn', path: 'Crate', names: ['position'] });
+
+    expect(snapped.text).toContain('Crate moved down 5 m and rests on Floor, now at Vector3(4, 1, 0).');
+    expect(crate.text).toContain('position = Vector3(4, 1, 0)');
+  });
+
+  it('gives the crate a box collision that rays then hit', async () => {
+    const added = await tools().call('node_add_collision', { scene: 'res://main.tscn', path: 'Crate', shape: 'box' });
+    const onCrate = await tools().call('scene_raycast', { scene: 'res://main.tscn', from: [4, 10, 0] });
+
+    expect(added.text).toContain('Added a box collision to Crate in res://main.tscn as one Undo step: Crate/StaticBody3D/CollisionShape3D (BoxShape3D).');
+    expect(added.text).toContain('The collision measures Vector3(2, 2, 2); the mesh measures Vector3(2, 2, 2).');
+    expect(onCrate.text).toContain('hits Crate/StaticBody3D (StaticBody3D) at Vector3(4, 2, 0)');
+    expect(onCrate.text).not.toContain('visible mesh');
+  });
 });

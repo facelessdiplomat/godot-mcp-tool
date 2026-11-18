@@ -2,17 +2,26 @@ import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'nod
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { findScripts, ScriptPathError } from '../../src/scripts/ScriptFiles.js';
+import { findCodeFiles, findScripts, ScriptPathError } from '../../src/scripts/ScriptFiles.js';
 
 describe('findScripts', () => {
   let root: string;
 
   beforeEach(() => {
     root = realpathSync(mkdtempSync(join(tmpdir(), 'script-files-')));
-    for (const folder of ['player', 'player/states', 'addons/gut', '.godot']) {
+    for (const folder of ['player', 'player/states', 'addons/gut', '.godot', 'shaders']) {
       mkdirSync(join(root, folder), { recursive: true });
     }
-    for (const file of ['main.gd', 'player/player.gd', 'player/states/jump.gd', 'player/notes.txt', 'addons/gut/gut.gd', '.godot/cache.gd']) {
+    for (const file of [
+      'main.gd',
+      'player/player.gd',
+      'player/states/jump.gd',
+      'player/notes.txt',
+      'addons/gut/gut.gd',
+      '.godot/cache.gd',
+      'shaders/water.gdshader',
+      'shaders/colors.gdshaderinc',
+    ]) {
       writeFileSync(join(root, file), 'extends Node\n');
     }
   });
@@ -60,5 +69,39 @@ describe('findScripts', () => {
 
   it('refuses files that are not scripts', () => {
     expect(() => findScripts(root, ['res://player/notes.txt'])).toThrow(new ScriptPathError('res://player/notes.txt is not a .gd script.'));
+  });
+});
+
+describe('findCodeFiles', () => {
+  let root: string;
+
+  beforeEach(() => {
+    root = realpathSync(mkdtempSync(join(tmpdir(), 'code-files-')));
+    mkdirSync(join(root, 'shaders'), { recursive: true });
+    mkdirSync(join(root, 'player'), { recursive: true });
+    for (const file of ['player/player.gd', 'player/glow.gdshader', 'shaders/water.gdshader', 'shaders/colors.gdshaderinc', 'shaders/readme.md']) {
+      writeFileSync(join(root, file), '');
+    }
+  });
+
+  afterEach(() => {
+    rmSync(root, { recursive: true, force: true });
+  });
+
+  it('sorts scripts and shaders of files and folders apart', () => {
+    const found = findCodeFiles(root, ['res://player', 'res://shaders/water.gdshader']);
+
+    expect(found.scripts.map((script) => script.resourcePath)).toEqual(['res://player/player.gd']);
+    expect(found.shaders.map((shader) => shader.resourcePath)).toEqual(['res://player/glow.gdshader', 'res://shaders/water.gdshader']);
+  });
+
+  it('checks shader includes through the shaders that include them', () => {
+    expect(() => findCodeFiles(root, ['res://shaders/colors.gdshaderinc'])).toThrow(
+      new ScriptPathError('res://shaders/colors.gdshaderinc is a shader include; check a .gdshader file that includes it.'),
+    );
+  });
+
+  it('refuses files that are neither scripts nor shaders', () => {
+    expect(() => findCodeFiles(root, ['res://shaders/readme.md'])).toThrow(new ScriptPathError('res://shaders/readme.md is not a .gd script or a .gdshader file.'));
   });
 });

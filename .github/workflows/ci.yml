@@ -56,6 +56,74 @@ jobs:
       - name: Build the package
         run: npm run build
 
+  other-systems:
+    name: Unit tests and an editor on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-2025
+            archive: win64.exe.zip
+            binary: Godot_v${GODOT_STABLE_VERSION}-stable_win64_console.exe
+          - os: macos-15
+            archive: macos.universal.zip
+            binary: Godot.app/Contents/MacOS/Godot
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: server/package-lock.json
+
+      - name: Install dependencies
+        working-directory: server
+        run: npm ci
+
+      - name: Check types
+        working-directory: server
+        run: npm run typecheck
+
+      - name: Run unit tests
+        working-directory: server
+        run: npm test
+
+      - name: Build the package
+        working-directory: server
+        run: npm run build
+
+      - name: Download the official Godot ${{ env.GODOT_STABLE_VERSION }} build
+        env:
+          ARCHIVE_SUFFIX: ${{ matrix.archive }}
+          BINARY: ${{ matrix.binary }}
+        run: |
+          release="https://github.com/godotengine/godot-builds/releases/download/${GODOT_STABLE_VERSION}-stable"
+          archive="Godot_v${GODOT_STABLE_VERSION}-stable_${ARCHIVE_SUFFIX}"
+          cd "$RUNNER_TEMP"
+          curl --fail --silent --show-error --location --output "$archive" "$release/$archive"
+          curl --fail --silent --show-error --location --output SHA512-SUMS.txt "$release/SHA512-SUMS.txt"
+          grep " $archive\$" SHA512-SUMS.txt > expected-sum.txt
+          if command -v sha512sum >/dev/null; then sha512sum --check --strict expected-sum.txt; else shasum -a 512 --check --strict expected-sum.txt; fi
+          unzip -q "$archive" -d godot
+          echo "GODOT_BIN=$RUNNER_TEMP/godot/$(eval echo "$BINARY")" >> "$GITHUB_ENV"
+
+      - name: Show the Godot version
+        run: '"$GODOT_BIN" --headless --version'
+
+      - name: Start the editor from the server
+        working-directory: server
+        run: npx vitest run --config vitest.integration.config.ts test/integration/editorLaunch.test.ts
+
   godot-master:
     name: Build Godot master
     runs-on: ubuntu-24.04

@@ -21,6 +21,13 @@ describe('ProjectLocator', () => {
     return directory;
   }
 
+  it('takes up the project that project_create made in a session that started without one', () => {
+    const projectRoot = createProject(join(sandbox, 'capsule-walk'));
+    const locator = new ProjectLocator({}, sandbox, undefined, projectRoot);
+
+    expect(locator.locate()).toEqual({ found: true, root: projectRoot, source: 'project_create' });
+  });
+
   it('uses GODOT_PROJECT_PATH when it points to a project', () => {
     const projectRoot = createProject(join(sandbox, 'game'));
     const locator = new ProjectLocator({ GODOT_PROJECT_PATH: projectRoot }, sandbox);

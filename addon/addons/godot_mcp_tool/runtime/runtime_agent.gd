@@ -4,6 +4,7 @@ const GodotMcpCommandRouter := preload("../commands/command_router.gd")
 const GodotMcpDebuggerSink := preload("debugger_sink.gd")
 const GodotMcpGameRequestResponder := preload("game_request_responder.gd")
 const GodotMcpGameTime := preload("game_time.gd")
+const GodotMcpHeadlessWindow := preload("headless_window.gd")
 const GodotMcpLogFileWriter := preload("log_file_writer.gd")
 const GodotMcpRuntimeActivation := preload("runtime_activation.gd")
 const GodotMcpRuntimeLogger := preload("runtime_logger.gd")
@@ -42,6 +43,7 @@ func _ready() -> void:
 		set_process(false)
 		return
 	process_mode = Node.PROCESS_MODE_ALWAYS
+	GodotMcpHeadlessWindow.give_project_size(get_tree().root)
 	await get_tree().process_frame
 	_flush()
 	_sink.send_ready(_current_scene_path())

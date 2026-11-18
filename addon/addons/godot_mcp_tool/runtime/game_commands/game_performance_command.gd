@@ -29,6 +29,7 @@ func execute(params: Dictionary) -> Variant:
 	var draw_calls: Array[float] = []
 	var primitives: Array[float] = []
 	var drawn_objects: Array[float] = []
+	var custom_monitors := {}
 	await tree.process_frame
 	var previous_usec := Time.get_ticks_usec()
 	for frame in frames:
@@ -41,6 +42,7 @@ func execute(params: Dictionary) -> Variant:
 		draw_calls.append(Performance.get_monitor(Performance.RENDER_TOTAL_DRAW_CALLS_IN_FRAME))
 		primitives.append(Performance.get_monitor(Performance.RENDER_TOTAL_PRIMITIVES_IN_FRAME))
 		drawn_objects.append(Performance.get_monitor(Performance.RENDER_TOTAL_OBJECTS_IN_FRAME))
+		_sample_custom_monitors(custom_monitors)
 	return {
 		"scene": _scene.scene_path(),
 		"frames": frames,
@@ -62,7 +64,24 @@ func execute(params: Dictionary) -> Variant:
 		"physics_3d_active_objects": Performance.get_monitor(Performance.PHYSICS_3D_ACTIVE_OBJECTS),
 		"physics_3d_collision_pairs": Performance.get_monitor(Performance.PHYSICS_3D_COLLISION_PAIRS),
 		"physics_3d_islands": Performance.get_monitor(Performance.PHYSICS_3D_ISLAND_COUNT),
+		"custom_monitors": _custom_monitor_summaries(custom_monitors),
 	}
+
+
+static func _sample_custom_monitors(samples: Dictionary) -> void:
+	for monitor in Performance.get_custom_monitor_names():
+		var value: Variant = Performance.get_custom_monitor(monitor)
+		if value is int or value is float:
+			if not samples.has(monitor):
+				samples[monitor] = [] as Array[float]
+			(samples[monitor] as Array[float]).append(float(value))
+
+
+static func _custom_monitor_summaries(samples: Dictionary) -> Dictionary:
+	var summaries := {}
+	for monitor in samples:
+		summaries[str(monitor)] = _summary(samples[monitor])
+	return summaries
 
 
 static func _summary(values: Array[float]) -> Dictionary:

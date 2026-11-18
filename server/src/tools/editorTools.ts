@@ -8,7 +8,8 @@ import { type CaptureReader, createEditorScreenshotTool } from './captureTools.j
 import { createFilesystemMoveTool, createResourceFindUsagesTool } from './fileTools.js';
 import { createInputMapGetTool, createInputMapSetTool } from './inputTools.js';
 import { createNavigationBakeTool } from './navigationTools.js';
-import { createNodeDuplicateTool, createNodeReparentTool } from './nodeStructureTools.js';
+import { createNodeDuplicateTool, createNodeMakeLocalTool, createNodeReparentTool, createNodeSaveAsSceneTool } from './nodeStructureTools.js';
+import { createNodeAddCollisionTool, createNodeSnapToFloorTool, createSceneRaycastTool } from './placementTools.js';
 import {
   createNodeAddTool,
   createNodeDeleteTool,
@@ -20,6 +21,7 @@ import {
 } from './nodeTools.js';
 import { EditorRescanTool } from './EditorRescanTool.js';
 import {
+  createEditorGetStateTool,
   createEditorSelectTool,
   createProjectInfoTool,
   createProjectSettingsGetTool,
@@ -29,6 +31,7 @@ import { createResourceCreateTool, createResourceGetTool, createResourceSetPrope
 import { createSceneCloseTool, createSceneCreateTool, createSceneGetTreeTool, createSceneOpenTool, createSceneSaveTool } from './sceneTools.js';
 import { createSignalConnectTool, createSignalDisconnectTool, createSignalListTool } from './signalTools.js';
 import type { Tool } from './Tool.js';
+import { createEditorRedoTool, createEditorUndoTool } from './historyTools.js';
 
 export function createEditorTools(editor: EditorGateway, projectReader: EditorGateway, readCapture: CaptureReader): Tool[] {
   return [
@@ -48,9 +51,14 @@ export function createEditorTools(editor: EditorGateway, projectReader: EditorGa
     createNodeDeleteTool(editor),
     createNodeDuplicateTool(editor),
     createNodeReparentTool(editor),
+    createNodeSaveAsSceneTool(editor),
+    createNodeMakeLocalTool(editor),
     createNodeFindTool(projectReader),
     createNodeGetPropertiesTool(projectReader),
     createNodeGetBoundsTool(projectReader),
+    createSceneRaycastTool(editor),
+    createNodeSnapToFloorTool(editor),
+    createNodeAddCollisionTool(editor),
     createNodeSetPropertiesTool(editor),
     createSignalListTool(projectReader),
     createSignalConnectTool(editor),
@@ -72,6 +80,9 @@ export function createEditorTools(editor: EditorGateway, projectReader: EditorGa
     createAutoloadRemoveTool(editor),
     createNodeSetGroupsTool(editor),
     createEditorSelectTool(editor),
+    createEditorUndoTool(editor),
+    createEditorRedoTool(editor),
+    createEditorGetStateTool(editor),
     createSceneCloseTool(editor),
   ];
 }

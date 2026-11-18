@@ -43,3 +43,15 @@ func select_nodes(_nodes: Array[Node]) -> void:
 
 func select_file(_file_path: String) -> void:
 	pass
+
+
+func current_selection() -> Array[Node]:
+	return []
+
+
+func current_file_selection() -> PackedStringArray:
+	return PackedStringArray()
+
+
+func main_screen_name() -> String:
+	return ""

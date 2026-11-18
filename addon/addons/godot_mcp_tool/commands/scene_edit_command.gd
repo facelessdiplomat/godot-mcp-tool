@@ -25,6 +25,7 @@ func execute(params: Dictionary) -> Variant:
 	var problem := edit.prepare(scene_root, params)
 	if problem != null:
 		edit.changes.release_created()
+		edit.discard_outside_changes()
 		return problem
 	if not edit.changes.is_empty():
 		_context.history.record(edit.action_name, scene_root, [edit.changes])

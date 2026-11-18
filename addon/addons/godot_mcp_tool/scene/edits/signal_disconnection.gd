@@ -32,6 +32,8 @@ func prepare(scene_root: Node, params: Dictionary) -> GodotMcpCommandError:
 			"%s.%s is not connected to %s.%s()" % [source.name, signal_name, target.name, method],
 			"signal_list with path \"%s\" shows the connections of its signals." % source_path,
 		)
+	if GodotMcpInstancedScenes.is_inherited(connection):
+		return _inherited_connection_refusal(scene_root, source, signal_name, target, method)
 	_scene_root = scene_root
 	_source = source
 	_target = target
@@ -51,6 +53,22 @@ func finish() -> Dictionary:
 		"to": GodotMcpNodeLocator.path_of(_scene_root, _target),
 		"method": _method,
 	}
+
+
+static func _inherited_connection_refusal(scene_root: Node, source: Node, signal_name: String, target: Node, method: String) -> GodotMcpCommandError:
+	var connection_text := "%s.%s is connected to %s.%s()" % [GodotMcpNodeLocator.path_of(scene_root, source), signal_name, GodotMcpNodeLocator.path_of(scene_root, target), method]
+	var scene_path := GodotMcpInstancedScenes.scene_making_connection(source, signal_name, target, method, scene_root)
+	if scene_path.is_empty():
+		return GodotMcpCommandError.new(
+			GodotMcpJsonRpc.INVALID_PARAMS,
+			"%s by an instanced scene or by the scene this one inherits from, so this scene cannot remove the connection" % connection_text,
+			"Disconnect it in the scene that makes it.",
+		)
+	return GodotMcpCommandError.new(
+		GodotMcpJsonRpc.INVALID_PARAMS,
+		"%s by %s, so this scene cannot remove the connection" % [connection_text, scene_path],
+		"Disconnect it in that scene with scene: \"%s\"." % scene_path,
+	)
 
 
 static func _find_connection(source: Node, signal_name: String, target: Node, method: String) -> Dictionary:

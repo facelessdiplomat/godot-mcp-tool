@@ -17,12 +17,14 @@ func prepare(scene_root: Node, params: Dictionary) -> GodotMcpCommandError:
 	var node := GodotMcpNodeLocator.find(scene_root, node_path)
 	if node == null:
 		return GodotMcpCommandError.new(GodotMcpJsonRpc.NOT_FOUND, "Node \"%s\" not found" % node_path, GodotMcpNodeLocator.not_found_hint(scene_root, node_path))
-	var planned := _context.properties.plan(node, properties)
+	var planned := _context.properties.plan(node, properties, scene_root.scene_file_path)
 	_scene_root = scene_root
 	_node = node
 	_decoded = planned["decoded"]
 	_rejected = planned["rejected"]
 	changes = planned["changes"]
+	if not changes.is_empty():
+		_save_changes_inside_instances(node, scene_root)
 	action_name = "MCP: Set properties of %s" % node.name
 	return null
 
@@ -34,4 +36,5 @@ func finish() -> Dictionary:
 		"applied": report["applied"],
 		"rejected": report["rejected"],
 		"not_applied": report["not_applied"],
+		"editable_children": _editable_children,
 	}

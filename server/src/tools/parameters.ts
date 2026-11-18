@@ -10,6 +10,11 @@ export const sceneToRead = z
   .optional()
   .describe('The scene to read, as a res:// path or "main" for the main scene of the project; a scene that is not open is read from disk. Default: the scene currently open in the editor.');
 
+export const expandInstances = z
+  .boolean()
+  .optional()
+  .describe('Also include the nodes inside instanced scenes, such as "Enemy2/Mesh", which node_set_properties changes for that instance only. Default: only the instances themselves, and the nodes of instances whose Editable Children is on.');
+
 export const nodePath = z.string().min(1).describe('Path of the node relative to the scene root, such as "Player/Camera"; "." is the root itself.');
 
 const propertyValuesDescription = [
@@ -21,6 +26,7 @@ const propertyValuesDescription = [
   'resources as a "res://…" path, or {"new": "Class", …properties} to create one;',
   'a script as "res://….gd"; node references as paths relative to the node ("../Player") or to the scene root ("Player");',
   'Transform3D, Basis, AABB and Rect2 in Godot syntax ("Transform3D(…)"). Scripting properties such as global_position work too.',
+  'A path changes one part only: "mesh:size" a property of the node\'s own mesh, "position:y" one coordinate.',
   'Every value is read back after it is set.',
 ].join(' ');
 

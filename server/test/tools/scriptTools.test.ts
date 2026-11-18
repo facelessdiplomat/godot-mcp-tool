@@ -101,6 +101,63 @@ describe('script_validate', () => {
     expect(editorErrors.takeSummary()).toBe(['⚠ New error since the last call:', '- in the editor: res://enemy.gd:3: Parse Error: Unexpected "Indent".'].join('\n'));
   });
 
+  it('reports the shaders it compiled after the scripts', async () => {
+    const validator = checker({
+      method: 'language server',
+      reports: [{ resourcePath: 'res://player.gd', problems: [] }],
+      shaderReports: [
+        { resourcePath: 'res://shaders/water.gdshader', problems: [{ line: 4, severity: 'error', message: 'Invalid arguments for the built-in function: "vec3(float,float)".' }] },
+        { resourcePath: 'res://shaders/lit.gdshader', problems: [{ file: 'res://shaders/colors.gdshaderinc', line: 2, severity: 'error', message: 'Expected a ";".' }] },
+        { resourcePath: 'res://shaders/sky.gdshader', problems: [] },
+      ],
+    });
+
+    const result = await toolFor(validator).execute({ paths: ['res://'] });
+
+    expect(textOf(result)).toBe(
+      [
+        "No problems in 1 script: res://player.gd (checked with the editor's language server).",
+        "2 errors in 2 of 3 shaders (compiled by Godot's shader compiler, which stops at the first error of each shader).",
+        'res://shaders/water.gdshader',
+        '  4 error: Invalid arguments for the built-in function: "vec3(float,float)".',
+        'res://shaders/lit.gdshader',
+        '  res://shaders/colors.gdshaderinc:2 error: Expected a ";".',
+        'No problems: res://shaders/sky.gdshader',
+      ].join('\n'),
+    );
+  });
+
+  it('reports shaders alone when only shaders were named', async () => {
+    const validator = checker({ method: 'check-only', reports: [], shaderReports: [{ resourcePath: 'res://shaders/sky.gdshader', problems: [] }] });
+
+    const result = await toolFor(validator).execute({ paths: ['res://shaders/sky.gdshader'] });
+
+    expect(textOf(result)).toBe("No problems in 1 shader: res://shaders/sky.gdshader (compiled by Godot's shader compiler).");
+  });
+
+  it('leaves out the editor errors of the shaders it compiled', async () => {
+    const editorErrors = new ErrorSummary();
+    editorErrors.observe(1, 'log.status', { last_seq: 0, errors: 0, recent_errors: [] });
+    editorErrors.observe(1, 'log.status', {
+      last_seq: 3,
+      errors: 3,
+      recent_errors: [
+        { seq: 1, source: 'editor', message: 'Invalid arguments for the built-in function: "vec3(float,float)".', location: 'res://shaders/water.gdshader:4' },
+        { seq: 2, source: 'editor', message: 'Shader compilation failed.', location: 'servers/rendering/renderer_rd/forward_clustered/scene_shader_forward_clustered.cpp:300' },
+        { seq: 3, source: 'editor', message: 'Parse Error: Unexpected "Indent".', location: 'res://enemy.gd:3' },
+      ],
+    });
+    const validator = checker({
+      method: 'check-only',
+      reports: [],
+      shaderReports: [{ resourcePath: 'res://shaders/water.gdshader', problems: [{ line: 4, severity: 'error', message: 'Invalid arguments for the built-in function: "vec3(float,float)".' }] }],
+    });
+
+    await new ScriptValidateTool(validator, editorErrors).execute({ paths: ['res://shaders/water.gdshader'] });
+
+    expect(editorErrors.takeSummary()).toBe(['⚠ New error since the last call:', '- in the editor: res://enemy.gd:3: Parse Error: Unexpected "Indent".'].join('\n'));
+  });
+
   it('explains paths it cannot check', async () => {
     const result = await toolFor(checker(new ScriptPathError('res://enemy.gd does not exist.'))).execute({ paths: ['res://enemy.gd'] });
 

@@ -11,6 +11,7 @@ export interface ApplicationEnvironment {
   readonly workingDirectory: string;
   readonly platform: NodeJS.Platform;
   readonly homeDirectory: string;
+  readonly bundledAddonDirectory?: string | undefined;
 }
 
 export interface GodotContext {
@@ -23,8 +24,8 @@ export interface GodotContext {
 
 const bridgeRequestTimeoutMs = 30_000;
 
-export function createGodotContext(environment: ApplicationEnvironment, commandLineProjectPath?: string): GodotContext {
-  const project = new ProjectLocator(environment.variables, environment.workingDirectory, commandLineProjectPath).locate();
+export function createGodotContext(environment: ApplicationEnvironment, commandLineProjectPath?: string, createdProjectRoot?: string): GodotContext {
+  const project = new ProjectLocator(environment.variables, environment.workingDirectory, commandLineProjectPath, createdProjectRoot).locate();
   const discovery = project.found ? new DiscoveryFileReader(project.root, isProcessAlive) : undefined;
   const editor: EditorSession = discovery
     ? new EditorConnection(

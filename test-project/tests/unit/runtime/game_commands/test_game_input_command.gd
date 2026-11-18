@@ -6,6 +6,7 @@ const GodotMcpGamePropertiesGetCommand := preload("res://addons/godot_mcp_tool/r
 const GodotMcpGameScene := preload("res://addons/godot_mcp_tool/runtime/game_commands/game_scene.gd")
 const GodotMcpGameStepCommand := preload("res://addons/godot_mcp_tool/runtime/game_commands/game_step_command.gd")
 const GodotMcpGameTime := preload("res://addons/godot_mcp_tool/runtime/game_time.gd")
+const GodotMcpHeadlessWindow := preload("res://addons/godot_mcp_tool/runtime/headless_window.gd")
 const GodotMcpJsonRpc := preload("res://addons/godot_mcp_tool/bridge/json_rpc.gd")
 const GodotMcpPropertyEditor := preload("res://addons/godot_mcp_tool/scene/property_editor.gd")
 const GodotMcpVariantCodec := preload("res://addons/godot_mcp_tool/codec/variant_codec.gd")
@@ -36,6 +37,26 @@ class InputRecorder:
 		events.append(event)
 
 
+class RecordingMoments:
+	extends "res://addons/godot_mcp_tool/capture/moment_camera.gd"
+
+	var grabbed := 0
+	var saved_labels := PackedStringArray()
+	var saved_count := 0
+
+	func _init() -> void:
+		super(null)
+
+	func grab() -> Variant:
+		grabbed += 1
+		return Image.create_empty(4, 4, false, Image.FORMAT_RGBA8)
+
+	func save(images: Array, labels: PackedStringArray, _options: Dictionary) -> Variant:
+		saved_count = images.size()
+		saved_labels = labels
+		return {"path": "/captures/moments-1-001.png", "moments": Array(labels)}
+
+
 class FixedCapture:
 	extends "res://addons/godot_mcp_tool/commands/command.gd"
 
@@ -55,6 +76,17 @@ var _arena: Node
 var _watcher: Node
 var _time: GodotMcpGameTime
 var _command: GodotMcpGameInputCommand
+var _moments: RecordingMoments
+var _runner_window_size := Vector2i.ZERO
+
+
+func before_all() -> void:
+	_runner_window_size = get_tree().root.size
+	GodotMcpHeadlessWindow.give_project_size(get_tree().root)
+
+
+func after_all() -> void:
+	get_tree().root.size = _runner_window_size
 
 
 func before_each() -> void:
@@ -92,8 +124,10 @@ func after_each() -> void:
 
 func _command_with(capture: FixedCapture) -> GodotMcpGameInputCommand:
 	var codec := GodotMcpVariantCodec.new()
-	var reader := GodotMcpGamePropertiesGetCommand.new(GodotMcpGameScene.new(func() -> Node: return _arena), GodotMcpPropertyEditor.new(codec), codec)
-	return GodotMcpGameInputCommand.new(capture, _time, reader)
+	var scene := GodotMcpGameScene.new(func() -> Node: return _arena)
+	var reader := GodotMcpGamePropertiesGetCommand.new(scene, GodotMcpPropertyEditor.new(codec), codec)
+	_moments = RecordingMoments.new()
+	return GodotMcpGameInputCommand.new(capture, _time, reader, scene, _moments)
 
 
 func _watched(property: String) -> int:
@@ -288,3 +322,151 @@ func test_takes_no_screenshot_unless_asked() -> void:
 	var result: Dictionary = await _command_with(capture).execute({"steps": [{"action": JUMP_ACTION}]})
 	assert_eq(capture.calls, 0)
 	assert_false(result.has("screenshot"))
+
+
+func _add_button(path_name: String, position: Vector2, size: Vector2) -> Button:
+	var menu := Control.new()
+	menu.name = "Menu"
+	_arena.add_child(menu)
+	var button := Button.new()
+	button.name = path_name
+	button.position = position
+	button.size = size
+	menu.add_child(button)
+	return button
+
+
+func test_scrolls_the_mouse_wheel_where_asked() -> void:
+	await _command.execute({"steps": [{"wheel": "down", "at": [20, 30], "clicks": 2}]})
+	var wheel := _events_of("InputEventMouseButton").filter(func(event: InputEventMouseButton) -> bool: return event.button_index == MOUSE_BUTTON_WHEEL_DOWN)
+	assert_eq(wheel.map(func(event: InputEventMouseButton) -> bool: return event.pressed), [true, false, true, false])
+	assert_eq((wheel[0] as InputEventMouseButton).position, Vector2(20, 30))
+
+
+func test_drags_with_a_mouse_button_held() -> void:
+	var result: Dictionary = await _command.execute({"steps": [{"click": [10, 10], "state": "down"}, {"mouse_motion": [30, 0]}, {"click": [40, 10], "state": "up"}]})
+	var motions := _events_of("InputEventMouseMotion")
+	assert_eq((motions[-2] as InputEventMouseMotion).button_mask, MOUSE_BUTTON_MASK_LEFT)
+	var buttons := _events_of("InputEventMouseButton")
+	assert_eq(buttons.map(func(event: InputEventMouseButton) -> bool: return event.pressed), [true, false])
+	assert_eq((buttons[1] as InputEventMouseButton).position, Vector2(40, 10))
+	assert_eq(result["released"], [])
+
+
+func test_releases_a_held_mouse_button_at_the_end() -> void:
+	var result: Dictionary = await _command.execute({"steps": [{"click": [10, 10], "state": "down", "button": "right"}]})
+	assert_eq(result["released"], ["mouse right"])
+	var buttons := _events_of("InputEventMouseButton")
+	assert_eq(buttons.map(func(event: InputEventMouseButton) -> bool: return event.pressed), [true, false])
+
+
+func test_clicks_a_control_by_its_path() -> void:
+	var button := _add_button("Resume", Vector2(100, 100), Vector2(80, 30))
+	var result: Dictionary = await _command.execute({"steps": [{"click": "Menu/Resume"}]})
+	var buttons := _events_of("InputEventMouseButton")
+	assert_eq((buttons[0] as InputEventMouseButton).position, Vector2(140, 115))
+	assert_eq(result["clicked"], [{"step": 1, "path": "Menu/Resume", "at": [140, 115]}])
+	button.queue_free()
+
+
+func test_stops_at_a_control_it_cannot_click() -> void:
+	var button := _add_button("Resume", Vector2(100, 100), Vector2(80, 30))
+	button.visible = false
+	var result: Dictionary = await _command.execute({"steps": [{"click": "Menu/Resume"}, {"action": JUMP_ACTION}]})
+	assert_eq(result["failed_step"]["step"], 1)
+	assert_string_contains(result["failed_step"]["error"], "not visible")
+	assert_eq(_events_of("InputEventAction"), [])
+
+
+func test_refuses_to_click_a_node_that_is_not_a_control() -> void:
+	var result: Dictionary = await _command.execute({"steps": [{"click": "Watcher"}]})
+	assert_string_contains(result["failed_step"]["error"], "not a Control")
+
+
+func test_taps_and_drags_a_finger_on_the_touch_screen() -> void:
+	var result: Dictionary = await _command.execute({"steps": [{"touch": [50, 60], "state": "down", "finger": 1}, {"touch_drag": [20, 0], "finger": 1}, {"touch": [70, 60], "state": "up", "finger": 1}]})
+	var touches := _events_of("InputEventScreenTouch")
+	assert_eq(touches.map(func(event: InputEventScreenTouch) -> bool: return event.pressed), [true, false])
+	assert_eq((touches[0] as InputEventScreenTouch).index, 1)
+	var drags := _events_of("InputEventScreenDrag")
+	assert_eq((drags[0] as InputEventScreenDrag).position, Vector2(70, 60))
+	assert_eq((drags[0] as InputEventScreenDrag).relative, Vector2(20, 0))
+	assert_eq(result["released"], [])
+
+
+func test_stops_at_a_drag_of_a_finger_that_is_not_down() -> void:
+	var result: Dictionary = await _command.execute({"steps": [{"touch_drag": [20, 0]}]})
+	assert_string_contains(result["failed_step"]["error"], "not down")
+
+
+func test_takes_screenshots_at_moments_of_the_input_and_at_the_end() -> void:
+	var result: Dictionary = await _command.execute({"steps": [{"screenshot": true}, {"wait_physics_frames": 3}, {"screenshot": true}], "screenshot": true})
+	assert_eq(_moments.grabbed, 3)
+	assert_eq(_moments.saved_labels, PackedStringArray(["step 1, frame 0", "step 3, frame 3", "end, frame 3"]))
+	assert_eq(result["screenshot"]["path"], "/captures/moments-1-001.png")
+
+
+func test_refuses_more_screenshots_than_one_image_holds() -> void:
+	var steps: Array = []
+	for index in 7:
+		steps.append({"screenshot": true})
+	var error: Variant = await _command.execute({"steps": steps})
+	assert_true(error is GodotMcpCommandError)
+	assert_string_contains((error as GodotMcpCommandError).message, "6")
+
+
+func test_lists_the_signals_emitted_while_the_input_plays() -> void:
+	_watcher.add_user_signal("bumped", [{"name": "strength", "type": TYPE_INT}])
+	var emit_after_two_frames := func() -> void:
+		await _time.physics_frame_ended
+		await _time.physics_frame_ended
+		_watcher.emit_signal(&"bumped", 7)
+	emit_after_two_frames.call()
+	var result: Dictionary = await _command.execute({"steps": [{"wait_physics_frames": 4}], "watch_signals": [{"node": "Watcher", "signal": "bumped"}]})
+	var watched: Array = result["signals"]
+	assert_eq(watched.size(), 1)
+	assert_eq(watched[0]["node"], "Watcher")
+	assert_eq(watched[0]["signal"], "bumped")
+	var emissions: Array = watched[0]["emissions"]
+	assert_eq(emissions.size(), 1)
+	assert_eq(emissions[0]["step"], 1)
+	assert_eq(emissions[0]["arguments"], [7])
+
+
+func test_refuses_to_watch_a_signal_that_the_node_lacks() -> void:
+	var error: Variant = await _command.execute({"steps": [{"wait_physics_frames": 1}], "watch_signals": [{"node": "Watcher", "signal": "bumpd"}]})
+	assert_true(error is GodotMcpCommandError)
+	assert_string_contains((error as GodotMcpCommandError).message, "bumpd")
+	assert_eq(_recorder.events, [])
+
+
+func test_presses_a_button_by_its_path_in_a_paused_game() -> void:
+	var layer := CanvasLayer.new()
+	layer.name = "PauseMenu"
+	layer.process_mode = Node.PROCESS_MODE_ALWAYS
+	_arena.add_child(layer)
+	var button := Button.new()
+	button.name = "Resume"
+	button.text = "Resume"
+	button.position = Vector2(500, 280)
+	button.size = Vector2(70, 31)
+	layer.add_child(button)
+	var presses: Array = []
+	button.pressed.connect(func() -> void: presses.append(true))
+	get_tree().paused = true
+	await _command.execute({"steps": [{"click": "PauseMenu/Resume"}]})
+	get_tree().paused = false
+	assert_eq(presses.size(), 1)
+
+
+func test_presses_a_button_by_its_path() -> void:
+	var button := Button.new()
+	button.name = "Plain"
+	button.text = "Plain"
+	button.position = Vector2(300, 200)
+	button.size = Vector2(70, 31)
+	_arena.add_child(button)
+	var presses: Array = []
+	button.pressed.connect(func() -> void: presses.append(true))
+	await _command.execute({"steps": [{"click": "Plain"}]})
+	assert_eq(presses.size(), 1)

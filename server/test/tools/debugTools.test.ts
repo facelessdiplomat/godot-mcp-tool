@@ -90,6 +90,13 @@ class FakeGameDebugger implements GameDebugService {
     return Promise.resolve(jumpVariables);
   }
 
+  readonly evaluations: [string, number][] = [];
+
+  evaluate(expression: string, frame: number): Promise<string> {
+    this.evaluations.push([expression, frame]);
+    return Promise.resolve('8.5');
+  }
+
   resume(action: ResumeAction): Promise<GameStop | undefined> {
     this.resumes.push(action);
     if (this.stop === undefined) {
@@ -204,9 +211,19 @@ describe('debug_state', () => {
         '- direction = (0, 0, -1)',
         'Members of #0:',
         '- velocity = (0, -9.8, 0)',
-        'Resume with debug_continue: action "continue", "step_over" or "step_into".',
+        'Resume with debug_continue: action "continue", "step_over", "step_into" or "step_out".',
       ].join('\n'),
     );
+  });
+
+  it('evaluates an expression in the shown frame', async () => {
+    const service = new FakeGameDebugger();
+    service.stop = stopAtJump;
+
+    const result = await createDebugStateTool(service, readScript).execute({ frame: 1, expression: 'velocity.y + 1' });
+
+    expect(service.evaluations).toEqual([['velocity.y + 1', 1]]);
+    expect(textOf(result).split('\n').at(-2)).toBe('velocity.y + 1 = 8.5 (evaluated in #1)');
   });
 
   it('names the error the game stopped on and refuses a frame the stack does not have', async () => {
@@ -243,7 +260,10 @@ describe('debug_continue', () => {
     const continued = await createDebugContinueTool(service, readScript).execute({});
     const stepped = await createDebugContinueTool(service, readScript).execute({ action: 'step_over' });
 
-    expect(service.resumes).toEqual(['continue', 'step_over']);
+    const steppedOut = await createDebugContinueTool(service, readScript).execute({ action: 'step_out' });
+
+    expect(service.resumes).toEqual(['continue', 'step_over', 'step_out']);
+    expect(textOf(steppedOut).split('\n')[0]).toBe('Stepped out to res://player.gd:9 in _physics_process:');
     expect(textOf(continued)).toBe('The game continues. debug_state with wait_ms waits for it to stop at the next breakpoint.');
     expect(textOf(stepped)).toBe(
       [

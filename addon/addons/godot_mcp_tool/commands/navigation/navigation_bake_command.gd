@@ -3,6 +3,7 @@ extends "../command.gd"
 const GodotMcpChangeSet := preload("../../scene/change_set.gd")
 const GodotMcpEditingContext := preload("../../scene/editing_context.gd")
 const GodotMcpIndefiniteArticle := preload("../../util/indefinite_article.gd")
+const GodotMcpInstancedScenes := preload("../../scene/instanced_scenes.gd")
 const GodotMcpNavigationBakeReport := preload("../../navigation/navigation_bake_report.gd")
 const GodotMcpNodeFactory := preload("../../scene/node_factory.gd")
 const GodotMcpNodeLocator := preload("../../scene/node_locator.gd")
@@ -71,7 +72,8 @@ static func _regions_to_bake(scene_root: Node, region_path: String) -> Variant:
 				"%s is %s, not a NavigationRegion3D" % [region_path, GodotMcpIndefiniteArticle.before(GodotMcpNodeFactory.display_class(node))],
 				"Pass the path of a NavigationRegion3D, or leave path out to bake every one in the scene.",
 			)
-		return [node]
+		var refusal := GodotMcpInstancedScenes.refusal_for_part_of(node, scene_root, "navigation mesh")
+		return [node] if refusal == null else refusal
 	var regions: Array = []
 	_collect_regions(scene_root, scene_root, regions)
 	if regions.is_empty():

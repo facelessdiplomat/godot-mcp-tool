@@ -1625,7 +1625,8 @@ The whole integration suite, run next to that editor, found two more problems:
 - [x] A Claude Code plugin that bundles the MCP server configuration, the `.gd` validation hook and the skill:
       the plugin `godot` in `plugin/` starts the server with `npx -y godot-mcp-tool@<version>`, pinned to the version
       of the package, and asks for the Godot executable, which may stay empty; its `PostToolUse` hook runs
-      `godot-mcp-tool check-edited-script` after every `Write` or `Edit` of a `.gd` file, which checks the file with
+      `godot-mcp-tool check-edited-script` after every `Write` or `Edit` of a `.gd` (and, since milestone 7, a
+      `.gdshader`) file, which checks the file with
       the editor's language server or with `godot --check-only` and shows Claude the errors (exit code 2) or adds the
       warnings to its context, and says nothing about clean scripts, other files or projects it cannot check. The
       repository is the marketplace `godot-mcp-tool` (`.claude-plugin/marketplace.json`), and `claude plugin validate`
@@ -1691,42 +1692,67 @@ Store waits for your go-ahead.
 Milestones 6–9 come from the gap analysis of 2026-11-17 (§8.14). This one mostly extends existing tools, so it is
 cheap and touches every session.
 
-- [ ] Nodes inside instanced scenes. `scene_get_tree` and `node_find` list only the nodes that the scene root owns
-      (`scene_tree_describer.gd`), `node_delete`, `node_reparent` and `node_duplicate` refuse the nodes of an
-      instance, and nothing calls `set_editable_instance`. `node_set_properties` does take a path into an instance,
-      such as `Enemy2/Mesh`: the locator resolves it and the change is not checked against the instance. First check
-      what the saved scene keeps of such a change: if the editor shows it and the file drops it, that is a silent
-      write failure (§9.1) in a released tool and is fixed before the rest. Then: `expand_instances` in
-      `scene_get_tree` and `node_find`; a change inside an instance turns on its Editable Children in the same Undo
-      step, and the result says so; `node_save_as_scene` and `node_make_local`, also as operations of
-      `scene_batch_edit`.
-- [ ] Property paths into sub-resources: `mesh:size` or `material_override:albedo_color` in `node_get_properties`,
-      `node_set_properties`, `resource_get` and `resource_set_properties`. The codec takes a resource as a path, as
-      `{"new": …}` or as `null` (`resource_converter.gd`), so changing one property of a built-in material means
-      creating the material again with all its properties.
-- [ ] `editor_get_state`: the scene on screen, the nodes the user selected and the script open in the script editor
-      with its caret line. The addon reads the selection only for its own use (`editor_scene_access.gd`), so "make
-      this node red" has no meaning for the agent yet.
-- [ ] Options of `game_run`: `debug_draw` (`collisions`, `navigation`, `paths`), `arguments` for the game after
-      `--`, `window_size` and `locale`. `run_arguments.gd` knows only `--ignore-error-breaks`, `--fixed-fps` and
-      `--headless`; collision shapes and navigation meshes drawn into a screenshot show at once why a body falls
-      through a floor or a path takes a detour. The engine flags are checked against `godot --help` of the pinned
-      build first.
-- [ ] Steps of `game_input`: `wheel`; a mouse button with `state: "down"` and `"up"`, for drags and for cameras that
-      orbit while a button is held; `touch` and `touch_drag`; `click` on a `Control` by its node path instead of
-      pixels; `screenshot` at an exact moment, like `read`. The runtime agent creates action, key, joypad, mouse
-      button and mouse motion events only (`game_input_command.gd`).
-- [ ] `controls` in `game_get_tree`: every visible `Control` with its rectangle in game-view pixels, its text and
-      whether it is disabled or focused, so a menu is read without a screenshot.
-- [ ] Signals of the running game: `signal` in `game_wait` waits until a node emits a signal and returns its
-      arguments; `watch_signals` in `game_input` lists the emissions during the input with their physics frames.
-      `game_wait` takes an expression only, so "is `died` emitted once" needs temporary `print` calls today.
-- [ ] Frame strips: `frames` in `game_screenshot` puts up to six moments, a given number of physics frames apart,
-      into one labelled image, as `views` does for angles. One frame cannot show an animation, a camera move or an
-      effect, and animation is where models struggle most (§8.9).
+- [x] Changes inside instanced scenes are saved. The check confirmed a silent write failure (§9.1) in released
+      tools: `node_set_properties` on `Enemy2/Mesh` reported the value as applied and the editor showed it, but the
+      saved scene dropped it, because the scene packs only nodes that it owns or that lie in an instance with
+      Editable Children (Appendix B). Groups, signal connections from such nodes, nodes added under them and
+      `node_call_method` lost their changes the same way. Now each of these edits, alone or in `scene_batch_edit`,
+      turns on Editable Children of every instance between the node and the scene root in the same Undo step, as the
+      editor's toggle does, and the result names those instances; the change applies to that instance only.
+      `animation_set`, `animation_delete`, `animation_tree_set` and `navigation_bake` refuse a node inside an
+      instance and name its scene, because the instances share its animation libraries and navigation meshes, so a
+      change would reach every instance and be saved by no scene. `signal_disconnect` refuses a connection that an
+      instanced scene makes, as the editor's Signals dock does, and names that scene. Unit tests check what
+      `PackedScene.pack()` keeps; an integration test saves a scene through a headless editor, reads the file, undoes
+      the change in the editor and saves again.
+- [x] Nodes inside instanced scenes in the read tools, and new instance tools. `scene_get_tree` and `node_find`
+      show the nodes of instances with Editable Children, as the Scene dock does, mark such instances, and with
+      `expand_instances` show and search the nodes of every instance; otherwise they say that instances hide nodes.
+      `signal_list` lists the connections that the scene itself saves, those from nodes of editable instances
+      included, and marks the ones an instanced scene makes. `node_save_as_scene` (Save Branch as Scene) writes a
+      branch to a new file with its root at the origin and puts an instance in its place with the old transform and
+      the connections of the old root; `node_make_local` (Make Local) takes over the nodes of an instance and the
+      connections its scene made. Both are operations of `scene_batch_edit` too, and a batch that fails deletes the
+      file it wrote. Building them found a silent failure in `node_duplicate`: `Node.duplicate()` from a script
+      instances scenes without their instance state, so a duplicated instance was saved with all its properties and
+      with the connections of its own scene again, which Godot reports as "already connected" when the scene loads.
+      Both duplicate now with the editor's flag (Appendix B).
+- [x] Property paths into sub-resources: `mesh:size` or `material_override:albedo_color` in `node_get_properties`,
+      `node_set_properties`, `resource_get` and `resource_set_properties`, and in the running game; paths into a value,
+      such as `position:y`, change one part and keep the others, also several parts of one value in one call. Each
+      change is one Undo step with the rest. A path through a resource file, or through a built-in resource of an
+      instanced scene, is rejected with the way out: `resource_set_properties` for the file, or the node's own
+      resource with `{"new": …}`, because a change in place would reach every user and, for an instanced scene, be
+      saved by no scene. A path through an empty resource says how to create it with its values at once.
+- [x] `editor_get_state`: the scene on screen and the main screen (3D, 2D or Script), the nodes selected in the Scene
+      dock with their types, the files selected in the FileSystem dock, the script open in the script editor with the
+      line of its caret and the selected text, and the open scenes, so "make this node red" has a meaning.
+- [x] Options of `game_run`: `debug_draw` (`collisions`, `navigation`, `paths`, `avoidance`), `arguments` for the
+      game after `--`, `window_size` and `locale`, checked against `godot --help` of the pinned build (Appendix B).
+      Runs from the editor add them to the editor's own arguments without repeating a flag that the Debug menu
+      already adds; runs without the editor pass them to the Godot process. Integration tests read
+      `debug_collisions_hint`, the user arguments and the locale inside the game for both kinds of run.
+- [x] Steps of `game_input`: `wheel` with notches and a position; a mouse button with `state: "down"` and `"up"`,
+      whose held buttons go into the `button_mask` of mouse motion, so that drags and orbiting cameras work; `touch`
+      and `touch_drag` with fingers 0–9; `click` on the middle of a visible `Control` by its node path, reported with
+      the position it clicked; and `screenshot` at an exact moment, like `read`. Up to six screenshots of one input,
+      the final one included, come back as one labelled image (`moment_camera.gd`). A step that cannot run, such as
+      a click on a hidden Control or a drag of a finger that is not down, stops the input and is reported with the
+      reason. A windowed integration test clicks a toggle button by its path and checks it in the game.
+- [x] `controls` in `game_get_tree`: every visible button, label, text field, range, list, tab bar and tree with its
+      rectangle in game-view pixels, its text or value, and whether it is disabled, pressed or focused, so a menu is
+      read without a screenshot; containers and panels are left out, and the result names a control to click.
+- [x] Signals of the running game: `signal` in `game_wait` waits until a node emits a signal and returns its
+      arguments; `watch_signals` in `game_input` lists every emission during the input with its step, physics frame
+      and arguments. Both connect a variadic GDScript method (`...arguments`, Godot 4.5 and later), so signals with
+      any number of arguments work, and disconnect it again, also from a node freed meanwhile.
+- [x] Frame strips: `frames` in `game_screenshot` puts two to six moments, `every_physics_frames` apart, into one
+      labelled image, as `views` does for angles; while `game_pause` holds the game, it plays exactly those frames
+      and pauses again. The strip and the screenshots of `game_input` share `moment_camera.gd`, which labels each
+      frame in a `SubViewport` and lays them out like the views.
 
-Order of work: the check of property changes inside instances first, because it may be a bug in a released tool;
-then the instance tools and the property paths, which share the property code; the options of `game_run` and the
+Order of work: the check of property changes inside instances first, because it may be a bug in a released tool
+(done: it was, and it is fixed); then the instance tools and the property paths, which share the property code; the options of `game_run` and the
 steps of `game_input`, which depend on nothing else; signals; frame strips; `editor_get_state`; the acceptance test
 and an evaluation scenario for each capability.
 
@@ -1736,31 +1762,71 @@ the player must emit `landed` exactly once." The saved scene keeps the red mater
 clicks Resume by its node path, one frame strip shows the jump with the shapes drawn, and the single emission of
 `landed` comes from `watch_signals`.
 
+Status: done. The scenario passes as the automated acceptance test
+`server/test/integration/milestone6Scenario.test.ts`, headless or with a window when `GODOT_MCP_WINDOW_TESTS=1`: it
+paints `Enemy2` red through Editable Children and leaves `Enemy1`, `Enemy3` and `res://enemy.tscn` as they were, reads
+the selection back with `editor_get_state`, runs the game with collision shapes drawn, opens the pause menu, lists its
+controls and clicks Resume by its path, sees `landed` emitted once in a jump, and with a window shows the jump as a
+strip of four frames. Three new evaluation scenarios, `paint-one-enemy`, `land-once` and `resume-the-menu`, pass with
+their reference solutions; runs with an agent are still to do. Preparing them found two problems, now fixed:
+
+- A click by path did nothing in a game without a window: the headless display server gives the root window 64×64
+  pixels, so every point outside it counts as outside the window, no control is hovered and buttons ignore the press.
+  The runtime agent now gives the root window of a headless game the window size of the project, which also lays out
+  its interface as a window would (Appendix B).
+- `node_duplicate` saved duplicated instances with all their properties and the connections of their own scene again
+  (above).
+
 ### Milestone 7 — 3D content
 
-- [ ] Ray casts: `scene_raycast` returns the position, normal and node that a ray hits in the open scene, or in the
-      running game with `in_game`, where it also answers "what is under the player" and "does the enemy see the
-      player"; `node_snap_to_floor` moves nodes down until their bounds rest on what is below, as one Undo step.
-      `node_get_bounds` is the only spatial check today, so objects are placed from computed coordinates, which
-      fails on uneven ground and in imported levels. Spike first: whether the physics space of the edited scene
-      answers `intersect_ray` for shapes added in the same call, and how to hit meshes that have no collision.
-- [ ] `node_add_collision`: a collision for a `MeshInstance3D` built from its mesh — trimesh, convex, several
-      convex shapes, or a box, sphere or capsule fitted to its bounds — as one Undo step, also an operation of
-      `scene_batch_edit`. `create_trimesh_collision()`, `create_convex_collision()` and
-      `create_multiple_convex_collisions()` are bound (API dump of 4.8 beta 2) but reachable only through
-      `node_call_method`, which is off by default; imported models already get theirs from the import settings.
-- [ ] Animation beyond property tracks. `animation_set` writes value tracks only (`animation_track_planner.gd`): add
-      method-call tracks, for footsteps and hit moments, and audio tracks. `animation_tree_set` builds states that
-      each play one animation: add states that blend animations by a parameter (`AnimationNodeBlendSpace1D` and
-      `AnimationNodeBlendSpace2D`), the usual setup for walking and running by speed. `animation` in
-      `editor_screenshot` renders the poses of an animation at given times without running the game.
-- [ ] Shaders: `script_validate` and the plugin's hook check `.gdshader` files. Nothing checks them today, so the
-      agent learns of a shader error from the editor's log after a run. Spike first: how to get the compile errors
-      of one shader file with their lines; the addon's `Logger` already receives shader errors (§9.6).
-- [ ] UI and 2D scenes in the editor. `editor_screenshot` refuses a scene whose root is a `CanvasItem`, so a HUD or
-      a menu can be seen only in a running game with a window. Render such a scene at the window size of the project
-      or at given `sizes`, such as 16:9 and 4:3 in one image; `node_get_bounds` returns the rectangle of a `Control`
-      or a 2D node.
+- [x] Ray casts: `scene_raycast` returns the position, normal, distance and node that a ray hits in the open scene, or
+      in the running game with `in_game`, straight down by default or between two points; `node_snap_to_floor` moves
+      nodes down or up until their bottom rests on what is below, as one Undo step, taking the bottom from collision
+      shapes first and meshes second, as the editor's Snap Object to Floor does. The spike answered both questions:
+      the edited scene's physics space answers `intersect_ray` after one physics frame, also for CSG shapes added just
+      before; and meshes without collision are hit through `Mesh.generate_triangle_mesh()` and
+      `TriangleMesh.intersect_segment()`, so each hit says whether it met a collision shape or a visible mesh, and the
+      nearer of the two wins. A ray starting inside an excluded node passes through it.
+- [x] `node_add_collision`: a collision for a `MeshInstance3D` built from its mesh — trimesh, convex, simplified
+      convex, several convex shapes, or a box, capsule, cylinder or sphere fitted to its bounds — as one Undo step,
+      also an operation of `scene_batch_edit`. It mirrors Mesh → Create Collision Shape of the editor
+      (`mesh_instance_3d_editor_plugin.cpp`): a `StaticBody3D` child with the shapes by default, or `CollisionShape3D`
+      siblings for a mesh that is already part of a body; capsules and cylinders turn toward the longest side of the
+      mesh or a given axis. The result compares the size of the collision with the size of the mesh, so a wrong fit
+      shows without a picture. Shapes are built through `Mesh.create_trimesh_shape()`,
+      `Mesh.create_convex_shape()` and, for several hulls, `create_multiple_convex_collisions()` on a temporary
+      `MeshInstance3D`, so no node outside the Undo action is touched.
+- [x] Animation beyond property tracks. `animation_set` takes method tracks (`{"type": "method"}`, keys with a
+      method and its arguments, checked against the methods of the node and decoded by their parameter types, as
+      `node_call_method` does) and audio tracks (`{"type": "audio"}` on an `AudioStreamPlayer`, `2D` or `3D`, keys
+      with a stream and offsets); only value tracks get RESET keys, and `animation_get` shows method keys as calls
+      and audio keys as stream paths. `animation_tree_set` takes blend states: `{"name": "move", "blend": [{"animation":
+      "walk", "at": 2}, {"animation": "run", "at": 6}]}` builds an `AnimationNodeBlendSpace1D`, points at `[x, y]` an
+      `AnimationNodeBlendSpace2D`; limits default to the outermost points, points get names of their own (required
+      since 4.8), and points of a two-dimensional blend on one line are rejected because no triangle can blend them.
+      The result names `parameters/<state>/blend_position`. `animation` in `editor_screenshot` poses the scene at up
+      to six times through a temporary internal `AnimationPlayer` that carries only the value, transform and blend
+      shape tracks, so methods stay uncalled and sounds silent, and puts every animated value back afterwards
+      (`AnimationMixer.make_backup()` is not bound).
+- [x] Shaders: `script_validate` and the plugin's hook check `.gdshader` files. The spike answered the question:
+      `Shader.code` followed by `Shader.get_rid()` compiles at once, also in the dummy renderer of a headless Godot,
+      and `ShaderCompiler` reports the first error through `_err_print_error` with `ERR_HANDLER_SHADER`, so a
+      `Logger` added for the call receives it with its line, and with the include file and its line when the error
+      sits in a `.gdshaderinc` (`set_include_path()` lets relative includes resolve). The command `shader.validate`
+      runs in the editor or in the headless project query; `RenderingServer.get_shader_parameter_list()` waits for
+      a renderer on its own thread. `script_validate` sorts `.gd` and `.gdshader` files of its paths apart, reports
+      shaders after scripts and leaves the errors it reported out of the next summary of new editor errors; a
+      `.gdshaderinc` is checked through the shaders that include it.
+- [x] UI and 2D scenes in the editor. `editor_screenshot` renders a scene whose root is a `CanvasItem` at the
+      window size of the project or at given `sizes`, such as 16:9 and 4:3 in one image, each with its size and
+      aspect in a caption strip below it, so that no caption covers a HUD corner. A copy of the scene (without its
+      file path, so the editor does not take it for an open scene) is laid out in a `SubViewport` the way the game
+      window would: the stretch mode and aspect of the project give the layout size (`size_2d_override` with
+      stretch), and `keep` letterboxes. `node_get_bounds` returns the rectangle of a `Control` or a 2D node in canvas
+      pixels, from controls, sprites, polygons, lines, meshes and tile maps, or from 2D collision shapes, and says
+      whether a control fits the window; a UI scene read from disk is first laid out in a viewport of the window
+      size, because the editor gives only the edited root `Control` the project size
+      (`Control::get_parent_anchorable_rect()`).
 - [ ] `gridmap_get_cells` / `gridmap_set_cells`, still only when an evaluation needs them (milestone 4).
 
 Order of work: the spike on ray casts, then `scene_raycast` and `node_snap_to_floor`; `node_add_collision`; the
@@ -1773,26 +1839,50 @@ speed, and show me the HUD at 16:9 and at 4:3." The bottom of each crate lies wi
 under it, the rock stops the player in the running game, the footsteps are counted there, the blend position follows
 the speed, and one image shows the HUD at both sizes.
 
+Status: done, except `gridmap_*`, which still waits for an evaluation that needs it. The scenario passes as the
+automated acceptance test `server/test/integration/milestone7Scenario.test.ts`, headless or with a window when
+`GODOT_MCP_WINDOW_TESTS=1`: ten instanced crates dropped from 9 m rest on a hill that got its trimesh collision through
+`node_add_collision` in the same batch, each bottom within a centimeter of the hill under its center by
+`scene_raycast`; the walker stops at the rock with its convex collision; the walk cycle calls `_on_footstep` twice a
+second; the blend position is 2 while walking and 0 at the rock; and with a window one image shows the HUD at 16:9 and
+4:3 while `node_get_bounds` places its health bar inside the window. Three new evaluation scenarios,
+`crates-on-the-hill`, `footsteps-and-blend` and `hud-at-two-sizes`, pass with their reference solutions; runs with an
+agent are still to do. Two timing assumptions in older tests with a window gave way under load: the first screenshot
+of a strip or of an input can come one physics frame after its start, which the labels report truthfully, so the
+tests now accept it.
+
 ### Milestone 8 — Project life cycle
 
-- [ ] `project_create` and an `init` command of the package: a new project in an empty folder — `project.godot` with
-      the name, the renderer, the 3D physics engine and the window size, the addon installed and enabled, and a main
-      scene. Without a `project.godot` the server only asks for `GODOT_PROJECT_PATH` (`ProjectLocator.ts`), while
-      "make a game from scratch" is a common first request. Spike first: how a server that Claude Code started in a
-      folder without a project takes up the new one without a restart.
-- [ ] `test_install_framework` and `plugin_set_enabled`. Without a test framework `test_run` tells the user to
-      install one from the Asset Library, which breaks the loop. Install GUT or gdUnit4 at the versions that
-      `scripts/install-gut.sh` and `scripts/install-gdunit4.sh` pin and enable the plugin with
-      `EditorInterface.set_plugin_enabled()`. The tool downloads code, so Claude Code asks before every call
-      (`requiresUserInteraction`, §8.12).
-- [ ] `editor_undo` / `editor_redo`. Every agent command is an Undo action named "MCP: …" (§9.2), but the agent
-      cannot take one back except by building the opposite change. Undo or redo the last actions of a scene's
-      history and return their names; by default only while they are the agent's own.
-- [ ] Spike: export presets. `EditorExportPlatform.create_preset()` is bound, but `EditorExportPreset` has only
-      getters and no bound class adds a preset to the editor's list (API dump of 4.8 beta 2), and the editor writes
-      its own list over `export_presets.cfg` (§8.8). To find out: whether a preset written to the file while no
-      editor runs is enough for `export_project`, which reads the file in a process of its own. A tool follows only
-      if it is.
+- [x] `project_create` and an `init` command of the package: a new project in an empty folder (hidden files and
+      notes may be there) — `project.godot` with the name, the renderer, Jolt Physics, the window size and the
+      settings the project manager gives new projects (`EditorNode::get_initial_settings()` is applied only to an
+      empty `project.godot`), a main scene with a camera and a light, `.gitignore`, `.gitattributes`,
+      `.editorconfig`, and the addon installed with its plugin enabled. The spike answered the question: a server
+      that started without a project registers its tools as followers of the current application; `project_create`
+      hands the new root over, and the next call builds the application for it (editor connection, launcher, game
+      gateway) and drops the old one, so `editor_launch` right after it starts the editor of the new project without
+      a restart. A project that appears in the working folder by other means is taken up the same way.
+- [x] `test_install_framework` and `plugin_set_enabled`. The installer fetches GUT 9.7.1 or gdUnit4 6.2.2 with
+      `git clone --depth 1 --branch <tag>`, refuses a tag that no longer points at the pinned commit, copies
+      `git archive` of the addon folder into `res://addons`, rescans the editor and enables the plugin; Claude Code
+      asks before every call (`requiresUserInteraction`, `openWorldHint`). `plugin_set_enabled` goes through
+      `EditorInterface.set_plugin_enabled()` in a running editor, then saves `project.godot` at once, since the editor
+      would write the plugin and the autoloads it adds only 1.5 s later; without an editor it edits `[editor_plugins]`
+      of `project.godot`. It refuses to turn the godot MCP plugin off, and when a plugin is off it names the autoloads
+      from its folder that are still in `project.godot` (Appendix B). `test_run` names the installer when no
+      framework is found.
+- [x] `editor_undo` / `editor_redo`. `EditorUndoRedoManager.undo()` is not bound, so the commands step the
+      `UndoRedo` of the scene's history (`get_history_undo_redo(get_object_history_id(root))`) and emit
+      `version_changed` of the manager, which the editor uses to refresh the unsaved marks and the Undo menu. By
+      default they stop at an action that is not named "MCP: …"; the result names what was undone and what comes
+      next. After such an undo the editor's own Ctrl+Shift+Z may find nothing to redo, because the manager keeps its
+      own list of actions; `editor_redo` redoes them.
+- [x] Spike: export presets. The answer is yes: `EditorExport::load_config()` makes each preset with
+      `create_preset()` of its platform, which holds the default options, and sets only the options the file names,
+      so a preset of a few lines is enough for `export_project`, whose export runs in a process of its own. The
+      editor reads the file only when it starts (`should_reload_presets` is set when platforms change) and writes its
+      own list when presets change in the Export dialog. `export_preset_add` writes such a preset — runnable when it
+      is the first of its platform, exporting to `build/<platform>/<game name>` — and says so when an editor runs.
 
 Order of work: the spike on a server without a project, then `project_create` and `init`; `plugin_set_enabled` and
 `test_install_framework`; `editor_undo` and `editor_redo`; the spike on export presets; the acceptance test.
@@ -1801,22 +1891,44 @@ Order of work: the spike on a server without a project, then `project_create` an
 moves." The agent creates the project, starts the editor, installs GUT after the one confirmation, writes the test
 first and runs it green; nothing else is done by hand.
 
+Status: done. The scenario passes as the automated acceptance test
+`server/test/integration/milestone8Scenario.test.ts` when `GODOT_MCP_NETWORK_TESTS=1`, because it downloads GUT
+from GitHub: in an empty folder the server creates "Capsule Walk", starts its editor, installs and enables GUT, builds
+a capsule scene and a floor, sees the test of the walking capsule fail while the capsule stands still and pass once it
+walks, with `script_validate` clean in between. `projectCreation.test.ts` covers the server that takes up the new
+project without a restart, and `exportProject.test.ts` exports a pack with a preset that `export_preset_add` wrote
+while no editor ran. Runs with an agent are still to do.
+
 ### Milestone 9 — Code and debugging
 
-- [ ] `script_rename_symbol`: rename a function, variable, signal or class across the project, also in the method
-      names of signal connections in scenes and of method tracks in animations, which a rename in code alone leaves
-      broken. Spike first: which requests the editor's language server answers besides diagnostics; the server uses
-      `didOpen`, `didClose` and `publishDiagnostics` only (`LanguageServerClient.ts`).
-- [ ] Debugger: `expression` in `debug_state` evaluates in the stack frame, `step_out` in `debug_continue` leaves
-      the current function, `break_on_error` in `game_run` stops the game at the first script error as at a
-      breakpoint. The server sends neither `evaluate` nor `stepOut` to the debug adapter; check first which of them
-      the adapters of 4.7 and 4.8 answer.
-- [ ] `game_performance`: the custom monitors of the game (`Performance.get_custom_monitor_names()`), and the
-      functions that take the most time. The tool reads a fixed list of monitors, which shows that script time is
-      high but not where. Spike first: whether the times of single functions reach a script through the profilers
-      of `EngineDebugger` (`profiler_enable()` and `register_profiler()` are bound).
-- [ ] `docs_class`: the `@GDScript` page with annotations such as `@export_range` and `@rpc`, and the default values
-      of engine properties, both missing since milestone 2 (§8.6).
+- [x] `script_rename_symbol`: the spike found that the editor's language server answers `textDocument/rename`,
+      `prepareRename` and `references` (`GDScriptTextDocument`), renaming every identifier it can resolve to the
+      same symbol in all scripts of the project. The tool finds the declaration in the given script, refuses while
+      the editor holds unsaved files, opens every script with the language server, applies its edits, then lets the
+      addon rename what code alone leaves broken: the method of signal connections to nodes with the script (also
+      through an instanced scene whose root has it), the keys of method tracks in files that use the script, saved
+      values and animated paths of a renamed variable, and connections of a renamed signal; open scenes are
+      reloaded. Places that still name the old symbol — strings in `call()` or `has_method()`, untyped calls — are
+      listed to check by hand.
+- [x] Debugger. The debug adapter of 4.8 answers `evaluate` in two steps: the first request only forwards the
+      expression to the game and gets no answer, a repeated one returns the value once the game sent it, so
+      `debug_state` with `expression` asks again every 250 ms. It has no `stepOut`, and it reports no stop after a
+      step it did not start itself, so `step_out` in `debug_continue` sends the remote debugger's own `"out"` command
+      through the addon's `EditorDebuggerSession` and waits for the stack to change. `break_on_error` in `game_run`
+      leaves out `--ignore-error-breaks`, so the game stops at its first script error as at a breakpoint; a game run
+      without the editor refuses it.
+- [x] `game_performance`: the custom monitors of `Performance.add_custom_monitor()`, sampled every frame, and the
+      script functions that took the most time of their own. The spike answered the question: function times do not
+      reach a script in the game, but the editor's `EditorDebuggerSession.toggle_profiler("servers", …)` turns on the
+      game's script profiler, and turning it off makes the game send `servers:profile_total` with the accumulated
+      times and `servers:function_signature` names (`path::line::function`, the line where the body starts). The
+      editor parses those messages itself, so the addon reads them from the `debug_data` signal of its
+      `ScriptEditorDebugger`, leaving out its own measuring code and functions that did not run.
+- [x] `docs_class`: the `@GDScript` page and the default values of engine properties come from the help cache that
+      the editor writes when it starts (`editor_doc_cache-<major>.<minor>.res` in its cache folder, a resource whose
+      `classes` meta holds every class of the help, `@GDScript` with its annotations included). A script run with
+      `godot --headless --script` turns it into JSON, cached next to the API dump per version and cache file. Without
+      that cache the reference stays as before.
 
 Order of work: the spikes on the language server and the debug adapter, since they decide what the tools can offer;
 `script_rename_symbol`; the debugger options; `game_performance`; the `@GDScript` page; the acceptance test.
@@ -1825,16 +1937,32 @@ Order of work: the spikes on the language server and the debug adapter, since th
 game slow." The scripts, the signal connections of the scenes and the method tracks name `apply_damage`, the game
 runs without errors, and the agent names the slow function from `game_performance`, not from reading the code.
 
+Status: done. The scenario passes as the automated acceptance test
+`server/test/integration/milestone9Scenario.test.ts`: `script_rename_symbol` renames `take_damage` in both scripts,
+in the signal connection and in the method track of the scene, with nothing left to check, the game runs without
+errors, and `game_performance` names `plan_routes` first among the slow functions. Two new evaluation scenarios,
+`rename-everywhere` and `find-the-slow-function`, pass with their reference solutions; runs with an agent are still to
+do. Writing the scene part of the rename found that static variables of addon scripts stay `null` in the editor,
+because the editor does not run the static initializers of scripts that are not `@tool` (Appendix B).
+
 ### Alongside milestones 6–9 — Platform
 
-- [ ] Progress notifications for long calls: `editor_launch` waits up to three minutes, `test_run` five by default
-      and `export_project` ten, all without a word until they end; also `game_run` with `duration_ms` and the first
-      import of a project. Check first how Claude Code shows them.
-- [ ] CI on Windows and macOS. Every job runs on Ubuntu 24.04, development happens on macOS, and Windows, where
-      other servers fail most (§5), is tested nowhere. Start with the unit tests and one integration test with a
-      headless editor on each.
+- [x] Progress notifications for long calls. Every tool call whose request carries a `progressToken` gets a
+      `notifications/progress` every five seconds while it runs, with the elapsed time as progress and a message
+      such as "test_run is still working (25 s)", so a client can show that `editor_launch`, `test_run`,
+      `export_project` or a long `game_run` are alive and reset its timeout. Whether Claude Code shows them is still
+      to see in a session.
+- [x] CI on Windows and macOS. The job "Unit tests and an editor" runs the types, the unit tests and the build on
+      `windows-2025` and `macos-15`, downloads the official Godot build of the stable version checked against the
+      release's `SHA512-SUMS.txt`, and starts the editor from the server (`editorLaunch.test.ts`). Test projects link
+      the addon as a junction, which Windows allows without extra rights. Its first runs show what fails there.
 - [ ] An evaluation scenario in `docs/evals/` for every new capability and a third full run; the comparison with an
-      existing server (§13), which the results still lack.
+      existing server (§13), which the results still lack. Done: twelve scenarios for milestones 6–9, each passing
+      with its reference solution and failing its checks when left unsolved: `fix-the-water-shader`,
+      `bring-back-the-pillars`, `turn-on-a-plugin` and `exports-for-windows-and-linux` cover shaders, undo,
+      plugins and export presets. Writing `turn-on-a-plugin` found that `plugin_set_enabled` returned before the
+      editor wrote `project.godot`, so a game started right after it ran without the plugin's autoload; the addon now
+      saves at once. Left: every run with an agent, which needs `CLAUDE_BIN`.
 - [ ] Left from milestone 5: the check of the user guides on a fresh project and the publication to the Godot Asset
       Store.
 
@@ -2255,6 +2383,26 @@ Checked against the sources in `~/Software/godot` (`master`, 4.8-beta, commit `6
 | Since 4.6 the editor stores an autoload that it adds as `*uid://…` when the script already has a UID, and as `*res://…` otherwise; the addon resolves both | `editor/settings/editor_autoload_settings.cpp` (2025-10), observed on 4.7.2 |
 | `EditorPlugin._run_scene` and `EditorDock` exist since 4.6; `ScriptEditor.reload_open_files()`, `EditorInterface.get_unsaved_scenes()` and `ScriptEditor.get_unsaved_files()` since 4.7. A script that names a class its engine lacks, or calls a method that an engine singleton lacks, fails to parse, and so does every script that preloads it, while a method that an object lacks fails only when it is called | `editor/plugins/editor_plugin.cpp`, `editor/script/script_editor_plugin.cpp`, `editor/editor_interface.cpp` (their history), observed on 4.5.2 |
 | `MeshInstance3D.skeleton` defaults to `..` on 4.5 and to an empty path since 4.6, so on 4.5 every mesh holds a node path to its parent; moving a node therefore reports only the node paths whose text changes | `scene/3d/mesh_instance_3d.cpp` (2025-10), observed on 4.5.2 |
+| `SceneState::_parse_node` packs a node only when the scene root owns it or its owner is an instance with Editable Children (`Node.set_editable_instance`); any other node inside an instance is skipped with its properties, groups and children, also those the scene added, and `_parse_connections` skips its connections. Nested instances need Editable Children on every instance up to the scene root. The Scene dock's toggle records `set_editable_instance` and `set_scene_instance_load_placeholder(false)` as one Undo action, and `set_editable_instance` emits `editor_state_changed`, which updates the dock | `scene/resources/packed_scene.cpp`, `editor/docks/scene_tree_dock.cpp`, `scene/main/node.cpp`; observed on 4.8 with `PackedScene.pack()` and a headless editor |
+| Instances of a scene share its built-in sub-resources, such as an `AnimationLibrary` or a `NavigationMesh`: a change made in place, such as a new animation, reaches every instance and is saved by no scene, even with Editable Children, because the packer compares such properties by object | observed on 4.8 |
+| Connections made by an instanced scene or by the base of an inherited scene get `CONNECT_INHERITED` (32), which `Object.ConnectFlags` does not expose to scripts but `get_signal_connection_list()` reports; the scene that instances them cannot remove them, and the Signals dock does not offer to disconnect them. `SceneState.get_path()` names the file of a loaded scene, and `get_base_scene_state()` its base | `scene/resources/packed_scene.cpp`, `editor/scene/connections_dialog.cpp`, `core/object/object.h` |
+| `Node.duplicate()` instances the scenes of instanced nodes with `GEN_EDIT_STATE_DISABLED` unless the flags include `DUPLICATE_FROM_EDITOR` (32), which `Node.DuplicateFlags` does not expose to scripts but the binding passes through in editor builds; without it the copies have no instance state, so `PackedScene.pack()` saves every property of an instance and the connections of its scene again. The flag also skips groups that are not persistent, as the Scene dock's duplicate does. The editor's Save Branch as Scene resets the position of the saved root by default and gives the new instance the position, rotation and scale of the branch; Make Local clears `scene_file_path`, gives the nodes owned by the instance to the scene root and reconnects their connections without `CONNECT_INHERITED` | `scene/main/node.h`, `scene/main/node.cpp`, `editor/docks/scene_tree_dock.cpp` |
+| A game takes `--debug-collisions`, `--debug-navigation`, `--debug-paths` and `--debug-avoidance` (the Debug menu of the editor), `--resolution <W>x<H>` and `--language <locale>`; arguments after `--` reach `OS.get_cmdline_user_args()`. `--debug-collisions` sets `SceneTree.debug_collisions_hint`, which the game can read | `godot --help` of 4.8, observed on 4.8 |
+| The headless display server gives the root window a size of 64×64 pixels, whatever the project sets. The GUI hovers a control only when the mouse position lies inside the visible rectangle of the window (`Window::_update_mouse_over`), and `BaseButton` presses only a hovered button, so synthetic clicks outside 64×64 do nothing; setting `Window.size` of the root works headless and fixes both the clicks and the layout. With a window, a root that embeds subwindows (the default for games) tracks the mouse from the input events alone | `scene/main/window.cpp`, `scene/main/viewport.cpp`, `scene/gui/base_button.cpp`, observed on 4.8 |
+| In the editor, `World3D.direct_space_state` of the edited scene answers `intersect_ray` against its collision shapes, CSG shapes with `use_collision` included once a physics frame has passed; the editor's Snap Object to Floor takes the bottom from the collision shapes, then from the visual instances, starts the ray 1 m above it and excludes the bodies of the node. `Mesh.generate_triangle_mesh()` and `TriangleMesh.intersect_segment()` find hits on meshes without collision; `CSGShape3D.get_meshes()` gives the mesh of a root shape one rendered frame after it changes | `editor/scene/3d/node_3d_editor_plugin.cpp`, `doc/classes/TriangleMesh.xml`, observed on 4.8 |
+| The shader compiler reports the first error of a shader through `_err_print_error` with `ERR_HANDLER_SHADER`, with the file and line of an include when the error sits there; `Shader.get_rid()` compiles at once, also in the dummy renderer of a headless Godot | `servers/rendering/shader_compiler.cpp` (`compile`), `servers/rendering/dummy/storage/material_storage.cpp` |
+| A root `Control` of the edited scene lays out at the project window size (`display/window/size/viewport_*`); any other root `Control` takes the visible rectangle of its viewport | `scene/gui/control.cpp` (`get_parent_anchorable_rect`) |
+| `AnimationMixer.make_backup()` and `EditorUndoRedoManager.undo()` / `redo()` are not bound; `get_history_undo_redo()` gives the `UndoRedo` of a history, and the editor refreshes its unsaved marks on `version_changed` of the manager | `scene/animation/animation_mixer.cpp`, `editor/editor_undo_redo_manager.cpp` |
+| `add_blend_point()` of blend spaces takes a point name since 4.8 and warns without one; 2D blend spaces triangulate their points by themselves (`auto_triangles`) | `scene/animation/animation_blend_space_1d.cpp`, `animation_blend_space_2d.cpp` |
+| The editor applies the settings of new projects (`EditorNode::get_initial_settings()`: stretch `canvas_items`/`expand`, Jolt Physics, …) only to an empty `project.godot` | `editor/editor_node.cpp` |
+| `EditorExport::load_config()` builds each preset with `create_preset()` of its platform and sets only the options the file names; the editor reloads `export_presets.cfg` only when platforms change | `editor/export/editor_export.cpp` |
+| The GDScript language server answers `textDocument/rename`, `prepareRename` and `references` across all scripts | `modules/gdscript/language_server/gdscript_text_document.cpp`, `gdscript_workspace.cpp` |
+| The debug adapter answers `evaluate` only on a repeated request after the game sent the value, has no `stepOut`, and sends `stopped` after a step only when it started the step; the remote debugger of the game takes `out`, `evaluate` and `set_ignore_error_breaks` directly | `editor/debugger/debug_adapter/debug_adapter_parser.cpp`, `debug_adapter_protocol.cpp`, `core/debugger/remote_debugger.cpp` |
+| Turning the game's `servers` profiler off sends `servers:profile_total` with the accumulated script function times; the editor handles `servers:` messages itself and shows every message on the `debug_data` signal of `ScriptEditorDebugger` | `servers/debugger/servers_debugger.cpp`, `editor/debugger/script_editor_debugger.cpp` |
+| The editor caches its whole help, `@GDScript` included, in `editor_doc_cache-<major>.<minor>.res` (meta `classes`) in its cache folder | `editor/doc/editor_help.cpp` |
+| The editor does not run static variable initializers of scripts that are not `@tool`, so such `static var` stay `null` there | observed in the addon (`symbol_rename_in_text.gd`) |
+| `EditorInterface.set_plugin_enabled()` runs `_enable_plugin()` / `_disable_plugin()` and changes `editor_plugins/enabled` at once, but `project.godot` gets them only from the queued save of `ProjectSettingsEditor` 1.5 s later. A plugin that removes its autoload in `_disable_plugin()` leaves it in `project.godot`, since `remove_autoload_singleton()` keeps the setting (see above) | `editor/editor_node.cpp` (`_update_addon_config`), observed on 4.8 |
+| The debug adapter puts its responses at the front of a client's queue and its events at the back, so the answer to a `stackTrace` sent right after a game stopped can arrive before the `stopped` event that names the reason | `editor/debugger/debug_adapter/debug_adapter_protocol.cpp` (`process_message`, `notify_stopped_*`) |
 
 ---
 

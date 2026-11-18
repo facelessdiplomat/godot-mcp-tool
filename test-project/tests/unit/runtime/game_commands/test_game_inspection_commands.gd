@@ -107,3 +107,66 @@ func test_sets_properties_of_the_running_game() -> void:
 	assert_eq(result["applied"], ["position"])
 	assert_eq(((result["rejected"] as Array)[0] as Dictionary)["name"], "speed")
 	assert_eq(_player.position, Vector3(0, 5, 0))
+
+
+func _build_menu() -> Control:
+	var menu := Control.new()
+	menu.name = "Menu"
+	_arena.add_child(menu)
+	var box := VBoxContainer.new()
+	box.name = "Box"
+	menu.add_child(box)
+	var title := Label.new()
+	title.name = "Title"
+	title.text = "Paused"
+	title.position = Vector2(40, 10)
+	title.size = Vector2(160, 20)
+	menu.add_child(title)
+	var resume := Button.new()
+	resume.name = "Resume"
+	resume.text = "Resume"
+	resume.position = Vector2(40, 40)
+	resume.size = Vector2(160, 50)
+	menu.add_child(resume)
+	var quit := Button.new()
+	quit.name = "Quit"
+	quit.text = "Quit"
+	quit.disabled = true
+	quit.position = Vector2(40, 100)
+	quit.size = Vector2(160, 50)
+	menu.add_child(quit)
+	var secret := Button.new()
+	secret.name = "Secret"
+	secret.visible = false
+	menu.add_child(secret)
+	var health := ProgressBar.new()
+	health.name = "Health"
+	health.value = 75
+	health.position = Vector2(300, 10)
+	health.size = Vector2(200, 20)
+	menu.add_child(health)
+	return menu
+
+
+func test_lists_the_visible_controls_with_their_rectangles_texts_and_states() -> void:
+	_build_menu()
+	var result: Dictionary = await GodotMcpGameTreeCommand.new(_scene).execute({"controls": true})
+	var controls: Array = result["controls"]
+	assert_eq(controls.map(func(control: Dictionary) -> String: return control["path"]), ["Menu/Title", "Menu/Resume", "Menu/Quit", "Menu/Health"])
+	assert_eq(controls[1], {"path": "Menu/Resume", "type": "Button", "rect": [40, 40, 160, 50], "text": "Resume", "disabled": false, "focused": false})
+	assert_eq(controls[2]["disabled"], true)
+	assert_eq(controls[3]["value"], 75.0)
+	assert_eq(controls[0]["text"], "Paused")
+	assert_false(result["truncated"])
+
+
+func test_marks_the_focused_control_and_a_toggled_button() -> void:
+	var menu := _build_menu()
+	var resume := menu.get_node("Resume") as Button
+	resume.toggle_mode = true
+	resume.button_pressed = true
+	resume.grab_focus()
+	var result: Dictionary = await GodotMcpGameTreeCommand.new(_scene).execute({"controls": true, "path": "Menu"})
+	var listed: Dictionary = (result["controls"] as Array).filter(func(control: Dictionary) -> bool: return control["path"] == "Menu/Resume")[0]
+	assert_true(listed["focused"])
+	assert_true(listed["pressed"])

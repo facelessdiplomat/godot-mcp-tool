@@ -33,15 +33,17 @@ func prepare(scene_root: Node, params: Dictionary) -> GodotMcpCommandError:
 	changes.add_undo_call(parent, &"remove_child", [_node])
 	changes.add_undo_call(_node, &"set_owner", [null])
 	changes.add_do_reference(_node)
+	_save_changes_inside_instances(parent, scene_root)
 	return null
 
 
 func finish() -> Dictionary:
-	var report := _context.properties.assign(_node, _properties)
+	var report := _context.properties.assign(_node, _properties, _scene_root.scene_file_path)
 	return {
 		"path": GodotMcpNodeLocator.path_of(_scene_root, _node),
 		"type": GodotMcpNodeFactory.display_class(_node),
 		"applied": report["applied"],
 		"rejected": report["rejected"],
 		"not_applied": report["not_applied"],
+		"editable_children": _editable_children,
 	}

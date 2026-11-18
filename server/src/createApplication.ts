@@ -1,3 +1,4 @@
+import { join } from 'node:path';
 import { readFileSync } from 'node:fs';
 import type { McpServer } from '@modelcontextprotocol/server';
 import { DocsSource } from './docs/DocsSource.js';
@@ -6,7 +7,24 @@ import { EditorOrHeadlessGateway } from './editor/EditorOrHeadlessGateway.js';
 import { DebugAdapterClient } from './debug/DebugAdapterClient.js';
 import { GameDebugger } from './debug/GameDebugger.js';
 import { ProjectExporter } from './export/ProjectExporter.js';
+import { AddonInstaller } from './addon/AddonInstaller.js';
+import type { EditorSession } from './bridge/EditorConnection.js';
+import { readAddonVersion } from './addon/InstalledAddon.js';
+import type { GodotBinaryLocator } from './godot/GodotBinaryLocator.js';
 import { GodotCli } from './godot/GodotCli.js';
+import { bundledAddonDirectory } from './packageFiles.js';
+import { ProjectCreator } from './project/ProjectCreator.js';
+import { editorHelpCacheCandidates } from './docs/EditorHelpDocs.js';
+import { ProjectLocator } from './project/ProjectLocator.js';
+import { type Adoption, ProjectCreateTool } from './tools/ProjectCreateTool.js';
+import { PluginSetEnabledTool, TestInstallFrameworkTool } from './tools/pluginTools.js';
+import { ExportPresetAddTool } from './tools/ExportPresetAddTool.js';
+import { ScriptRenameTool } from './tools/ScriptRenameTool.js';
+import { ScriptRenamer } from './scripts/ScriptRenamer.js';
+import { LanguageServerClient } from './lsp/LanguageServerClient.js';
+import { ExportPresetWriter } from './export/ExportPresetWriter.js';
+import { PluginSwitch } from './addon/PluginSwitch.js';
+import { TestFrameworkInstaller } from './testing/TestFrameworkInstaller.js';
 import { NodeDetachedLauncher } from './process/DetachedLauncher.js';
 import { NodeProcessLauncher } from './process/ProcessLauncher.js';
 import { NodeProcessRunner } from './process/ProcessRunner.js';
@@ -20,9 +38,11 @@ import { ErrorSummary } from './runtime/ErrorSummary.js';
 import { GameGatewayRouter } from './runtime/GameGatewayRouter.js';
 import { GameOutputCursor } from './runtime/GameOutputCursor.js';
 import { LocalGameGateway } from './runtime/LocalGameGateway.js';
+import { CodeValidator } from './scripts/CodeValidator.js';
 import { createScriptValidator } from './scripts/createScriptValidator.js';
+import { ShaderValidator } from './scripts/ShaderValidator.js';
 import { type ApplicationEnvironment, createGodotContext } from './createGodotContext.js';
-import { createMcpServer } from './server/createMcpServer.js';
+import { type ApplicationParts, ProjectFollowingApplication } from './server/ProjectFollowingApplication.js';
 import { readOnlyInstructions, serverInstructions, unsafeInstructions } from './server/serverInstructions.js';
 import { applyToolPolicy, readToolPolicy } from './server/ToolPolicy.js';
 import { SERVER_NAME, SERVER_VERSION } from './serverInfo.js';
@@ -44,14 +64,23 @@ import { createEditorRunScriptTool, createFilesystemDeleteTool, createGameEvalTo
 import { userCacheDirectory } from './util/CacheDirectory.js';
 import { parsePort } from './util/ports.js';
 
+const frameworkRescanTimeoutMs = 90_000;
+
 export interface Application {
   createMcpServer(): McpServer;
   shutdown(): void;
 }
 
-
 export function createApplication(environment: ApplicationEnvironment): Application {
-  const { project, discovery, editor, binaryLocator, locateGodot } = createGodotContext(environment);
+  return new ProjectFollowingApplication(
+    (createdProjectRoot, adopt) => createApplicationParts(environment, createdProjectRoot, adopt),
+    { name: SERVER_NAME, version: SERVER_VERSION },
+    () => new ProjectLocator(environment.variables, environment.workingDirectory).locate(),
+  );
+}
+
+function createApplicationParts(environment: ApplicationEnvironment, createdProjectRoot: string | undefined, adopt: (root: string) => Adoption): ApplicationParts {
+  const { project, discovery, editor, binaryLocator, locateGodot } = createGodotContext(environment, undefined, createdProjectRoot);
   const errorSummary = new ErrorSummary((resourcePath, timeMs) => project.found && fileChangedAfter(project.root, resourcePath, timeMs));
   editor.onNotification((connectionNumber, method, params) => {
     errorSummary.observe(connectionNumber, method, params);
@@ -72,6 +101,9 @@ export function createApplication(environment: ApplicationEnvironment): Applicat
     cacheDirectory: userCacheDirectory(environment),
     locateBinary: locateGodot,
     processRunner,
+    helpCacheCandidates: (binaryPath, versionBranch) =>
+      editorHelpCacheCandidates({ platform: environment.platform, homeDirectory: environment.homeDirectory, variables: environment.variables, binaryPath }, versionBranch),
+    helpDumpScript: join(environment.bundledAddonDirectory ?? bundledAddonDirectory, 'docs', 'editor_help_dump.gd'),
   });
   const policy = readToolPolicy(environment.variables);
   const windowless = environment.variables['GODOT_MCP_HEADLESS'] === '1';
@@ -106,21 +138,55 @@ export function createApplication(environment: ApplicationEnvironment): Applicat
       toolNotes,
     }),
     new EditorLaunchTool(editorLauncher, { headlessByDefault: windowless }),
+    new ProjectCreateTool(
+      new ProjectCreator({
+        workingDirectory: environment.variables['CLAUDE_PROJECT_DIR'] ?? environment.workingDirectory,
+        installAddon: (projectRoot) => addonInstaller(environment).install(projectRoot),
+        readVersionBranch: () => readVersionBranch(binaryLocator, processRunner),
+      }),
+      adopt,
+    ),
     ...createEditorTools(editor, projectReader, readFileSync),
-    new ScriptValidateTool(
-      createScriptValidator({
+    new ScriptRenameTool(
+      new ScriptRenamer({
         projectRoot: project.found ? project.root : undefined,
         editor,
-        locateGodot,
-        processRunner,
-        languageServerPort: parsePort(environment.variables['GODOT_LSP_PORT']),
+        languageServerAddress: async () => {
+          const address = await editor.languageServer();
+          const port = parsePort(environment.variables['GODOT_LSP_PORT']);
+          return address === undefined || port === undefined ? address : { ...address, port };
+        },
+        connect: (address) => LanguageServerClient.connect(address),
       }),
+    ),
+    new ScriptValidateTool(
+      new CodeValidator(
+        project.found ? project.root : undefined,
+        createScriptValidator({
+          projectRoot: project.found ? project.root : undefined,
+          editor,
+          locateGodot,
+          processRunner,
+          languageServerPort: parsePort(environment.variables['GODOT_LSP_PORT']),
+        }),
+        new ShaderValidator(projectReader),
+      ),
       errorSummary,
+    ),
+    new PluginSetEnabledTool(new PluginSwitch(project.found ? project.root : undefined, editor)),
+    new TestInstallFrameworkTool(
+      new TestFrameworkInstaller({
+        projectRoot: project.found ? project.root : undefined,
+        processRunner,
+        plugins: new PluginSwitch(project.found ? project.root : undefined, editor),
+        rescan: () => rescanWhenConnected(editor),
+      }),
     ),
     new TestRunTool(
       new TestRunner({ projectRoot: project.found ? project.root : undefined, editor, locateBinary: locateGodot, processRunner, now: () => Date.now() }),
       errorSummary,
     ),
+    new ExportPresetAddTool(new ExportPresetWriter(project.found ? project.root : undefined, editor)),
     new ExportProjectTool(
       new ProjectExporter({
         projectRoot: project.found ? project.root : undefined,
@@ -160,12 +226,39 @@ export function createApplication(environment: ApplicationEnvironment): Applicat
   ].join('\n');
 
   return {
-    createMcpServer: () =>
-      createMcpServer({ name: SERVER_NAME, version: SERVER_VERSION, instructions, tools, resources, prompts }),
+    project,
+    instructions,
+    tools,
+    resources,
+    prompts,
     shutdown: () => {
       localGame.shutdown();
       gameDebugger.close();
       editor.close();
     },
   };
+}
+
+function addonInstaller(environment: ApplicationEnvironment): AddonInstaller {
+  const directory = environment.bundledAddonDirectory ?? bundledAddonDirectory;
+  return new AddonInstaller({ bundle: { directory, version: readAddonVersion(directory) ?? '' }, isEditorRunning: () => false });
+}
+
+async function readVersionBranch(binaryLocator: GodotBinaryLocator, processRunner: NodeProcessRunner): Promise<string | undefined> {
+  const binary = binaryLocator.locate();
+  if (!binary.found) {
+    return undefined;
+  }
+  try {
+    const version = await new GodotCli(processRunner, binary.path).version();
+    return `${String(version.major)}.${String(version.minor)}`;
+  } catch {
+    return undefined;
+  }
+}
+
+async function rescanWhenConnected(editor: EditorSession): Promise<void> {
+  if ((await editor.status()).connected) {
+    await editor.request('editor.rescan', {}, { timeoutMs: frameworkRescanTimeoutMs });
+  }
 }

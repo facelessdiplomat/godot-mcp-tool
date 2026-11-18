@@ -1,9 +1,11 @@
 import type { LoggedError } from '../runtime/ErrorSummary.js';
+import type { ScriptReport } from './ScriptValidator.js';
 
 const editorSource = 'editor';
 const scriptErrorPattern = /^(Parse|Compile) Error: /;
 const failedLoadPattern = /^Failed to load script "(?<path>[^"]+)"/;
 const lineSuffixPattern = /:\d+$/;
+const shaderCompilationFailed = 'Shader compilation failed.';
 
 export function isLoadErrorOf(resourcePaths: readonly string[]): (error: LoggedError) => boolean {
   const checkedPaths = new Set(resourcePaths);
@@ -23,4 +25,9 @@ export function scriptOfLoadError(error: LoggedError): string | undefined {
   }
   const scriptPath = error.location?.replace(lineSuffixPattern, '');
   return scriptPath !== undefined && scriptErrorPattern.test(error.message) ? scriptPath : undefined;
+}
+
+export function isShaderErrorOf(reports: readonly ScriptReport[]): (error: LoggedError) => boolean {
+  const reportedMessages = new Set(reports.flatMap((report) => report.problems.map((problem) => problem.message)));
+  return (error) => error.source === editorSource && reportedMessages.size > 0 && (reportedMessages.has(error.message) || error.message === shaderCompilationFailed);
 }

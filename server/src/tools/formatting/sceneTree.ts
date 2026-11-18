@@ -5,6 +5,7 @@ export interface NodeTraits {
   readonly script?: string | undefined;
   readonly instance?: string | undefined;
   readonly groups?: readonly string[] | undefined;
+  readonly editable_children?: boolean | undefined;
 }
 
 export interface SceneTreeNode extends NodeTraits {
@@ -18,6 +19,7 @@ export const nodeTraitsSchema = z.object({
   script: z.string().optional(),
   instance: z.string().optional(),
   groups: z.array(z.string()).optional(),
+  editable_children: z.boolean().optional(),
 });
 
 const sceneTreeNodeSchema: z.ZodType<SceneTreeNode> = z.lazy(() =>
@@ -33,6 +35,7 @@ export const sceneTreeResultSchema = z.object({
   unsaved: z.boolean().optional(),
   node_count: z.number().int(),
   truncated: z.boolean(),
+  hidden_instance_nodes: z.boolean().optional(),
   root: sceneTreeNodeSchema,
 });
 
@@ -48,6 +51,9 @@ export function formatSceneTree(result: SceneTreeResult): string {
   appendChildren(lines, result.root, '');
   if (result.truncated) {
     lines.push('Some nodes are not shown. Call scene_get_tree again with a larger max_depth or max_nodes to see them.');
+  }
+  if (result.hidden_instance_nodes === true) {
+    lines.push('Nodes inside instanced scenes are not shown; expand_instances: true lists them too.');
   }
   return lines.join('\n');
 }
@@ -74,7 +80,7 @@ export function formatNodeSummary(label: string, node: NodeTraits): string {
     parts.push(`[script ${node.script}]`);
   }
   if (node.instance !== undefined) {
-    parts.push(`[instance ${node.instance}]`);
+    parts.push(node.editable_children === true ? `[instance ${node.instance}, editable children]` : `[instance ${node.instance}]`);
   }
   if (node.groups !== undefined && node.groups.length > 0) {
     parts.push(`groups=${node.groups.join(',')}`);

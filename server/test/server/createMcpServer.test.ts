@@ -158,4 +158,31 @@ describe('createMcpServer', () => {
 
     expect(connected.getInstructions()).toBe('Use these tools.');
   });
+
+  it('tells a client that asks for progress that a long call is still working', async () => {
+    const slowTool: Tool<typeof echoSchema> = {
+      name: 'slow_echo',
+      definition: { title: 'Slow echo', description: 'Returns the text after a while.', inputSchema: echoSchema, annotations: { readOnlyHint: true }, alwaysLoad: false },
+      execute: async (input) => {
+        await new Promise((resolve) => setTimeout(resolve, 90));
+        return textResult(input.text);
+      },
+    };
+    const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+    const server = createMcpServer({ name: 'godot', version: '0.1.0', instructions: 'Use these tools.', tools: [slowTool], progressIntervalMs: 20 });
+    await server.connect(serverTransport);
+    client = new Client({ name: 'test-client', version: '1.0.0' });
+    await client.connect(clientTransport);
+    const reports: { progress: number; message?: string | undefined }[] = [];
+
+    const result = await client.callTool({ name: 'slow_echo', arguments: { text: 'done' } }, { onprogress: (progress) => reports.push(progress) });
+    const quiet = await client.callTool({ name: 'slow_echo', arguments: { text: 'again' } });
+
+    expect(result.content).toEqual([{ type: 'text', text: 'done' }]);
+    expect(reports.length).toBeGreaterThanOrEqual(2);
+    expect(reports.map((report) => report.progress)).toEqual([...reports.map((report) => report.progress)].sort((left, right) => left - right));
+    expect(reports[0]?.message).toMatch(/^slow_echo is still working \(\d+ s\)$/);
+    expect(quiet.content).toEqual([{ type: 'text', text: 'again' }]);
+  });
 });
+

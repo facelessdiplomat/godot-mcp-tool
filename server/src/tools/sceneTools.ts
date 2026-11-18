@@ -3,7 +3,7 @@ import type { EditorGateway } from '../editor/EditorGateway.js';
 import { changingAnnotations, readingAnnotations } from './annotations.js';
 import { BridgeTool } from './bridge/BridgeTool.js';
 import { formatSceneTree, type SceneTreeResult, sceneTreeResultSchema } from './formatting/sceneTree.js';
-import { sceneToRead } from './parameters.js';
+import { expandInstances, sceneToRead } from './parameters.js';
 import { textResult } from './results.js';
 
 const openedSceneSchema = z.object({
@@ -21,6 +21,7 @@ const sceneGetTreeInput = z.object({
   scene: sceneToRead,
   max_depth: z.number().int().min(0).max(64).default(8).describe('How many levels below the root to show.'),
   max_nodes: z.number().int().min(1).max(2000).default(200).describe('The most nodes to list; hidden children are counted.'),
+  expand_instances: expandInstances,
 });
 
 export function createSceneGetTreeTool(editor: EditorGateway): BridgeTool<typeof sceneGetTreeInput, SceneTreeResult> {
@@ -29,7 +30,7 @@ export function createSceneGetTreeTool(editor: EditorGateway): BridgeTool<typeof
     definition: {
       title: 'Scene tree',
       description:
-        'Show the node tree of a scene as compact text: node names and types, attached scripts, instanced scenes and groups. Use it before changing a scene to learn the node paths that the node tools take. Reads the scene open in the editor by default, or any scene by its res:// path.',
+        'Show the node tree of a scene as compact text: node names and types, attached scripts, instanced scenes and groups. Use it before changing a scene to learn the node paths that the node tools take. Reads the scene open in the editor by default, or any scene by its res:// path. The nodes inside an instanced scene are listed when its Editable Children is on, or for every instance with expand_instances.',
       inputSchema: sceneGetTreeInput,
       annotations: readingAnnotations,
       alwaysLoad: true,

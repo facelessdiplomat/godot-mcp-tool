@@ -32,7 +32,7 @@ func before_each() -> void:
 	var character: Node3D = _add(Node3D.new(), "Character", _level)
 	var player: AnimationPlayer = _add(AnimationPlayer.new(), "AnimationPlayer", character)
 	var library := AnimationLibrary.new()
-	for animation_name in ["idle", "walk", "jump"]:
+	for animation_name in ["idle", "walk", "jump", "run", "strafe_left", "strafe_right"]:
 		var animation := Animation.new()
 		animation.length = 1.0
 		animation.loop_mode = Animation.LOOP_LINEAR
@@ -156,6 +156,100 @@ func test_rejects_the_states_and_transitions_it_cannot_use_and_keeps_the_rest() 
 	assert_eq((result["transitions"] as Array).size(), 1)
 
 
+func _moving_machine(blend: Array, limits := {}) -> Dictionary:
+	var state := {"name": "move", "blend": blend}
+	state.merge(limits)
+	return {"tree": TREE, "player": PLAYER, "states": [state], "transitions": [{"from": "Start", "to": "move"}]}
+
+
+func test_blends_animations_by_one_parameter_in_a_blend_state() -> void:
+	var result: Dictionary = await _set_up(_moving_machine([{"animation": "walk", "at": 2}, {"animation": "run", "at": 6}]))
+	assert_eq(result["states"], [{
+		"name": "move",
+		"blend": [{"animation": "walk", "at": 2.0}, {"animation": "run", "at": 6.0}],
+		"min": 2.0,
+		"max": 6.0,
+		"parameter": "parameters/move/blend_position",
+	}])
+	assert_eq(result["rejected"], [])
+	var blend_space := (_tree.tree_root as AnimationNodeStateMachine).get_node("move") as AnimationNodeBlendSpace1D
+	assert_not_null(blend_space)
+	assert_eq(blend_space.get_blend_point_count(), 2)
+	assert_eq((blend_space.get_blend_point_node(1) as AnimationNodeAnimation).animation, &"run")
+	assert_eq(blend_space.get_blend_point_name(1), &"run")
+	assert_eq(blend_space.get_blend_point_position(1), 6.0)
+	assert_eq(blend_space.min_space, 2.0)
+	assert_eq(blend_space.max_space, 6.0)
+	_tree.active = true
+	_tree.advance(0.1)
+	_tree.set("parameters/move/blend_position", 4.0)
+	_tree.advance(0.1)
+	assert_eq(_current_state(), "move")
+	assert_eq(_tree.get("parameters/move/blend_position"), 4.0)
+	_tree.active = false
+
+
+func test_blends_animations_in_two_dimensions_within_the_given_limits() -> void:
+	var points := [
+		{"animation": "idle", "at": [0, 0]},
+		{"animation": "walk", "at": [0, 1]},
+		{"animation": "strafe_left", "at": [-1, 0]},
+		{"animation": "strafe_right", "at": [1, 0]},
+	]
+	var result: Dictionary = await _set_up(_moving_machine(points, {"min": [-2, -1], "max": [2, 1]}))
+	var state: Dictionary = (result["states"] as Array)[0]
+	assert_eq(state["blend"][2], {"animation": "strafe_left", "at": [-1.0, 0.0]})
+	assert_eq(state["min"], [-2.0, -1.0])
+	assert_eq(state["max"], [2.0, 1.0])
+	var blend_space := (_tree.tree_root as AnimationNodeStateMachine).get_node("move") as AnimationNodeBlendSpace2D
+	assert_not_null(blend_space)
+	assert_eq(blend_space.get_blend_point_count(), 4)
+	assert_eq(blend_space.get_blend_point_position(2), Vector2(-1, 0))
+	assert_eq(blend_space.min_space, Vector2(-2, -1))
+	assert_eq(blend_space.max_space, Vector2(2, 1))
+	assert_true(blend_space.auto_triangles)
+
+
+func test_gives_points_of_one_animation_names_of_their_own() -> void:
+	await _set_up(_moving_machine([{"animation": "walk", "at": -1}, {"animation": "idle", "at": 0}, {"animation": "walk", "at": 1}]))
+	var blend_space := (_tree.tree_root as AnimationNodeStateMachine).get_node("move") as AnimationNodeBlendSpace1D
+	assert_eq([blend_space.get_blend_point_name(0), blend_space.get_blend_point_name(1), blend_space.get_blend_point_name(2)], [&"walk", &"idle", &"walk_2"])
+
+
+func test_rejects_blend_states_it_cannot_build() -> void:
+	var walk_and_run := [{"animation": "walk", "at": 0}, {"animation": "run", "at": 1}]
+	var result: Dictionary = await _set_up({
+		"tree": TREE,
+		"player": PLAYER,
+		"states": [
+			{"name": "both", "animation": "walk", "blend": walk_and_run},
+			{"name": "alone", "blend": [{"animation": "walk", "at": 0}]},
+			{"name": "mixed", "blend": [{"animation": "walk", "at": 0}, {"animation": "run", "at": [1, 0]}]},
+			{"name": "misspelled", "blend": [{"animation": "wlk", "at": 0}, {"animation": "run", "at": 1}]},
+			{"name": "line", "blend": [{"animation": "idle", "at": [0, 0]}, {"animation": "walk", "at": [1, 0]}, {"animation": "run", "at": [2, 0]}]},
+			{"name": "same", "blend": [{"animation": "walk", "at": 1}, {"animation": "run", "at": 1}]},
+			{"name": "backwards", "blend": walk_and_run, "min": 5, "max": 1},
+			{"name": "outside", "blend": walk_and_run, "min": 0.5, "max": 1},
+			{"name": "nowhere", "blend": [{"animation": "walk"}, {"animation": "run", "at": 1}]},
+			{"name": "move", "blend": walk_and_run},
+		],
+		"transitions": [{"from": "Start", "to": "move"}],
+	})
+	var rejected := (result["rejected"] as Array).map(func(rejection: Dictionary) -> String: return rejection["item"])
+	assert_eq(rejected, ["both", "alone", "mixed", "misspelled", "line", "same", "backwards", "outside", "nowhere"])
+	var reasons := (result["rejected"] as Array).map(func(rejection: Dictionary) -> String: return rejection["reason"])
+	assert_string_contains(reasons[0], "either animation or blend")
+	assert_string_contains(reasons[1], "at least two points")
+	assert_string_contains(reasons[2], "mixes")
+	assert_string_contains(reasons[3], "no animation \"wlk\"")
+	assert_string_contains(reasons[4], "on one line")
+	assert_string_contains(reasons[5], "same position")
+	assert_string_contains(reasons[6], "min")
+	assert_string_contains(reasons[7], "outside")
+	assert_string_contains(reasons[8], "at")
+	assert_eq((result["states"] as Array).size(), 1)
+
+
 func test_warns_when_no_transition_leaves_start() -> void:
 	var machine := _walking_machine()
 	machine["transitions"] = [{"from": "idle", "to": "walk", "condition": "moving"}]
@@ -189,3 +283,16 @@ func test_reads_the_state_machine_of_a_tree() -> void:
 	assert_eq(result["states"], [{"name": "idle", "animation": "idle"}, {"name": "walk", "animation": "walk"}])
 	assert_eq((result["transitions"] as Array).size(), 3)
 	assert_eq(result["conditions"], ["moving", "stopped"])
+
+
+func test_reads_the_blend_states_of_a_tree() -> void:
+	await _set_up(_moving_machine([{"animation": "walk", "at": 2}, {"animation": "run", "at": 6}], {"min": 0, "max": 8}))
+	var result: Dictionary = await GodotMcpAnimationTreeGetCommand.new(_context).execute({"tree": TREE})
+	assert_eq(result["states"], [{
+		"name": "move",
+		"type": "AnimationNodeBlendSpace1D",
+		"blend": [{"animation": "walk", "at": 2.0}, {"animation": "run", "at": 6.0}],
+		"min": 0.0,
+		"max": 8.0,
+		"parameter": "parameters/move/blend_position",
+	}])

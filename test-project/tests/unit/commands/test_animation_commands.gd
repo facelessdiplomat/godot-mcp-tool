@@ -10,6 +10,9 @@ const FakeScriptEditorAccess := preload("res://tests/support/fake_script_editor_
 const GodotMcpJsonRpc := preload("res://addons/godot_mcp_tool/bridge/json_rpc.gd")
 const GodotMcpPlainUndoHistory := preload("res://addons/godot_mcp_tool/scene/plain_undo_history.gd")
 const GodotMcpVariantCodec := preload("res://addons/godot_mcp_tool/codec/variant_codec.gd")
+const ScratchFolder := preload("res://tests/support/scratch_folder.gd")
+
+const WALKER_SCRIPT := "extends Node3D\n\nvar steps: Array = []\n\n\nfunc _on_footstep(foot: String) -> void:\n\tsteps.append(foot)\n"
 
 var _scenes: FakeSceneAccess
 var _history: GodotMcpPlainUndoHistory
@@ -18,6 +21,7 @@ var _level: Node3D
 var _door: Node3D
 var _lamp: OmniLight3D
 var _player: AnimationPlayer
+var _scratch_directory: String
 
 
 func before_each() -> void:
@@ -33,11 +37,13 @@ func before_each() -> void:
 	_door.position = Vector3(0, 1, 0)
 	_lamp = _add(OmniLight3D.new(), "Lamp")
 	_player = _add(AnimationPlayer.new(), "AnimationPlayer")
+	_scratch_directory = "res://.godot/mcp_test_scratch/%d" % Time.get_ticks_usec()
 
 
 func after_each() -> void:
 	_history.dispose()
 	_scenes.release()
+	ScratchFolder.remove(ProjectSettings.globalize_path(_scratch_directory))
 
 
 func _add(node: Node, name: String) -> Node:
@@ -59,6 +65,32 @@ func _rejected_paths(result: Dictionary) -> Array:
 	return (result["rejected"] as Array).map(func(rejection: Dictionary) -> String: return rejection["path"])
 
 
+func _rejection_reasons(result: Dictionary) -> Array:
+	return (result["rejected"] as Array).map(func(rejection: Dictionary) -> String: return rejection["reason"])
+
+
+func _walker() -> Node3D:
+	var script := GDScript.new()
+	script.source_code = WALKER_SCRIPT
+	script.reload()
+	var walker := Node3D.new()
+	walker.set_script(script)
+	return _add(walker, "Walker") as Node3D
+
+
+func _saved_sound() -> String:
+	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(_scratch_directory))
+	var sound_path := _scratch_directory.path_join("step.tres")
+	var sound := AudioStreamWAV.new()
+	sound.data = PackedByteArray([0, 0, 0, 0])
+	ResourceSaver.save(sound, sound_path)
+	return sound_path
+
+
+func _footsteps_track(keys: Array) -> Dictionary:
+	return {"type": "method", "path": "Walker", "keys": keys}
+
+
 func test_creates_an_animation_with_a_value_track_as_one_undo_step() -> void:
 	var result: Dictionary = await _set_animation(_door_rising())
 	assert_eq(result["scene"], "res://level.tscn")
@@ -67,7 +99,7 @@ func test_creates_an_animation_with_a_value_track_as_one_undo_step() -> void:
 	assert_eq(result["created"], true)
 	assert_eq(result["length"], 1.0)
 	assert_eq(result["loop"], "none")
-	assert_eq(result["tracks"], [{"path": "Door:position", "keys": 2, "interpolation": "linear", "update": "continuous", "from": "Vector3(0, 1, 0)", "to": "Vector3(0, 4, 0)"}])
+	assert_eq(result["tracks"], [{"type": "value", "path": "Door:position", "keys": 2, "interpolation": "linear", "update": "continuous", "from": "Vector3(0, 1, 0)", "to": "Vector3(0, 4, 0)"}])
 	assert_eq(result["rejected"], [])
 	assert_eq(_history.last_action_name(), "MCP: Set animation open")
 	_player.play("open")
@@ -137,6 +169,90 @@ func test_rejects_the_tracks_it_cannot_use_and_keeps_the_rest() -> void:
 	assert_string_contains(reasons[5], "twice")
 	assert_eq((result["tracks"] as Array).size(), 1)
 	assert_eq(_player.get_animation("open").get_track_count(), 1)
+
+
+func test_calls_methods_at_the_times_of_a_method_track() -> void:
+	var walker := _walker()
+	var result: Dictionary = await _set_animation({"player": "AnimationPlayer", "name": "walk", "length": 1.0, "loop": "linear", "tracks": [
+		_footsteps_track([{"time": 0.75, "method": "_on_footstep", "args": ["right"]}, {"time": 0.25, "method": "_on_footstep", "args": ["left"]}]),
+	]})
+	assert_eq(result["tracks"], [{"type": "method", "path": "Walker", "keys": 2, "calls": [
+		{"time": 0.25, "call": "_on_footstep(\"left\")"},
+		{"time": 0.75, "call": "_on_footstep(\"right\")"},
+	]}])
+	assert_eq(result["rejected"], [])
+	assert_eq(result["reset_tracks"], [])
+	assert_false(_player.has_animation("RESET"))
+	var walk := _player.get_animation("walk")
+	assert_eq(walk.track_get_type(0), Animation.TYPE_METHOD)
+	assert_eq(walk.track_get_path(0), NodePath("Walker"))
+	assert_eq(walk.method_track_get_name(0, 0), &"_on_footstep")
+	assert_eq(walk.method_track_get_params(0, 0), ["left"])
+	_player.callback_mode_method = AnimationMixer.ANIMATION_CALLBACK_MODE_METHOD_IMMEDIATE
+	_player.play("walk")
+	_player.advance(0.5)
+	assert_eq(walker.get("steps"), ["left"])
+	_player.advance(0.5)
+	assert_eq(walker.get("steps"), ["left", "right"])
+	_player.stop()
+
+
+func test_rejects_method_tracks_it_cannot_call() -> void:
+	_walker()
+	var result: Dictionary = await _set_animation({"player": "AnimationPlayer", "name": "walk", "length": 1.0, "tracks": [
+		{"type": "method", "path": "Walker", "keys": [{"time": 0.25, "method": "_on_fotstep", "args": ["left"]}]},
+		{"type": "method", "path": "Walker:position", "keys": [{"time": 0.25, "method": "_on_footstep", "args": ["left"]}]},
+		{"type": "method", "path": "Walker", "keys": [{"time": 0.25, "method": "_on_footstep"}]},
+		{"type": "method", "path": "Walker", "keys": [{"time": 0.25}]},
+		{"type": "jump", "path": "Walker", "keys": [{"time": 0.25}]},
+		{"type": "method", "path": "Walker", "keys": [{"time": 0.5, "method": "_on_footstep", "args": ["left"]}]},
+		{"type": "method", "path": "Walker", "keys": [{"time": 0.75, "method": "_on_footstep", "args": ["right"]}]},
+	]})
+	assert_eq(_rejected_paths(result), ["Walker", "Walker:position", "Walker", "Walker", "Walker", "Walker"])
+	var reasons := _rejection_reasons(result)
+	assert_string_contains(reasons[0], "no method _on_fotstep")
+	assert_string_contains(reasons[0], "_on_footstep")
+	assert_string_contains(reasons[1], "a node relative to the parent")
+	assert_string_contains(reasons[2], "_on_footstep takes foot: String; got 0")
+	assert_string_contains(reasons[3], "names no method")
+	assert_string_contains(reasons[4], "unknown track type \"jump\"")
+	assert_string_contains(reasons[5], "twice")
+	assert_eq((result["tracks"] as Array).size(), 1)
+
+
+func test_plays_sounds_through_an_audio_track() -> void:
+	_add(AudioStreamPlayer3D.new(), "Footsteps")
+	var sound_path := _saved_sound()
+	var result: Dictionary = await _set_animation({"player": "AnimationPlayer", "name": "walk", "tracks": [
+		{"type": "audio", "path": "Footsteps", "keys": [{"time": 0.25, "stream": sound_path}, {"time": 0.75, "stream": sound_path, "start_offset": 0.1}]},
+	]})
+	assert_eq(result["tracks"], [{"type": "audio", "path": "Footsteps", "keys": 2, "sounds": [{"time": 0.25, "stream": sound_path}, {"time": 0.75, "stream": sound_path}]}])
+	assert_eq(result["length"], 0.75)
+	assert_eq(result["reset_tracks"], [])
+	var walk := _player.get_animation("walk")
+	assert_eq(walk.track_get_type(0), Animation.TYPE_AUDIO)
+	assert_eq(walk.audio_track_get_key_stream(0, 1).resource_path, sound_path)
+	assert_almost_eq(walk.audio_track_get_key_start_offset(0, 1), 0.1, 0.0001)
+	assert_eq(walk.audio_track_get_key_end_offset(0, 1), 0.0)
+
+
+func test_rejects_audio_tracks_without_a_player_or_a_sound() -> void:
+	_add(AudioStreamPlayer.new(), "Music")
+	var sound_path := _saved_sound()
+	var result: Dictionary = await _set_animation({"player": "AnimationPlayer", "name": "walk", "tracks": [
+		{"type": "audio", "path": "Lamp", "keys": [{"time": 0, "stream": sound_path}]},
+		{"type": "audio", "path": "Music", "keys": [{"time": 0, "stream": "res://sounds/missing.ogg"}]},
+		{"type": "audio", "path": "Music", "keys": [{"time": 0}]},
+		{"type": "audio", "path": "Music", "keys": [{"time": 0, "stream": sound_path, "end_offset": -1}]},
+	]})
+	var reasons := _rejection_reasons(result)
+	assert_eq(reasons.size(), 4)
+	assert_string_contains(reasons[0], "Lamp is an OmniLight3D")
+	assert_string_contains(reasons[0], "AudioStreamPlayer3D")
+	assert_string_contains(reasons[1], "res://sounds/missing.ogg")
+	assert_string_contains(reasons[2], "names no stream")
+	assert_string_contains(reasons[3], "end_offset")
+	assert_false(_player.has_animation("walk"))
 
 
 func test_explains_what_it_needs() -> void:
@@ -213,6 +329,21 @@ func test_reads_the_animations_of_a_player_and_the_keys_of_one() -> void:
 	var unknown: GodotMcpCommandError = await GodotMcpAnimationGetCommand.new(_context).execute({"player": "AnimationPlayer", "name": "close"})
 	assert_eq(unknown.code, GodotMcpJsonRpc.NOT_FOUND)
 	assert_string_contains(unknown.hint, "open")
+
+
+func test_reads_method_calls_and_sounds_as_keys() -> void:
+	_walker()
+	_add(AudioStreamPlayer3D.new(), "Footsteps")
+	var sound_path := _saved_sound()
+	await _set_animation({"player": "AnimationPlayer", "name": "walk", "length": 1.0, "tracks": [
+		_footsteps_track([{"time": 0.25, "method": "_on_footstep", "args": ["left"]}]),
+		{"type": "audio", "path": "Footsteps", "keys": [{"time": 0.25, "stream": sound_path}]},
+	]})
+	var detailed: Dictionary = await GodotMcpAnimationGetCommand.new(_context).execute({"player": "AnimationPlayer", "name": "walk"})
+	assert_eq(detailed["animation"]["tracks"], [
+		{"path": "Walker", "type": "method", "key_count": 1, "keys": [{"time": 0.25, "value": "_on_footstep(\"left\")"}]},
+		{"path": "Footsteps", "type": "audio", "key_count": 1, "keys": [{"time": 0.25, "value": sound_path}]},
+	])
 
 
 func test_clears_the_autoplay_that_named_the_deleted_animation() -> void:

@@ -102,4 +102,32 @@ describe('LanguageServerClient', () => {
 
     await expect(connected.diagnose([{ path: '/projects/arena/player.gd', text: 'extends Node\n' }])).rejects.toBeInstanceOf(LanguageServerUnavailableError);
   });
+
+  it('renames a symbol with every script open and returns the edits of each file', async () => {
+    const enemyUri = pathToFileURL('/projects/arena/enemy.gd').href;
+    const playerUri = pathToFileURL('/projects/arena/player.gd').href;
+    server.renameEdits = (params) => ({
+      changes: {
+        [enemyUri]: [{ range: { start: { line: 3, character: 5 }, end: { line: 3, character: 16 } }, newText: (params['newName'] as string) }],
+        [playerUri]: [{ range: { start: { line: 6, character: 7 }, end: { line: 6, character: 18 } }, newText: (params['newName'] as string) }],
+      },
+    });
+    const connected = await connect();
+
+    const edits = await connected.rename(
+      [
+        { path: '/projects/arena/enemy.gd', text: 'extends Node\n\n\nfunc take_damage(amount: int) -> void:\n\tpass\n' },
+        { path: '/projects/arena/player.gd', text: 'extends Node\n' },
+      ],
+      { path: '/projects/arena/enemy.gd', line: 3, character: 5 },
+      'apply_damage',
+    );
+
+    const [renameRequest] = server.messages('textDocument/rename');
+    expect(renameRequest?.params).toEqual({ textDocument: { uri: enemyUri }, position: { line: 3, character: 5 }, newName: 'apply_damage' });
+    expect(edits.get('/projects/arena/enemy.gd')).toEqual([{ line: 3, startCharacter: 5, endCharacter: 16, newText: 'apply_damage' }]);
+    expect(edits.get('/projects/arena/player.gd')).toEqual([{ line: 6, startCharacter: 7, endCharacter: 18, newText: 'apply_damage' }]);
+    await expect.poll(() => server.messages('textDocument/didClose').length).toBe(2);
+  });
 });
+

@@ -3,6 +3,7 @@ import type { EditorGateway } from '../editor/EditorGateway.js';
 import { changingAnnotations, readingAnnotations } from './annotations.js';
 import { BridgeTool } from './bridge/BridgeTool.js';
 import { counted } from './formatting/counting.js';
+import { editableChildrenSchema, withEditableChildrenSentence } from './formatting/editableChildren.js';
 import {
   applyReportSchema,
   formatApplyReport,
@@ -13,10 +14,10 @@ import {
   propertyListSchema,
 } from './formatting/propertyReports.js';
 import { formatNodeSummary, nodeTraitsSchema } from './formatting/sceneTree.js';
-import { nodePath, propertyValues, sceneToChange, sceneToRead } from './parameters.js';
+import { expandInstances, nodePath, propertyValues, sceneToChange, sceneToRead } from './parameters.js';
 import { errorResult, textResult } from './results.js';
 
-export const addedNodeSchema = applyReportSchema.extend({ scene: z.string(), path: z.string(), type: z.string() });
+export const addedNodeSchema = applyReportSchema.extend({ scene: z.string(), path: z.string(), type: z.string(), editable_children: editableChildrenSchema });
 
 type AddedNode = z.infer<typeof addedNodeSchema>;
 
@@ -24,7 +25,7 @@ export const deletedNodesSchema = z.object({ scene: z.string(), deleted: z.array
 
 type DeletedNodes = z.infer<typeof deletedNodesSchema>;
 
-export const updatedNodeSchema = applyReportSchema.extend({ scene: z.string(), path: z.string() });
+export const updatedNodeSchema = applyReportSchema.extend({ scene: z.string(), path: z.string(), editable_children: editableChildrenSchema });
 
 type UpdatedNode = z.infer<typeof updatedNodeSchema>;
 
@@ -38,6 +39,9 @@ const nodeBoundsSchema = z.object({
   end: z.string(),
   visual_count: z.number(),
   collision_count: z.number(),
+  dimensions: z.literal(2).optional(),
+  window: z.string().optional(),
+  inside_window: z.boolean().optional(),
 });
 
 type NodeBounds = z.infer<typeof nodeBoundsSchema>;
@@ -47,6 +51,7 @@ const foundNodesSchema = z.object({
   matches: z.array(nodeTraitsSchema.extend({ path: z.string() })),
   total: z.number(),
   truncated: z.boolean(),
+  hidden_instance_nodes: z.boolean().optional(),
 });
 
 type FoundNodes = z.infer<typeof foundNodesSchema>;
@@ -77,7 +82,7 @@ export function createNodeAddTool(editor: EditorGateway): BridgeTool<typeof node
     responseSchema: addedNodeSchema,
     present: (added) => {
       const summary = `Added ${added.path} (${added.type}) to ${added.scene}. The scene has unsaved changes.`;
-      return textResult(isEmptyApplyReport(added) ? summary : `${summary}\n${formatApplyReport(added)}`);
+      return textResult(withEditableChildrenSentence(isEmptyApplyReport(added) ? summary : `${summary}\n${formatApplyReport(added)}`, added.editable_children));
     },
   });
 }
@@ -115,6 +120,7 @@ const nodeFindInput = z.object({
   script: z.string().min(1).optional().describe('The attached script, as a res:// path or a file name such as "player.gd".'),
   scene: sceneToRead,
   max_results: z.number().int().min(1).max(500).default(50).describe('The most nodes to list.'),
+  expand_instances: expandInstances,
 });
 
 export function createNodeFindTool(editor: EditorGateway): BridgeTool<typeof nodeFindInput, FoundNodes> {
@@ -123,7 +129,7 @@ export function createNodeFindTool(editor: EditorGateway): BridgeTool<typeof nod
     definition: {
       title: 'Find nodes',
       description:
-        'Find nodes in a scene by name, type, group or attached script; every given criterion must match. Returns their paths for the other node tools. Nodes inside instanced scenes are not searched, only the instances themselves.',
+        'Find nodes in a scene by name, type, group or attached script; every given criterion must match. Returns their paths for the other node tools. The nodes inside an instanced scene are searched when its Editable Children is on, or in every instance with expand_instances.',
       inputSchema: nodeFindInput,
       annotations: readingAnnotations,
       alwaysLoad: false,
@@ -143,6 +149,9 @@ function describeFoundNodes(found: FoundNodes, input: z.output<typeof nodeFindIn
   if (found.truncated) {
     lines.push(`Showing the first ${String(found.matches.length)} of ${String(found.total)}; narrow the search or raise max_results.`);
   }
+  if (found.hidden_instance_nodes === true) {
+    lines.push('Nodes inside instanced scenes were not searched; expand_instances: true searches them too.');
+  }
   return lines.join('\n');
 }
 
@@ -161,7 +170,7 @@ const nodeGetPropertiesInput = z.object({
   names: z
     .array(z.string())
     .optional()
-    .describe('Properties to read, such as ["position", "mesh"]. Default: every property whose value differs from its default.'),
+    .describe('Properties to read, such as ["position", "mesh"], or paths into a resource or a value, such as "mesh:size" or "position:y". Default: every property whose value differs from its default.'),
   include_defaults: z.boolean().default(false).describe('Without names, also list properties at their default values. The list gets long.'),
   scene: sceneToRead,
 });
@@ -198,7 +207,7 @@ export function createNodeGetBoundsTool(editor: EditorGateway): BridgeTool<typeo
     definition: {
       title: 'Node bounds',
       description:
-        'Measure the box that a 3D node and its children take up in world coordinates: center, size and corners, from its meshes and CSG shapes, or from its collision shapes when it has none. Use it to check placement and scale, such as whether a crate rests on the floor or a door is wide enough for the player.',
+        'Measure the box that a 3D node and its children take up in world coordinates: center, size and corners, from its meshes and CSG shapes, or from its collision shapes when it has none. For a Control or a 2D node, measure its rectangle in canvas pixels, from controls, sprites, polygons, lines and tile maps, or from 2D collision shapes; a control also says whether it fits the window of the project. Use it to check placement and scale, such as whether a crate rests on the floor, a door is wide enough for the player or a health bar stays on screen.',
       inputSchema: nodeGetBoundsInput,
       annotations: readingAnnotations,
       alwaysLoad: false,
@@ -211,11 +220,14 @@ export function createNodeGetBoundsTool(editor: EditorGateway): BridgeTool<typeo
 
 function describeBounds(bounds: NodeBounds, inGame: boolean): string {
   const place = inGame ? `the running game${bounds.scene === '' ? '' : ` (${bounds.scene})`}` : bounds.scene;
+  const window =
+    bounds.window === undefined ? [] : [`It ${bounds.inside_window === true ? 'lies inside' : 'reaches outside'} the ${bounds.window} window of the project.`];
   return [
-    `${capitalized(formatNodePath(bounds.path))} (${bounds.type}) in ${place}, in world coordinates:`,
+    `${capitalized(formatNodePath(bounds.path))} (${bounds.type}) in ${place}, in ${bounds.dimensions === 2 ? 'canvas pixels' : 'world coordinates'}:`,
     `center ${bounds.center}, size ${bounds.size}`,
     `from ${bounds.position} to ${bounds.end}`,
     describeMeasuredNodes(bounds),
+    ...window,
   ].join('\n');
 }
 
@@ -240,6 +252,7 @@ export const groupsChangedSchema = z.object({
   added: z.array(z.string()),
   removed: z.array(z.string()),
   unchanged: z.array(z.string()),
+  editable_children: editableChildrenSchema,
 });
 
 type GroupsChanged = z.infer<typeof groupsChangedSchema>;
@@ -281,7 +294,7 @@ function describeGroupChange(changed: GroupsChanged): string {
   if (changed.unchanged.length > 0) {
     lines.push(`Already as asked: ${changed.unchanged.join(', ')}`);
   }
-  return lines.join('\n');
+  return withEditableChildrenSentence(lines.join('\n'), changed.editable_children);
 }
 
 function listOfGroups(groups: readonly string[]): string {
@@ -300,7 +313,7 @@ export function createNodeSetPropertiesTool(editor: EditorGateway): BridgeTool<t
     definition: {
       title: 'Set node properties',
       description:
-        'Set several properties of a node as one Undo step, including script (a res://….gd path) and resources (a res:// path, or {"new": "Class", …} to create one). Every value is read back: the result lists what applied, what was rejected and why, and what the engine changed, for example by clamping.',
+        'Set several properties of a node as one Undo step, including script (a res://….gd path) and resources (a res:// path, or {"new": "Class", …} to create one). Every value is read back: the result lists what applied, what was rejected and why, and what the engine changed, for example by clamping. A node inside an instanced scene, such as "Enemy2/Mesh", changes for that instance only: Editable Children of the instance is turned on, as in the editor, so that the change is saved with this scene.',
       inputSchema: nodeSetPropertiesInput,
       annotations: changingAnnotations({ destructive: true, idempotent: true }),
       alwaysLoad: false,
@@ -311,9 +324,9 @@ export function createNodeSetPropertiesTool(editor: EditorGateway): BridgeTool<t
       const node = formatNodePath(updated.path);
       const report = formatApplyReport(updated);
       if (updated.applied.length === 0) {
-        return errorResult(`No property of ${node} in ${updated.scene} took the requested value.\n${report}`);
+        return errorResult(withEditableChildrenSentence(`No property of ${node} in ${updated.scene} took the requested value.\n${report}`, updated.editable_children));
       }
-      return textResult(`Updated ${node} in ${updated.scene}. The scene has unsaved changes.\n${report}`);
+      return textResult(withEditableChildrenSentence(`Updated ${node} in ${updated.scene}. The scene has unsaved changes.\n${report}`, updated.editable_children));
     },
   });
 }

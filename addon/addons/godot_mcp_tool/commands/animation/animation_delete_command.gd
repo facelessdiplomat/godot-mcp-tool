@@ -27,7 +27,7 @@ func execute(params: Dictionary) -> Variant:
 	if resolved is GodotMcpCommandError:
 		return resolved
 	var scene_root := resolved as Node
-	var found: Variant = GodotMcpAnimationReference.find_player(scene_root, player_path)
+	var found: Variant = GodotMcpAnimationReference.find_player_to_change(scene_root, player_path)
 	if found is GodotMcpCommandError:
 		return found
 	var player := found as AnimationPlayer

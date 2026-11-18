@@ -3,6 +3,7 @@ extends RefCounted
 const GodotMcpChangeSet := preload("../change_set.gd")
 const GodotMcpCommandError := preload("../../commands/command_error.gd")
 const GodotMcpEditingContext := preload("../editing_context.gd")
+const GodotMcpInstancedScenes := preload("../instanced_scenes.gd")
 const GodotMcpJsonRpc := preload("../../bridge/json_rpc.gd")
 const GodotMcpNodeFactory := preload("../node_factory.gd")
 const GodotMcpNodeLocator := preload("../node_locator.gd")
@@ -12,6 +13,7 @@ var changes := GodotMcpChangeSet.new()
 var action_name := ""
 
 var _context: GodotMcpEditingContext
+var _editable_children: Array = []
 
 
 func _init(context: GodotMcpEditingContext) -> void:
@@ -24,6 +26,14 @@ func prepare(_scene_root: Node, _params: Dictionary) -> GodotMcpCommandError:
 
 func finish() -> Dictionary:
 	return {}
+
+
+func discard_outside_changes() -> void:
+	pass
+
+
+func _save_changes_inside_instances(node: Node, scene_root: Node) -> void:
+	_editable_children = GodotMcpInstancedScenes.turn_on_editable_children_for(node, scene_root, changes)
 
 
 static func owned_subtree(node: Node, scene_root: Node) -> Array[Node]:

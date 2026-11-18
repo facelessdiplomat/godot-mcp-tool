@@ -1,5 +1,6 @@
 extends RefCounted
 
+const GodotMcpInstancedScenes := preload("instanced_scenes.gd")
 const GodotMcpNodeFactory := preload("node_factory.gd")
 const GodotMcpNodeLocator := preload("node_locator.gd")
 const GodotMcpSimilarNames := preload("../util/similar_names.gd")
@@ -74,7 +75,7 @@ static func saved_connections(node: Node, signal_name: String = "") -> Array[Dic
 
 static func describe_connection(scene_root: Node, source: Node, connection: Dictionary, codec: GodotMcpVariantCodec) -> Dictionary:
 	var callable: Callable = connection["callable"]
-	return {
+	var description := {
 		"from": GodotMcpNodeLocator.path_of(scene_root, source),
 		"signal": str((connection["signal"] as Signal).get_name()),
 		"to": target_text(scene_root, callable.get_object()),
@@ -82,6 +83,9 @@ static func describe_connection(scene_root: Node, source: Node, connection: Dict
 		"flags": flag_names(int(connection["flags"])),
 		"binds": codec.encode(callable.get_bound_arguments()),
 	}
+	if GodotMcpInstancedScenes.is_inherited(connection):
+		description["inherited"] = true
+	return description
 
 
 static func target_text(scene_root: Node, target: Object) -> String:

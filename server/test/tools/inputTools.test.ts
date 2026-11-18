@@ -193,6 +193,124 @@ describe('input tools', () => {
     expect(textOf(result)).toBe('Played 1 input step in 40 ms (2 physics frames).\nNo screenshot: The game runs without a window (headless), so it cannot render a screenshot');
   });
 
+  it('game_input forwards wheel, drag, touch, Control clicks and screenshot steps', async () => {
+    const editor = new FakeEditorGateway().respondTo('game.input', { steps: 7, waited_ms: 90, released: [], held: [], physics_frames: 6, paused: false, game_frame: 50 });
+    const steps = [
+      { wheel: 'down' as const, at: [20, 30], clicks: 2 },
+      { click: [10, 10], state: 'down' as const },
+      { mouse_motion: [30, 0] },
+      { click: [40, 10], state: 'up' as const },
+      { click: 'Menu/Resume' },
+      { touch: [50, 60], finger: 1, state: 'down' as const },
+      { touch_drag: [20, 0], finger: 1 },
+      { screenshot: true as const },
+    ];
+
+    await createGameInputTool(editor, () => Buffer.alloc(0)).execute({ steps });
+
+    expect(editor.requests[0]?.params).toEqual({ steps, release_at_end: true, screenshot: false });
+  });
+
+  it('game_input says where it clicked a Control and where it stopped', async () => {
+    const editor = new FakeEditorGateway().respondTo('game.input', {
+      steps: 3,
+      waited_ms: 60,
+      released: [],
+      held: [],
+      physics_frames: 4,
+      paused: false,
+      game_frame: 80,
+      clicked: [{ step: 1, path: 'Menu/Resume', at: [640, 360] }],
+      failed_step: { step: 2, error: 'Menu/Quit is not visible, so it cannot be clicked' },
+    });
+
+    const text = textOf(await createGameInputTool(editor, () => Buffer.alloc(0)).execute({ steps: [{ click: 'Menu/Resume' }, { click: 'Menu/Quit' }, { action: 'jump' }] }));
+
+    expect(text).toBe(
+      [
+        'Played 3 input steps in 60 ms (4 physics frames).',
+        'Step 1 clicked Menu/Resume at [640, 360].',
+        'Stopped at step 2: Menu/Quit is not visible, so it cannot be clicked. The later steps did not run.',
+      ].join('\n'),
+    );
+  });
+
+  it('game_input shows the screenshots of several moments as one labelled image', async () => {
+    const editor = new FakeEditorGateway().respondTo('game.input', {
+      steps: 3,
+      waited_ms: 70,
+      released: [],
+      held: [],
+      physics_frames: 10,
+      paused: false,
+      game_frame: 60,
+      screenshot: {
+        path: '/captures/moments-1-001.png',
+        width: 1280,
+        height: 368,
+        original_width: 1280,
+        original_height: 368,
+        scene: 'res://levels/arena.tscn',
+        views: [],
+        moments: ['step 1, frame 0', 'step 3, frame 10', 'end, frame 10'],
+      },
+    });
+
+    const result = await createGameInputTool(editor, () => Buffer.from('png')).execute({ steps: [{ screenshot: true }, { wait_physics_frames: 10 }, { screenshot: true }], screenshot: true });
+
+    expect(result.content[1]).toEqual({
+      type: 'text',
+      text: [
+        'Played 3 input steps in 70 ms (10 physics frames).',
+        'Screenshots of the running game (res://levels/arena.tscn) at step 1, frame 0; step 3, frame 10; end, frame 10, in one labelled image, 1280×368.',
+        'Saved to /captures/moments-1-001.png',
+      ].join('\n'),
+    });
+  });
+
+  it('game_input tells how to release a held mouse button or finger', async () => {
+    const editor = new FakeEditorGateway().respondTo('game.input', { steps: 2, waited_ms: 10, released: [], held: ['mouse right', 'touch 1'], physics_frames: 0, paused: false, game_frame: 5 });
+
+    const text = textOf(
+      await createGameInputTool(editor, () => Buffer.alloc(0)).execute({
+        steps: [{ click: [5, 5], button: 'right', state: 'down' }, { touch: [5, 5], finger: 1, state: 'down' }],
+        release_at_end: false,
+      }),
+    );
+
+    expect(text).toContain('Release it with {"click": [x, y], "button": "right", "state": "up"}.');
+  });
+
+  it('game_input lists the signals emitted while it played', async () => {
+    const editor = new FakeEditorGateway().respondTo('game.input', {
+      steps: 2,
+      waited_ms: 80,
+      released: [],
+      held: [],
+      physics_frames: 40,
+      paused: false,
+      game_frame: 100,
+      signals: [
+        { node: 'Player', signal: 'landed', emissions: [{ step: 2, physics_frames: 38, arguments: [] }] },
+        { node: 'Player', signal: 'died', emissions: [] },
+      ],
+    });
+
+    const text = textOf(
+      await createGameInputTool(editor, () => Buffer.alloc(0)).execute({
+        steps: [{ action: 'jump' }, { wait_physics_frames: 38 }],
+        watch_signals: [
+          { node: 'Player', signal: 'landed' },
+          { node: 'Player', signal: 'died' },
+        ],
+      }),
+    );
+
+    expect(editor.requests[0]?.params).toMatchObject({ watch_signals: [{ node: 'Player', signal: 'landed' }, { node: 'Player', signal: 'died' }] });
+    expect(text).toContain('Player.landed was emitted 1 time: in step 2 after 38 physics frames.');
+    expect(text).toContain('Player.died was not emitted.');
+  });
+
   it('game_input reads nodes at moments of the input', async () => {
     const editor = new FakeEditorGateway().respondTo('game.input', {
       steps: 3,

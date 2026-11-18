@@ -7,6 +7,7 @@ const GodotMcpNodeMatcher := preload("../../scene/node_matcher.gd")
 const GodotMcpParams := preload("../params.gd")
 const GodotMcpSceneSnapshot := preload("../../scene/scene_snapshot.gd")
 const GodotMcpSceneTreeDescriber := preload("../../scene/scene_tree_describer.gd")
+const GodotMcpSceneView := preload("../../scene/scene_view.gd")
 
 const DEFAULT_MAX_RESULTS := 50
 
@@ -24,7 +25,8 @@ func execute(params: Dictionary) -> Variant:
 	var script_path: Variant = GodotMcpParams.text(params, "script")
 	var scene_path: Variant = GodotMcpParams.text(params, "scene")
 	var max_results: Variant = GodotMcpParams.whole_number(params, "max_results", DEFAULT_MAX_RESULTS)
-	for value in [name_pattern, type_name, group, script_path, scene_path, max_results]:
+	var expand_instances: Variant = GodotMcpParams.flag(params, "expand_instances", false)
+	for value in [name_pattern, type_name, group, script_path, scene_path, max_results, expand_instances]:
 		if value is GodotMcpCommandError:
 			return value
 	if [name_pattern, type_name, group, script_path].all(func(criterion: String) -> bool: return criterion.is_empty()):
@@ -35,21 +37,16 @@ func execute(params: Dictionary) -> Variant:
 	if resolved is GodotMcpCommandError:
 		return resolved
 	var snapshot := resolved as GodotMcpSceneSnapshot
-	var found: Array[Node] = []
-	_collect_matches(snapshot.root, snapshot.root, GodotMcpNodeMatcher.new(name_pattern, type_name, group, script_path), found)
+	var view := GodotMcpSceneView.new(snapshot.root, expand_instances)
+	var matcher := GodotMcpNodeMatcher.new(name_pattern, type_name, group, script_path)
+	var found := view.nodes_under(snapshot.root).filter(func(node: Node) -> bool: return matcher.matches(node))
 	var limit := maxi(max_results, 1)
 	var matches: Array = []
-	for node in found.slice(0, limit):
+	for node: Node in found.slice(0, limit):
 		var entry := {"path": GodotMcpNodeLocator.path_of(snapshot.root, node)}
 		entry.merge(GodotMcpSceneTreeDescriber.traits_of(node, snapshot.root))
+		entry.merge(GodotMcpSceneTreeDescriber.editing_traits_of(node, view))
 		matches.append(entry)
-	var result := {"scene": snapshot.scene_path, "matches": matches, "total": found.size(), "truncated": found.size() > limit}
+	var result := {"scene": snapshot.scene_path, "matches": matches, "total": found.size(), "truncated": found.size() > limit, "hidden_instance_nodes": view.hides_instance_nodes}
 	snapshot.release()
 	return result
-
-
-static func _collect_matches(node: Node, scene_root: Node, matcher: GodotMcpNodeMatcher, found: Array[Node]) -> void:
-	if matcher.matches(node):
-		found.append(node)
-	for child in GodotMcpSceneTreeDescriber.owned_children(node, scene_root):
-		_collect_matches(child, scene_root, matcher, found)

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { readExportPresets } from '../../src/export/ExportPresets.js';
+import { readExportPresets, withExportPreset } from '../../src/export/ExportPresets.js';
 
 const presetsWrittenByTheEditor = [
   '[preset.0]',
@@ -61,5 +61,31 @@ describe('readExportPresets', () => {
 
   it('finds no presets in an empty file', () => {
     expect(readExportPresets('')).toEqual([]);
+  });
+});
+
+describe('adding an export preset', () => {
+  it('writes the first preset with the fields the editor reads, runnable', () => {
+    const text = withExportPreset('', { name: 'Linux', platform: 'Linux', exportPath: 'build/linux/capsule-walk.x86_64' });
+
+    expect(text).toBe(
+      ['[preset.0]', '', 'name="Linux"', 'platform="Linux"', 'runnable=true', 'export_filter="all_resources"', 'include_filter=""', 'exclude_filter=""', 'export_path="build/linux/capsule-walk.x86_64"', ''].join('\n'),
+    );
+    expect(readExportPresets(text)).toEqual([{ name: 'Linux', platform: 'Linux', exportPath: 'build/linux/capsule-walk.x86_64' }]);
+  });
+
+  it('numbers the next preset after the others and leaves the runnable one of a platform alone', () => {
+    const first = withExportPreset('', { name: 'Linux', platform: 'Linux', exportPath: 'build/linux/game.x86_64' });
+
+    const second = withExportPreset(first, { name: 'Linux demo', platform: 'Linux', exportPath: 'build/demo/game.x86_64' });
+
+    expect(second).toContain('\n[preset.1]\n\nname="Linux demo"\nplatform="Linux"\nrunnable=false\n');
+    expect(readExportPresets(second).map((preset) => preset.name)).toEqual(['Linux', 'Linux demo']);
+  });
+
+  it('refuses a name that a preset has already', () => {
+    const first = withExportPreset('', { name: 'Linux', platform: 'Linux', exportPath: 'build/linux/game.x86_64' });
+
+    expect(() => withExportPreset(first, { name: 'Linux', platform: 'Linux', exportPath: 'build/other/game.x86_64' })).toThrow('A preset named "Linux" exists already');
   });
 });

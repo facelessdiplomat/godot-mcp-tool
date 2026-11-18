@@ -33,6 +33,7 @@ export interface ScriptReport {
 export interface ValidationResult {
   readonly method: ValidationMethod;
   readonly reports: readonly ScriptReport[];
+  readonly shaderReports?: readonly ScriptReport[];
   readonly fallbackReason?: string;
 }
 

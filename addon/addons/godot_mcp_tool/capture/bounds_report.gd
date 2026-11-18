@@ -1,7 +1,9 @@
 extends RefCounted
 
 const GodotMcpBounds := preload("bounds.gd")
+const GodotMcpCanvasBounds := preload("canvas_bounds.gd")
 const GodotMcpCommandError := preload("../commands/command_error.gd")
+const GodotMcpHeadlessWindow := preload("../runtime/headless_window.gd")
 const GodotMcpJsonRpc := preload("../bridge/json_rpc.gd")
 const GodotMcpNodeFactory := preload("../scene/node_factory.gd")
 const GodotMcpVariantCodec := preload("../codec/variant_codec.gd")
@@ -10,6 +12,8 @@ const DECIMAL_SCALE := 1000.0
 
 
 static func describe(node: Node, codec: GodotMcpVariantCodec) -> Variant:
+	if node is CanvasItem:
+		return _describe_canvas_item(node as CanvasItem, codec)
 	var not_3d := _not_3d_error(node)
 	if not_3d != null:
 		return not_3d
@@ -32,14 +36,37 @@ static func framing_bounds(node: Node, is_whole_scene: bool) -> Variant:
 	return GodotMcpBounds.measure(node)["aabb"]
 
 
+static func _describe_canvas_item(item: CanvasItem, codec: GodotMcpVariantCodec) -> Dictionary:
+	var measured := GodotMcpCanvasBounds.measure(item)
+	var rect := measured["rect"] as Rect2
+	var report := {
+		"dimensions": 2,
+		"position": codec.encode(_rounded_2d(rect.position)),
+		"size": codec.encode(_rounded_2d(rect.size)),
+		"center": codec.encode(_rounded_2d(rect.get_center())),
+		"end": codec.encode(_rounded_2d(rect.end)),
+		"visual_count": measured["visual_count"],
+		"collision_count": measured["collision_count"],
+	}
+	if item is Control:
+		var window := Vector2(GodotMcpHeadlessWindow.project_window_size())
+		report["window"] = codec.encode(window)
+		report["inside_window"] = Rect2(Vector2.ZERO, window).encloses(rect)
+	return report
+
+
 static func _not_3d_error(node: Node) -> GodotMcpCommandError:
 	if node is Node3D:
 		return null
 	return GodotMcpCommandError.new(
 		GodotMcpJsonRpc.INVALID_PARAMS,
-		"\"%s\" is a %s, not a 3D node" % [node.name, GodotMcpNodeFactory.display_class(node)],
-		"Bounds are measured for Node3D nodes, such as MeshInstance3D, CSGBox3D or CharacterBody3D, together with their children.",
+		"\"%s\" is a %s, neither a 3D nor a 2D node" % [node.name, GodotMcpNodeFactory.display_class(node)],
+		"Bounds are measured for Node3D nodes, such as MeshInstance3D or CharacterBody3D, and for Control and Node2D nodes, such as a Button or a Sprite2D, together with their children.",
 	)
+
+
+static func _rounded_2d(vector: Vector2) -> Vector2:
+	return (vector * DECIMAL_SCALE).round() / DECIMAL_SCALE + Vector2.ZERO
 
 
 static func _rounded(vector: Vector3) -> Vector3:

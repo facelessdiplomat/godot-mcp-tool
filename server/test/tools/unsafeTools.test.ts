@@ -37,6 +37,26 @@ describe('unsafe tools', () => {
     expect(textOf(counted)).toBe('Called get_child_count on Camera in res://levels/arena.tscn: it returned 0 and changed no property of Camera.');
   });
 
+  it('node_call_method says when a call inside an instance turned on its editable children', async () => {
+    const editor = new FakeEditorGateway().respondTo('node.call_method', {
+      scene: 'res://levels/arena.tscn',
+      path: 'Enemy2/Mesh',
+      method: 'rotate_y',
+      value: null,
+      changed: ['rotation'],
+      editable_children: ['Enemy2'],
+    });
+
+    const result = await createNodeCallMethodTool(editor).execute({ path: 'Enemy2/Mesh', method: 'rotate_y', args: [1] });
+
+    expect(textOf(result)).toBe(
+      [
+        'Called rotate_y on Enemy2/Mesh in res://levels/arena.tscn. It changed rotation, recorded as one Undo step; the scene has unsaved changes.',
+        'Turned on Editable Children of Enemy2, so that this change inside the instanced scene is saved with this scene.',
+      ].join('\n'),
+    );
+  });
+
   it('game_eval shows the value with its type', async () => {
     const game = new FakeEditorGateway().respondTo('game.eval', { node: 'Player', value: 'Vector3(0, 1, 0)', type: 'Vector3' });
 

@@ -33,6 +33,14 @@ describe('game tools', () => {
     expect(createGameRunTool(editor, new GameOutputCursor()).definition.showsErrors).toBe(true);
   });
 
+  it('game_run asks the editor to stop the game at its first error', async () => {
+    const editor = new FakeEditorGateway().respondTo('game.run', quietRun);
+
+    await createGameRunTool(editor, new GameOutputCursor()).execute({ break_on_error: true });
+
+    expect(editor.requests[0]?.params).toEqual({ scene: 'main', watch_ms: 1000, stop_after: false, break_on_error: true });
+  });
+
   it('game_run passes a fixed frame rate and explains what it means', async () => {
     const editor = new FakeEditorGateway().respondTo('game.run', quietRun);
 
@@ -46,6 +54,27 @@ describe('game tools', () => {
         'No output yet.',
       ].join('\n'),
     );
+  });
+
+  it('game_run forwards debug drawing, game arguments, the window size and the locale', async () => {
+    const editor = new FakeEditorGateway().respondTo('game.run', quietRun);
+
+    await createGameRunTool(editor, new GameOutputCursor()).execute({
+      debug_draw: ['collisions', 'navigation'],
+      arguments: ['--level=3'],
+      window_size: [1280, 720],
+      locale: 'de',
+    });
+
+    expect(editor.requests[0]?.params).toEqual({
+      scene: 'main',
+      watch_ms: 1000,
+      stop_after: false,
+      debug_draw: ['collisions', 'navigation'],
+      arguments: ['--level=3'],
+      window_size: [1280, 720],
+      locale: 'de',
+    });
   });
 
   it('game_run runs for a given time and stops', async () => {
@@ -194,6 +223,47 @@ describe('game tools', () => {
 
     expect(editor.requests[0]?.params).toEqual({ path: '.', max_depth: 8, max_nodes: 200 });
     expect(text).toBe(['The running game, current scene res://levels/arena.tscn', 'Arena: Node3D', '├─ Player: CharacterBody3D', '└─ Bullet: Node3D'].join('\n'));
+  });
+
+  it('game_get_tree lists the visible controls to read and click a menu', async () => {
+    const editor = new FakeEditorGateway().respondTo('game.get_tree', {
+      scene: 'res://levels/arena.tscn',
+      total: 4,
+      truncated: false,
+      controls: [
+        { path: 'Menu/Title', type: 'Label', rect: [40, 10, 160, 20], text: 'Paused', focused: false },
+        { path: 'Menu/Resume', type: 'Button', rect: [40, 40, 160, 50], text: 'Resume', disabled: false, focused: true },
+        { path: 'Menu/Quit', type: 'Button', rect: [40, 100, 160, 50], text: 'Quit', disabled: true, focused: false },
+        { path: 'HUD/Health', type: 'ProgressBar', rect: [300, 10, 200, 20], value: 75, focused: false },
+      ],
+    });
+
+    const text = textOf(await createGameGetTreeTool(editor).execute({ controls: true }));
+
+    expect(editor.requests[0]?.params).toEqual({ max_depth: 8, max_nodes: 200, controls: true });
+    expect(text).toBe(
+      [
+        'Visible controls of the running game, current scene res://levels/arena.tscn, with their rectangles [x, y, width, height] in game-view pixels:',
+        'Menu/Title: Label "Paused" [40, 10, 160, 20]',
+        'Menu/Resume: Button "Resume" [40, 40, 160, 50], focused',
+        'Menu/Quit: Button "Quit" [40, 100, 160, 50], disabled',
+        'HUD/Health: ProgressBar value 75 [300, 10, 200, 20]',
+        'Click one with game_input, such as {"click": "Menu/Resume"}.',
+      ].join('\n'),
+    );
+  });
+
+  it('game_wait waits for a signal and shows its arguments', async () => {
+    const editor = new FakeEditorGateway()
+      .respondTo('game.wait', { emitted: true, arguments: [2.5], physics_frames: 3, waited_ms: 50, paused: false, game_frame: 90 })
+      .respondTo('game.wait', { emitted: false, physics_frames: 600, waited_ms: 10_000, paused: false, game_frame: 700 });
+
+    const emitted = textOf(await createGameWaitTool(editor).execute({ signal: 'landed', node: 'Player' }));
+    const missed = textOf(await createGameWaitTool(editor).execute({ signal: 'died', node: 'Enemy' }));
+
+    expect(editor.requests[0]?.params).toEqual({ signal: 'landed', node: 'Player', timeout_ms: 10_000 });
+    expect(emitted).toBe('Player emitted landed after 50 ms (3 physics frames) with [2.5].');
+    expect(missed).toBe('Enemy did not emit died within 10000 ms.');
   });
 
   it('game_get_properties lists values, getters included', async () => {

@@ -59,6 +59,7 @@ func prepare(scene_root: Node, params: Dictionary) -> GodotMcpCommandError:
 		return null
 	changes.add_do_call(source, &"connect", [signal_name, callable, _flags])
 	changes.add_undo_call(source, &"disconnect", [signal_name, callable])
+	_save_changes_inside_instances(source, scene_root)
 	return null
 
 
@@ -71,4 +72,5 @@ func finish() -> Dictionary:
 		"flags": GodotMcpSignalCatalog.flag_names(_flags),
 		"binds": _context.codec.encode(_binds),
 		"already_connected": _already_connected,
+		"editable_children": _editable_children,
 	}

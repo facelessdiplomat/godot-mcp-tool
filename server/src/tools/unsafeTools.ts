@@ -3,6 +3,7 @@ import * as z from 'zod/v4';
 import type { EditorGateway } from '../editor/EditorGateway.js';
 import { changingAnnotations } from './annotations.js';
 import { BridgeTool } from './bridge/BridgeTool.js';
+import { editableChildrenSchema, withEditableChildrenSentence } from './formatting/editableChildren.js';
 import { describeUses, type FileUsages, fileUsagesShape, formatCodeMentions, formatUsers } from './formatting/fileUsageReports.js';
 import { formatNodePath, formatValue } from './formatting/propertyReports.js';
 import { nodePath, sceneToChange } from './parameters.js';
@@ -12,7 +13,14 @@ const scriptRunSchema = z.object({ value: z.unknown(), errors: z.array(z.object(
 
 type ScriptRun = z.infer<typeof scriptRunSchema>;
 
-const methodCallSchema = z.object({ scene: z.string(), path: z.string(), method: z.string(), value: z.unknown(), changed: z.array(z.string()) });
+const methodCallSchema = z.object({
+  scene: z.string(),
+  path: z.string(),
+  method: z.string(),
+  value: z.unknown(),
+  changed: z.array(z.string()),
+  editable_children: editableChildrenSchema,
+});
 
 type MethodCall = z.infer<typeof methodCallSchema>;
 
@@ -89,7 +97,7 @@ function describeCall(call: MethodCall): string {
     return returned === undefined ? `${head}. It changed no property of ${node}.` : `${head}: it returned ${returned} and changed no property of ${node}.`;
   }
   const change = `It changed ${call.changed.join(', ')}, recorded as one Undo step; the scene has unsaved changes.`;
-  return returned === undefined ? `${head}. ${change}` : `${head}: it returned ${returned}. ${change}`;
+  return withEditableChildrenSentence(returned === undefined ? `${head}. ${change}` : `${head}: it returned ${returned}. ${change}`, call.editable_children);
 }
 
 const gameEvalInput = z.object({

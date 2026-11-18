@@ -47,7 +47,7 @@ func _open_viewport(world: World3D, view: Dictionary, size: Vector2i, labelled: 
 	camera.transform = view["transform"]
 	viewport.add_child(camera)
 	if labelled:
-		viewport.add_child(_label(view["label"], size))
+		viewport.add_child(label_for(view["label"], size))
 	_host.add_child(viewport)
 	camera.make_current()
 	camera.force_update_transform()
@@ -55,7 +55,7 @@ func _open_viewport(world: World3D, view: Dictionary, size: Vector2i, labelled: 
 	return viewport
 
 
-static func _label(text: String, cell_size: Vector2i) -> Label:
+static func label_for(text: String, cell_size: Vector2i) -> Label:
 	var font_size := maxi(MINIMUM_LABEL_FONT_SIZE, roundi(cell_size.y * LABEL_FONT_SHARE))
 	var label := Label.new()
 	label.text = text

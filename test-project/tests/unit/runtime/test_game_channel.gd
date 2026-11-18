@@ -5,14 +5,23 @@ const GodotMcpGameChannel := preload("res://addons/godot_mcp_tool/runtime/game_c
 const GodotMcpJsonRpc := preload("res://addons/godot_mcp_tool/bridge/json_rpc.gd")
 
 var _sent: Array = []
+var _debugger_commands: Array = []
 var _channel: GodotMcpGameChannel
 
 
 func before_each() -> void:
 	_sent = []
+	_debugger_commands = []
 	_channel = GodotMcpGameChannel.new(func(payload: Dictionary) -> bool:
 		_sent.append(payload)
+		return true, func(command: String) -> bool:
+		_debugger_commands.append(command)
 		return true)
+
+
+func test_passes_a_command_to_the_debugger_of_the_game() -> void:
+	assert_true(_channel.send_debugger_command("out"))
+	assert_eq(_debugger_commands, ["out"])
 
 
 func _answer_after_a_frame(answer: Dictionary) -> void:

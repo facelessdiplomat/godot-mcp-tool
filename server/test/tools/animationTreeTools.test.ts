@@ -102,6 +102,59 @@ describe('animation tree tools', () => {
     );
   });
 
+  it('animation_tree_set describes blend states and how a script sets their position', async () => {
+    type Position = number | [number, number];
+    const blendStates: { name: string; blend: { animation: string; at: Position }[]; min?: Position; max?: Position }[] = [
+      { name: 'move', blend: [{ animation: 'walk', at: 2 }, { animation: 'run', at: 6 }] },
+      {
+        name: 'strafe',
+        blend: [
+          { animation: 'idle', at: [0, 0] },
+          { animation: 'strafe_left', at: [-1, 0] },
+          { animation: 'strafe_right', at: [1, 0] },
+          { animation: 'walk', at: [0, 1] },
+        ],
+        min: [-1, 0],
+        max: [1, 1],
+      },
+    ];
+    const editor = new FakeEditorGateway().respondTo('animation_tree.set', {
+      scene: 'res://level.tscn',
+      tree: 'Character/AnimationTree',
+      player: 'Character/AnimationPlayer',
+      states: [
+        { name: 'move', blend: [{ animation: 'walk', at: 2 }, { animation: 'run', at: 6 }], min: 2, max: 6, parameter: 'parameters/move/blend_position' },
+        {
+          name: 'strafe',
+          blend: [
+            { animation: 'idle', at: [0, 0] },
+            { animation: 'strafe_left', at: [-1, 0] },
+            { animation: 'strafe_right', at: [1, 0] },
+            { animation: 'walk', at: [0, 1] },
+          ],
+          min: [-1, 0],
+          max: [1, 1],
+          parameter: 'parameters/strafe/blend_position',
+        },
+      ],
+      transitions: [{ from: 'Start', to: 'move', advance: 'auto', switch: 'immediate', xfade: 0 }],
+      rejected: [],
+      warnings: [],
+    });
+
+    const result = await createAnimationTreeSetTool(editor).execute({
+      tree: 'Character/AnimationTree',
+      states: blendStates,
+      transitions: [{ from: 'Start', to: 'move' }],
+    });
+
+    expect(editor.requests[0]?.params).toEqual({ tree: 'Character/AnimationTree', states: blendStates, transitions: [{ from: 'Start', to: 'move' }] });
+    expect(textOf(result).split('\n').slice(1, 3)).toEqual([
+      'States: move (blends walk at 2 and run at 6 by parameters/move/blend_position, from 2 to 6), strafe (blends idle at [0, 0], strafe_left at [-1, 0], strafe_right at [1, 0] and walk at [0, 1] by parameters/strafe/blend_position, from [-1, 0] to [1, 1])',
+      'Set a blend position from a script, such as $AnimationTree.set("parameters/move/blend_position", velocity.length()), or in the running game with game_set_properties on the AnimationTree.',
+    ]);
+  });
+
   it('animation_tree_set fails when no state could be used', async () => {
     const editor = new FakeEditorGateway().respondTo('animation_tree.set', {
       scene: 'res://level.tscn',

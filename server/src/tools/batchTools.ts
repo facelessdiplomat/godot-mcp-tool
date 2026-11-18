@@ -2,8 +2,22 @@ import * as z from 'zod/v4';
 import type { EditorGateway } from '../editor/EditorGateway.js';
 import { changingAnnotations } from './annotations.js';
 import { BridgeTool } from './bridge/BridgeTool.js';
+import { editableChildrenExplanation, withEditableChildrenNote } from './formatting/editableChildren.js';
 import { type ApplyReport, formatNodePath, formatValue } from './formatting/propertyReports.js';
-import { duplicatedNodeSchema, movedNodeSchema, nodeDuplicateInput, nodeReparentInput, summarizeDuplication, summarizeMove } from './nodeStructureTools.js';
+import {
+  duplicatedNodeSchema,
+  localizedInstanceSchema,
+  movedNodeSchema,
+  nodeDuplicateInput,
+  nodeMakeLocalInput,
+  nodeReparentInput,
+  nodeSaveAsSceneInput,
+  savedBranchSchema,
+  summarizeDuplication,
+  summarizeLocalization,
+  summarizeMove,
+  summarizeSavedBranch,
+} from './nodeStructureTools.js';
 import {
   addedNodeSchema,
   deletedNodesSchema,
@@ -16,6 +30,7 @@ import {
   updatedNodeSchema,
 } from './nodeTools.js';
 import { propertyValues, sceneToChange } from './parameters.js';
+import { addedCollisionSchema, nodeAddCollisionInput, summarizeAddedCollision } from './placementTools.js';
 import { textResult } from './results.js';
 import { connectedSignalSchema, disconnectedSignalSchema, signalConnectInput, signalDisconnectInput, summarizeConnection, summarizeDisconnection } from './signalTools.js';
 
@@ -32,6 +47,9 @@ const operationSchema = z.discriminatedUnion('op', [
   z.strictObject({ op: z.literal('node_set_groups'), ...nodeSetGroupsInput.omit({ scene: true }).shape }),
   z.strictObject({ op: z.literal('node_reparent'), ...nodeReparentInput.omit({ scene: true }).shape }),
   z.strictObject({ op: z.literal('node_duplicate'), ...nodeDuplicateInput.omit({ scene: true }).shape, properties: briefPropertyValues.optional() }),
+  z.strictObject({ op: z.literal('node_save_as_scene'), ...nodeSaveAsSceneInput.omit({ scene: true }).shape }),
+  z.strictObject({ op: z.literal('node_make_local'), ...nodeMakeLocalInput.omit({ scene: true }).shape }),
+  z.strictObject({ op: z.literal('node_add_collision'), ...nodeAddCollisionInput.omit({ scene: true }).shape }),
   z.strictObject({ op: z.literal('signal_connect'), ...signalConnectInput.omit({ scene: true }).shape }),
   z.strictObject({ op: z.literal('signal_disconnect'), ...signalDisconnectInput.omit({ scene: true }).shape }),
 ]);
@@ -45,6 +63,9 @@ const operationResultSchema = z.discriminatedUnion('op', [
   groupsChangedSchema.omit({ scene: true }).extend({ op: z.literal('node_set_groups') }),
   movedNodeSchema.omit({ scene: true }).extend({ op: z.literal('node_reparent') }),
   duplicatedNodeSchema.omit({ scene: true }).extend({ op: z.literal('node_duplicate') }),
+  savedBranchSchema.omit({ scene: true }).extend({ op: z.literal('node_save_as_scene') }),
+  localizedInstanceSchema.omit({ scene: true }).extend({ op: z.literal('node_make_local') }),
+  addedCollisionSchema.omit({ scene: true }).extend({ op: z.literal('node_add_collision') }),
   connectedSignalSchema.omit({ scene: true }).extend({ op: z.literal('signal_connect') }),
   disconnectedSignalSchema.omit({ scene: true }).extend({ op: z.literal('signal_disconnect') }),
 ]);
@@ -61,7 +82,7 @@ const sceneBatchEditInput = z.object({
     .min(1)
     .max(maximumOperations)
     .describe(
-      'The changes in order. Each is {"op": a tool name, ...the parameters of that tool except scene}, such as {"op": "node_add", "type": "CharacterBody3D", "name": "Player"}, {"op": "node_set_properties", "path": "Player", "properties": {"position": [0, 1, 0]}} or {"op": "signal_connect", "from": "Start", "signal": "pressed", "method": "_on_start_pressed"}. op is node_add, node_delete, node_set_properties, node_set_groups, node_reparent, node_duplicate, signal_connect or signal_disconnect.',
+      'The changes in order. Each is {"op": a tool name, ...the parameters of that tool except scene}, such as {"op": "node_add", "type": "CharacterBody3D", "name": "Player"}, {"op": "node_set_properties", "path": "Player", "properties": {"position": [0, 1, 0]}} or {"op": "signal_connect", "from": "Start", "signal": "pressed", "method": "_on_start_pressed"}. op is node_add, node_delete, node_set_properties, node_set_groups, node_reparent, node_duplicate, node_save_as_scene, node_make_local, node_add_collision, signal_connect or signal_disconnect.',
     ),
   scene: sceneToChange,
 });
@@ -89,28 +110,41 @@ function describeBatch(batch: BatchResult, operations: readonly Operation[]): st
   batch.results.forEach((result, index) => {
     lines.push(`${String(index + 1)}. ${summarizeOperation(result, operations[index])}`);
   });
+  if (batch.results.some((result) => editableChildrenOf(result).length > 0)) {
+    lines.push(editableChildrenExplanation);
+  }
   return lines.join('\n');
 }
 
 function summarizeOperation(result: OperationResult, operation: Operation | undefined): string {
   switch (result.op) {
     case 'node_add':
-      return withEngineAdjustments(withSetProperties(`Added ${result.path} (${result.type})`, result.applied), result);
+      return withEditableChildrenNote(withEngineAdjustments(withSetProperties(`Added ${result.path} (${result.type})`, result.applied), result), result.editable_children);
     case 'node_delete':
       return `Deleted ${result.deleted.join(', ')}`;
     case 'node_set_properties':
-      return withEngineAdjustments(`Set ${result.applied.join(', ')} of ${formatNodePath(result.path)}`, result);
+      return withEditableChildrenNote(withEngineAdjustments(`Set ${result.applied.join(', ')} of ${formatNodePath(result.path)}`, result), result.editable_children);
     case 'node_set_groups':
-      return summarizeGroupChange(result);
+      return withEditableChildrenNote(summarizeGroupChange(result), result.editable_children);
     case 'node_reparent':
       return summarizeMove(result, operation?.op === 'node_reparent' ? operation : {});
     case 'node_duplicate':
       return withEngineAdjustments(withSetProperties(summarizeDuplication(result), result.applied), result);
+    case 'node_save_as_scene':
+      return summarizeSavedBranch(result);
+    case 'node_make_local':
+      return summarizeLocalization(result);
+    case 'node_add_collision':
+      return withEditableChildrenNote(summarizeAddedCollision(result), result.editable_children);
     case 'signal_connect':
-      return summarizeConnection(result);
+      return withEditableChildrenNote(summarizeConnection(result), result.editable_children);
     case 'signal_disconnect':
       return summarizeDisconnection(result);
   }
+}
+
+function editableChildrenOf(result: OperationResult): readonly string[] {
+  return 'editable_children' in result ? result.editable_children : [];
 }
 
 function withSetProperties(summary: string, applied: readonly string[]): string {

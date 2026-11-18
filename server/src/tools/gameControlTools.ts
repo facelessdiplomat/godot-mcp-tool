@@ -40,6 +40,11 @@ const performanceSchema = z.object({
   physics_3d_active_objects: z.number(),
   physics_3d_collision_pairs: z.number(),
   physics_3d_islands: z.number(),
+  custom_monitors: z.record(z.string(), sampleSummarySchema).default({}),
+  profiled: z.boolean().optional(),
+  functions: z
+    .array(z.object({ script: z.string(), line: z.number(), function: z.string(), calls: z.number(), self_ms: z.number(), total_ms: z.number() }))
+    .default([]),
 });
 
 type Performance = z.infer<typeof performanceSchema>;
@@ -116,7 +121,7 @@ export function createGamePerformanceTool(game: EditorGateway): BridgeTool<typeo
     definition: {
       title: 'Game performance',
       description:
-        'Measure how the running game performs over a number of frames: frame time and FPS, time spent in process and physics code, draw calls and primitives, memory, counts of objects and nodes with orphan nodes (a sign of leaks), and the load of 3D physics. Needs a game started with game_run, with or without the editor.',
+        'Measure how the running game performs over a number of frames: frame time and FPS, time spent in process and physics code, draw calls and primitives, memory, counts of objects and nodes with orphan nodes (a sign of leaks), the load of 3D physics, the custom monitors the game adds with Performance.add_custom_monitor(), and in a game started from the editor the script functions that took the most time, with their files and lines. Needs a game started with game_run, with or without the editor.',
       inputSchema: gamePerformanceInput,
       annotations: readingAnnotations,
       alwaysLoad: false,
@@ -151,7 +156,33 @@ function describePerformance(measured: Performance): string {
     `Objects: ${String(measured.objects)}, nodes: ${String(measured.nodes)}, ${describeOrphans(measured.orphan_nodes)}, resources: ${String(measured.resources)}`,
     `3D physics: ${String(measured.physics_3d_active_objects)} active bodies, ${String(measured.physics_3d_collision_pairs)} collision pairs, ${String(measured.physics_3d_islands)} islands`,
   );
+  const monitors = Object.entries(measured.custom_monitors);
+  if (monitors.length > 0) {
+    lines.push(`Custom monitors: ${monitors.map(([name, summary]) => `${name} average ${formatNumber(summary.average)}, worst ${formatNumber(summary.max)}`).join('; ')}`);
+  }
+  lines.push(...describeFunctions(measured));
   return lines.join('\n');
+}
+
+function describeFunctions(measured: Performance): string[] {
+  if (measured.profiled === false) {
+    return ['Function times: not measured; they need a game started from the editor, whose debugger profiles its scripts.'];
+  }
+  if (measured.functions.length === 0) {
+    return measured.profiled === true ? ['Function times: no script function ran in these frames.'] : [];
+  }
+  return [
+    'Functions that took the most script time of their own over these frames:',
+    ...measured.functions.map(
+      (timed) =>
+        `- ${timed.function} (${timed.script}:${String(timed.line)}): ${timed.self_ms.toFixed(1)} ms in ${String(timed.calls)} calls, ${timed.total_ms.toFixed(1)} ms with what it calls`,
+    ),
+    'Look at the first one before the others: its own code takes the time, not the functions it calls.',
+  ];
+}
+
+function formatNumber(value: number): string {
+  return Number.isInteger(value) ? String(value) : value.toFixed(2);
 }
 
 function averageAndWorst(summary: SampleSummary): string {

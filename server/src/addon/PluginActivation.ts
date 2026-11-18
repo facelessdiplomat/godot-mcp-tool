@@ -12,11 +12,20 @@ export function isPluginEnabled(projectText: string): boolean {
 }
 
 export function withPluginEnabled(projectText: string): string {
+  return withPlugin(projectText, addonPluginPath, true);
+}
+
+export function isPluginPathEnabled(projectText: string, pluginPath: string): boolean {
+  return enabledPlugins(projectText).includes(pluginPath);
+}
+
+export function withPlugin(projectText: string, pluginPath: string, enabled: boolean): string {
   const plugins = enabledPlugins(projectText);
-  if (plugins.includes(addonPluginPath)) {
+  if (plugins.includes(pluginPath) === enabled) {
     return projectText;
   }
-  const enabledLine = `${enabledKey}=PackedStringArray(${[...plugins, addonPluginPath].map((plugin) => `"${plugin}"`).join(', ')})`;
+  const remaining = enabled ? [...plugins, pluginPath] : plugins.filter((plugin) => plugin !== pluginPath);
+  const enabledLine = `${enabledKey}=PackedStringArray(${remaining.map((plugin) => `"${plugin}"`).join(', ')})`;
   const lines = projectText.split('\n');
   const sectionStart = lines.findIndex((line) => sectionNameOf(line) === pluginsSectionName);
   if (sectionStart === -1) {

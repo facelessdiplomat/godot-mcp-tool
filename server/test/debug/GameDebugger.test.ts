@@ -17,15 +17,26 @@ class FakeGodotDebugAdapter implements DebugAdapterConnection {
   frames: FakeFrame[] = [];
   stepTo: FakeFrame[] | undefined;
   variablesNotSentYet = 0;
+  evaluationsBeforeTheAnswer = 1;
   readonly emitted: string[] = [];
   variablesByScope: Readonly<Record<string, readonly Record<string, unknown>[]>> = {};
   editorPath = projectPath;
   isOpen = true;
   private readonly listeners: ((event: DebugAdapterEvent) => void)[] = [];
 
-  request(command: string, args: Record<string, unknown> = {}): Promise<unknown> {
+  request(command: string, args: Record<string, unknown> = {}, timeoutMs = 1000): Promise<unknown> {
     this.requests.push({ command, args });
     switch (command) {
+      case 'evaluate':
+        if (this.evaluationsBeforeTheAnswer > 0) {
+          this.evaluationsBeforeTheAnswer -= 1;
+          return new Promise((_resolve, reject) => {
+            setTimeout(() => {
+              reject(new DebugAdapterUnavailableError(`The debug adapter did not answer "evaluate" within ${String(timeoutMs)} ms.`));
+            }, timeoutMs);
+          });
+        }
+        return Promise.resolve({ result: '20', variablesReference: 0 });
       case 'setBreakpoints':
         return this.setBreakpoints(args);
       case 'stackTrace':
@@ -254,6 +265,25 @@ describe('GameDebugger', () => {
     expect(await debug.waitForStop(2000)).toMatchObject({ reason: 'breakpoint', frames: [{ file: 'res://player.gd', line: 12 }] });
   });
 
+  it('waits a moment for the reason of a stop whose stack came first, since the debug adapter answers requests before the events it has queued', async () => {
+    const debug = gameDebugger();
+    await debug.currentStop();
+    adapter.frames = [{ file: 'player.gd', line: 12, name: '_physics_process' }];
+    setTimeout(() => {
+      adapter.emit('stopped', { reason: 'breakpoint', threadId: 1 });
+    }, 20);
+
+    expect(await debug.waitForStop(2000)).toMatchObject({ reason: 'breakpoint', frames: [{ file: 'res://player.gd', line: 12 }] });
+  });
+
+  it('reports a stop of unknown reason when no event follows its stack', async () => {
+    const debug = gameDebugger();
+    await debug.currentStop();
+    adapter.frames = [{ file: 'player.gd', line: 12, name: '_physics_process' }];
+
+    expect(await debug.currentStop()).toMatchObject({ reason: 'unknown', frames: [{ file: 'res://player.gd', line: 12 }] });
+  });
+
   it('reads the locals and members of a frame, without self, and names objects', async () => {
     adapter.variablesByScope = {
       1: [
@@ -315,4 +345,40 @@ describe('GameDebugger', () => {
     expect(adapter.requests.map((request) => request.command)).toEqual(['setBreakpoints', 'stackTrace', 'stackTrace', 'next', 'stackTrace', 'stackTrace', 'continue']);
     await expect(debug.resume('step_into', 2000)).rejects.toThrow('The game is not stopped in the debugger');
   });
+
+  it('evaluates an expression in a frame, asking again until the game has sent the value', async () => {
+    adapter.stop('breakpoint', [{ file: 'enemy.gd', line: 8, name: 'take_damage' }]);
+    const debug = gameDebugger();
+
+    const value = await debug.evaluate('health * 2', 0);
+
+    expect(value).toBe('20');
+    expect(adapter.requests.filter((request) => request.command === 'evaluate').map((request) => request.args)).toEqual([
+      { expression: 'health * 2', frameId: 0, context: 'repl' },
+      { expression: 'health * 2', frameId: 0, context: 'repl' },
+    ]);
+  });
+
+  it('steps out of the current function through the editor and waits for the stack to change, since the debug adapter reports no stop for it', async () => {
+    adapter.stop('breakpoint', [{ file: 'enemy.gd', line: 8, name: 'take_damage' }]);
+    const editorRequests: string[] = [];
+    const debug = gameDebugger({
+      editor: {
+        request: (method) => {
+          editorRequests.push(method);
+          setTimeout(() => {
+            adapter.frames = [{ file: 'player.gd', line: 12, name: 'hit' }];
+          }, 5);
+          return Promise.resolve({ sent: true });
+        },
+      },
+    });
+
+    const stepped = await debug.resume('step_out', 2000);
+
+    expect(editorRequests).toEqual(['debug.step_out']);
+    expect(stepped?.reason).toBe('step');
+    expect(stepped?.frames[0]).toEqual({ index: 0, file: 'res://player.gd', line: 12, function: 'hit' });
+  });
 });
+

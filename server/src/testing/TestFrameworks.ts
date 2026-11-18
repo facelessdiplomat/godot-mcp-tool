@@ -13,9 +13,18 @@ export interface TestRunPlan {
   readonly headless: boolean;
 }
 
+export interface TestFrameworkRelease {
+  readonly tag: string;
+  readonly commit: string;
+  readonly repository: string;
+  readonly addonFolder: string;
+  readonly testBase: string;
+}
+
 export interface TestFramework {
   readonly key: TestFrameworkKey;
   readonly name: TestFrameworkName;
+  readonly release: TestFrameworkRelease;
   readonly entryScript: string;
   readonly selectsTestsByName: boolean;
   readonly configurationFile: string | undefined;
@@ -33,6 +42,7 @@ export function entryScriptFile(projectRoot: string, framework: TestFramework): 
 export const gutFramework: TestFramework = {
   key: 'gut',
   name: 'GUT',
+  release: { tag: 'v9.7.1', commit: 'aeb5d4f3f7f0a6c9b5e178876d6c99b791fda605', repository: 'https://github.com/bitwes/Gut.git', addonFolder: 'gut', testBase: 'GutTest' },
   entryScript: 'res://addons/gut/gut_cmdln.gd',
   selectsTestsByName: true,
   configurationFile: '.gutconfig.json',
@@ -54,6 +64,13 @@ export const gutFramework: TestFramework = {
 export const gdUnitFramework: TestFramework = {
   key: 'gdunit4',
   name: 'gdUnit4',
+  release: {
+    tag: 'v6.2.2',
+    commit: '0127a55f4543dfc24746f6e5c7ba6f94105d51f2',
+    repository: 'https://github.com/godot-gdunit-labs/gdUnit4.git',
+    addonFolder: 'gdUnit4',
+    testBase: 'GdUnitTestSuite',
+  },
   entryScript: 'res://addons/gdUnit4/bin/GdUnitCmdTool.gd',
   selectsTestsByName: false,
   configurationFile: undefined,

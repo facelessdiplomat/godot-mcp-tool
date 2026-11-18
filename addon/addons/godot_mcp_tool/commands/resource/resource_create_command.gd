@@ -27,7 +27,7 @@ func execute(params: Dictionary) -> Variant:
 	if created is GodotMcpCommandError:
 		return created
 	var resource := created as Resource
-	var report := _context.properties.assign(resource, properties)
+	var report := _context.properties.assign(resource, properties, resource_path)
 	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path((resource_path as String).get_base_dir()))
 	var save_error := ResourceSaver.save(resource, resource_path)
 	if save_error != OK:

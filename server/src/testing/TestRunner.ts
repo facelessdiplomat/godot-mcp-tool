@@ -143,7 +143,7 @@ function chooseFramework(projectRoot: string, requested: TestFrameworkKey | unde
   }
   const [onlyFramework, otherFramework] = installed;
   if (onlyFramework === undefined) {
-    throw new TestRunError('No test framework was found in this project. Install GUT (addons/gut) or gdUnit4 (addons/gdUnit4) from the Asset Library.');
+    throw new TestRunError('No test framework was found in this project. Install GUT or gdUnit4 with test_install_framework.');
   }
   if (otherFramework !== undefined) {
     throw new TestRunError(`Both ${onlyFramework.name} and ${otherFramework.name} are installed; pass framework: "${onlyFramework.key}" or "${otherFramework.key}".`);

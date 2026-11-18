@@ -3,7 +3,7 @@ import { setTimeout as delay } from 'node:timers/promises';
 import * as z from 'zod/v4';
 import type { DebugAdapterAddress } from '../bridge/EditorConnection.js';
 import type { EditorGateway } from '../editor/EditorGateway.js';
-import { type DebugAdapterConnection, type DebugAdapterEvent, DebugAdapterRequestError } from './DebugAdapterClient.js';
+import { type DebugAdapterConnection, type DebugAdapterEvent, DebugAdapterRequestError, DebugAdapterUnavailableError } from './DebugAdapterClient.js';
 
 export interface SourceLine {
   readonly file: string;
@@ -41,7 +41,7 @@ export interface BreakpointChange {
   readonly clearAll: boolean;
 }
 
-export type ResumeAction = 'continue' | 'step_over' | 'step_into';
+export type ResumeAction = 'continue' | 'step_over' | 'step_into' | 'step_out';
 
 export interface GameDebuggerDependencies {
   readonly editor: EditorGateway;
@@ -70,7 +70,11 @@ const variablesAttempts = 20;
 const variablesRetryDelayMs = 50;
 const variablesNotReceivedCode = 'unknown';
 const resumeTimeoutMs = 2_000;
-const stepCommands: Readonly<Record<Exclude<ResumeAction, 'continue'>, string>> = { step_over: 'next', step_into: 'stepIn' };
+const stepCommands: Readonly<Record<Exclude<ResumeAction, 'continue' | 'step_out'>, string>> = { step_over: 'next', step_into: 'stepIn' };
+const evaluationAnswerMs = 250;
+const stackPollIntervalMs = 50;
+const evaluationAttempts = 12;
+const lateStopEventMs = 250;
 const stopReasons: Readonly<Record<string, StopReason>> = { breakpoint: 'breakpoint', step: 'step', exception: 'error', paused: 'pause' };
 
 const editorBreakpointsSchema = z.object({ breakpoints: z.array(z.string()) });
@@ -79,6 +83,7 @@ const stackTraceSchema = z.object({
 });
 const scopesSchema = z.object({ scopes: z.array(z.object({ name: z.string(), variablesReference: z.number() })) });
 const variablesSchema = z.object({ variables: z.array(z.object({ name: z.string(), value: z.string() })) });
+const evaluationSchema = z.object({ result: z.string() });
 
 export class GameDebugger {
   private openConnection: DebugAdapterConnection | undefined;
@@ -128,16 +133,14 @@ export class GameDebugger {
   }
 
   async currentStop(): Promise<GameStop | undefined> {
-    const connection = await this.connection();
-    const stack = stackTraceSchema.parse(await connection.request('stackTrace', mainThread));
-    if (stack.stackFrames.length === 0) {
+    const frames = await this.stackFrames();
+    if (frames.length === 0) {
       return undefined;
     }
-    return {
-      reason: this.lastStop?.reason ?? 'unknown',
-      error: this.lastStop?.error,
-      frames: stack.stackFrames.map((frame, index) => ({ index, file: this.resourcePathOf(frame.source.path), line: frame.line + 1, function: frame.name })),
-    };
+    if (this.lastStop === undefined) {
+      await this.nextEvent('stopped', lateStopEventMs);
+    }
+    return { reason: this.lastStop?.reason ?? 'unknown', error: this.lastStop?.error, frames };
   }
 
   async waitForStop(timeoutMs: number): Promise<GameStop | undefined> {
@@ -167,7 +170,8 @@ export class GameDebugger {
   }
 
   async resume(action: ResumeAction, stepTimeoutMs: number): Promise<GameStop | undefined> {
-    if ((await this.currentStop()) === undefined) {
+    const stopBefore = await this.currentStop();
+    if (stopBefore === undefined) {
       throw new DebugError('The game is not stopped in the debugger, so there is nothing to continue. debug_state waits for it to stop at a breakpoint.');
     }
     const connection = await this.connection();
@@ -178,9 +182,50 @@ export class GameDebugger {
       await resumed;
       return undefined;
     }
+    if (action === 'step_out') {
+      await this.dependencies.editor.request('debug.step_out', {});
+      return this.nextStackAfter(stopBefore.frames, stepTimeoutMs);
+    }
     const nextStop = this.nextEvent('stopped', stepTimeoutMs);
     await connection.request(stepCommands[action], mainThread);
     return (await nextStop) === undefined ? undefined : this.currentStop();
+  }
+
+  async evaluate(expression: string, frame: number): Promise<string> {
+    const connection = await this.connection();
+    for (let attempt = 1; ; attempt += 1) {
+      try {
+        const answer = evaluationSchema.parse(await connection.request('evaluate', { expression, frameId: frame, context: 'repl' }, evaluationAnswerMs));
+        return objectValuePattern.test(answer.result) ? '(object)' : answer.result;
+      } catch (error) {
+        const notAnsweredYet = error instanceof DebugAdapterUnavailableError && connection.isOpen;
+        if (!notAnsweredYet) {
+          throw error;
+        }
+        if (attempt >= evaluationAttempts) {
+          throw new DebugError(`The game sent no value for "${expression}"; the frame may have no script instance to evaluate it in.`);
+        }
+      }
+    }
+  }
+
+  private async nextStackAfter(framesBefore: readonly StackFrame[], timeoutMs: number): Promise<GameStop | undefined> {
+    const deadline = Date.now() + timeoutMs;
+    while (Date.now() < deadline) {
+      await delay(stackPollIntervalMs);
+      const frames = await this.stackFrames();
+      if (frames.length > 0 && !isSameStack(frames, framesBefore)) {
+        this.lastStop = { reason: 'step', error: undefined };
+        return { reason: 'step', error: undefined, frames };
+      }
+    }
+    return undefined;
+  }
+
+  private async stackFrames(): Promise<StackFrame[]> {
+    const connection = await this.connection();
+    const stack = stackTraceSchema.parse(await connection.request('stackTrace', mainThread));
+    return stack.stackFrames.map((frame, index) => ({ index, file: this.resourcePathOf(frame.source.path), line: frame.line + 1, function: frame.name }));
   }
 
   close(): void {
@@ -297,4 +342,10 @@ function sourceLineOf(text: string): SourceLine {
 
 function compareSourceLines(first: SourceLine, second: SourceLine): number {
   return first.file === second.file ? first.line - second.line : first.file.localeCompare(second.file);
+}
+
+function isSameStack(first: readonly StackFrame[], second: readonly StackFrame[]): boolean {
+  const [firstTop] = first;
+  const [secondTop] = second;
+  return first.length === second.length && firstTop?.file === secondTop?.file && firstTop?.line === secondTop?.line && firstTop?.function === secondTop?.function;
 }
