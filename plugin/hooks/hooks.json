@@ -7,13 +7,13 @@
         "hooks": [
           {
             "type": "command",
-            "command": "npx -y godot-mcp-tool@0.1.2 check-edited-script",
+            "command": "npx -y godot-mcp-tool@0.2.0 check-edited-script",
             "if": "Write(*.gd)",
             "timeout": 120
           },
           {
             "type": "command",
-            "command": "npx -y godot-mcp-tool@0.1.2 check-edited-script",
+            "command": "npx -y godot-mcp-tool@0.2.0 check-edited-script",
             "if": "Write(*.gdshader)",
             "timeout": 120
           }
@@ -24,13 +24,13 @@
         "hooks": [
           {
             "type": "command",
-            "command": "npx -y godot-mcp-tool@0.1.2 check-edited-script",
+            "command": "npx -y godot-mcp-tool@0.2.0 check-edited-script",
             "if": "Edit(*.gd)",
             "timeout": 120
           },
           {
             "type": "command",
-            "command": "npx -y godot-mcp-tool@0.1.2 check-edited-script",
+            "command": "npx -y godot-mcp-tool@0.2.0 check-edited-script",
             "if": "Edit(*.gdshader)",
             "timeout": 120
           }

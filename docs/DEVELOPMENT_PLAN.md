@@ -1675,6 +1675,13 @@ The whole integration suite, run next to that editor, found two more problems:
       `editor_rescan` reloads GDExtension libraries rebuilt on disk, which the editor otherwise does only when its
       window gets focus, so an agent that rebuilds a native library no longer has to ask the user to click into the
       editor (ADR-13).
+- [x] Version 0.2.0: the 22 tools that 0.1.2 lacked. From milestones 6–9 `editor_undo`, `editor_redo`,
+      `editor_get_state`, `plugin_set_enabled`, `project_create`, `test_install_framework`, `export_preset_add`,
+      `script_rename_symbol`, `scene_raycast`, `node_snap_to_floor`, `node_add_collision`, `node_save_as_scene` and
+      `node_make_local`; from the scenarios for the backlog `audio_buses_get`, `audio_buses_set`, `gridmap_get_cells`,
+      `gridmap_set_cells`, `tileset_add_atlas`, `tilemap_get_cells`, `tilemap_set_cells`, `user_data_get` and the
+      unsafe `user_data_delete`. With the fixes that the guide check found, the plugin and the guides match the
+      package again.
 - [ ] Publication to the Godot Asset Store (it replaced the Asset Library in 4.7).
 
 **Done when** the package is published, CI is green and the user documentation passes its check (below).
@@ -1999,8 +2006,8 @@ because the editor does not run the static initializers of scripts that are not 
       check found that `godot_status` and `docs/tools.md` called `test_install_framework` an unsafe tool that is on,
       since it asks the user first, that the guides counted four unsafe tools after `user_data_delete` made five,
       and that the menu item is called Allow Unsafe Tools in This Project; all of it is fixed. It also found that npm
-      still has 0.1.2, which lacks 15 tools that the skill and the guides on `master` describe, while `master` calls
-      itself 0.1.2 too: a new version has to be published before the guides and the plugin match what users get.
+      still had 0.1.2, which lacks 22 tools that the skill and the guides on `master` describe, while `master` called
+      itself 0.1.2 too; version 0.2.0 brings the package up to them.
 
 ### Backlog and open questions
 
