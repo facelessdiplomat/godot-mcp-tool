@@ -10,8 +10,10 @@ The line under each tool says what kind of tool it is:
 - *Makes changes*: it changes the project, the editor or the running game.
 - *Loaded at the start*: Claude has it from the first message; Claude Code loads the other tools when a task needs
   them.
-- *Off by default*: one of the unsafe tools. They need `GODOT_MCP_UNSAFE=1` and Project → Tools → Godot MCP Tool →
-  Allow Unsafe Tools in the editor, and Claude Code asks before every call.
+- *Off by default*: one of the unsafe tools. They need `GODOT_MCP_UNSAFE=1` and, in the editor,
+  Project → Tools → Godot MCP Tool → Allow Unsafe Tools in This Project.
+- *Claude Code asks before every call*: the user confirms each call, as for the unsafe tools and for a tool that
+  downloads code.
 
 ## Contents
 
@@ -845,7 +847,7 @@ No parameters.
 
 **Install test framework.** Install a test framework into the project and enable its plugin, so that test_run can run the project's tests: GUT 9.7.1 (default) or gdUnit4 6.2.2, each pinned to the commit of its release and fetched from GitHub with git. It downloads code, so the user confirms every call.
 
-*Makes changes · off by default; Claude Code asks before every call*
+*Makes changes · Claude Code asks before every call*
 
 - `framework`: "gut" or "gdunit4", default `"gut"`. gut (default) installs GUT, gdunit4 installs gdUnit4.
 

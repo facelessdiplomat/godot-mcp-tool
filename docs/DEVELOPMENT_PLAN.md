@@ -1533,7 +1533,7 @@ the next call showed a ⚠.
       animations of its `AnimationPlayer` and transitions with conditions, expressions, cross-fades and switch modes,
       as one Undo step; transitions advance by themselves from Start and with a condition or expression, and a
       machine that nothing leaves Start from comes with a warning; scenario `docs/evals/character-states.md`.
-- [ ] `gridmap_*` if evaluations show the need.
+- [x] `gridmap_get_cells` / `gridmap_set_cells`, added when `pave-the-courtyard` showed the need.
 - [x] Windowless mode: scene operations through a headless editor (`editor_launch` with `headless: true`, the
       default with `GODOT_MCP_HEADLESS=1`); a game started without the editor connects to the server over TCP (the
       port after `--`, the token in the environment), so `game_get_tree`, `game_get_properties`, `game_set_properties`,
@@ -1839,7 +1839,7 @@ their reference solutions and with an agent in the third full run. Preparing the
       whether a control fits the window; a UI scene read from disk is first laid out in a viewport of the window
       size, because the editor gives only the edited root `Control` the project size
       (`Control::get_parent_anchorable_rect()`).
-- [ ] `gridmap_get_cells` / `gridmap_set_cells`, still only when an evaluation needs them (milestone 4).
+- [x] `gridmap_get_cells` / `gridmap_set_cells`, added when an evaluation needed them (milestone 4).
 
 Order of work: the spike on ray casts, then `scene_raycast` and `node_snap_to_floor`; `node_add_collision`; the
 animation tracks before the blend states, then the poses; the shader spike and the check; the renders of UI scenes;
@@ -1990,8 +1990,17 @@ because the editor does not run the static initializers of scripts that are not 
       of the five affected scenarios passed all of them with 1 failed call instead of 6, and found that `window_size`
       of `game_run` did not change the size of a game started from an editor with a window; it now does (milestone
       6). Left: the comparison with an existing server (§13).
-- [ ] Left from milestone 5: the check of the user guides on a fresh project and the publication to the Godot Asset
-      Store.
+- [ ] Left from milestone 5: the publication to the Godot Asset Store. The check of the user guides on a fresh
+      project is done (2026-11-18), with the package packed from this repository: a project as the project manager
+      makes it, the addon installed with `npx godot-mcp-tool install-addon`, the server added with `claude mcp add`,
+      `doctor` and "Check the Godot connection." answering as the guide shows, and the first task of the README, an
+      arena with walls and a ramp shown from a few angles, done with 13 tool calls and none failed. The commands that
+      install the plugin work from a terminal, also without an SSH key for GitHub, and `init` makes a project. The
+      check found that `godot_status` and `docs/tools.md` called `test_install_framework` an unsafe tool that is on,
+      since it asks the user first, that the guides counted four unsafe tools after `user_data_delete` made five,
+      and that the menu item is called Allow Unsafe Tools in This Project; all of it is fixed. It also found that npm
+      still has 0.1.2, which lacks 15 tools that the skill and the guides on `master` describe, while `master` calls
+      itself 0.1.2 too: a new version has to be published before the guides and the plugin match what users get.
 
 ### Backlog and open questions
 

@@ -7,7 +7,12 @@ import type { Tool } from '../../src/tools/Tool.js';
 
 const emptyInput = z.object({});
 
-function tool(name: string, readOnly: boolean, requiresUserInteraction = false): Tool<typeof emptyInput> {
+interface Marks {
+  readonly requiresUserInteraction?: boolean;
+  readonly unsafe?: boolean;
+}
+
+function tool(name: string, readOnly: boolean, marks: Marks = {}): Tool<typeof emptyInput> {
   return {
     name,
     definition: {
@@ -16,11 +21,13 @@ function tool(name: string, readOnly: boolean, requiresUserInteraction = false):
       inputSchema: emptyInput,
       annotations: { readOnlyHint: readOnly },
       alwaysLoad: false,
-      requiresUserInteraction,
+      ...marks,
     },
     execute: (): Promise<CallToolResult> => Promise.resolve(textResult(name)),
   };
 }
+
+const unsafeTool = { requiresUserInteraction: true, unsafe: true };
 
 describe('tool policy', () => {
   it('reads the switches from the environment', () => {
@@ -49,16 +56,23 @@ describe('tool policy', () => {
   });
 
   it('names the unsafe tools when they are on', () => {
-    const applied = applyToolPolicy([tool('scene_get_tree', true), tool('game_eval', false, true), tool('editor_run_script', false, true)], {
-      readOnly: false,
-      unsafe: true,
-      disabled: [],
-    });
+    const tools = [tool('scene_get_tree', true), tool('test_install_framework', false, { requiresUserInteraction: true }), tool('game_eval', false, unsafeTool), tool('editor_run_script', false, unsafeTool)];
 
-    expect(applied.tools).toHaveLength(3);
+    const applied = applyToolPolicy(tools, { readOnly: false, unsafe: true, disabled: [] });
+
+    expect(applied.tools).toHaveLength(4);
     expect(applied.notes).toEqual([
-      'Unsafe tools are on (GODOT_MCP_UNSAFE): game_eval, editor_run_script. The editor must allow them too: Project → Tools → Godot MCP Tool → Allow Unsafe Tools.',
+      'Unsafe tools are on (GODOT_MCP_UNSAFE): game_eval, editor_run_script. The editor must allow them too: Project → Tools → Godot MCP Tool → Allow Unsafe Tools in This Project.',
     ]);
+  });
+
+  it('leaves the unsafe tools out by default, but not the tools that only ask the user to confirm each call', () => {
+    const tools = [tool('scene_get_tree', true), tool('test_install_framework', false, { requiresUserInteraction: true }), tool('game_eval', false, unsafeTool)];
+
+    const applied = applyToolPolicy(tools, { readOnly: false, unsafe: false, disabled: [] });
+
+    expect(applied.tools.map((selected) => selected.name)).toEqual(['scene_get_tree', 'test_install_framework']);
+    expect(applied.notes).toEqual([]);
   });
 
   it('says nothing about the defaults', () => {

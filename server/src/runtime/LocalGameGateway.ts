@@ -8,6 +8,7 @@ import type { EditorGateway, EditorRequestOptions } from '../editor/EditorGatewa
 import type { BinaryLookup } from '../godot/GodotBinaryLocator.js';
 import type { LaunchedProcess, ProcessLauncher } from '../process/ProcessLauncher.js';
 import { readConfigSections } from '../project/ConfigText.js';
+import { allowUnsafeToolsMenuItem } from '../server/ToolPolicy.js';
 import { LocalGameChannel } from './LocalGameChannel.js';
 import { LogBook } from './LogBook.js';
 import { RecordFile } from './RecordFile.js';
@@ -140,7 +141,7 @@ export class LocalGameGateway implements EditorGateway {
       throw new BridgeRequestError(
         'Unsafe tools are turned off in the editor for this project',
         unsafeDisabledCode,
-        'The user can turn them on in the editor with Project → Tools → Godot MCP Tool → Allow Unsafe Tools.',
+        `The user can turn them on in the editor with ${allowUnsafeToolsMenuItem}.`,
         undefined,
       );
     }

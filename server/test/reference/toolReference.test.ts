@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { type ListedTool, renderToolReference, type ServerListing } from './toolReference.js';
 
 function listingOf(tools: readonly ListedTool[], extra: Partial<ServerListing> = {}): ServerListing {
-  return { tools, prompts: [], resources: [], resourceTemplates: [], ...extra };
+  return { tools, prompts: [], resources: [], resourceTemplates: [], unsafeToolNames: [], ...extra };
 }
 
 function toolNamed(name: string, inputSchema: ListedTool['inputSchema'] = { type: 'object' }): ListedTool {
@@ -70,13 +70,17 @@ describe('renderToolReference', () => {
     );
   });
 
-  it('marks read-only tools and the unsafe tools that are off by default', () => {
-    const unsafeTool: ListedTool = { ...toolNamed('game_eval'), annotations: { readOnlyHint: false }, _meta: { 'anthropic/requiresUserInteraction': true } };
+  it('marks read-only tools, the unsafe tools that are off by default and the tools that ask first', () => {
+    const confirmed = { annotations: { readOnlyHint: false }, _meta: { 'anthropic/requiresUserInteraction': true } };
+    const unsafeTool: ListedTool = { ...toolNamed('game_eval'), ...confirmed };
+    const downloadingTool: ListedTool = { ...toolNamed('test_install_framework'), ...confirmed };
 
-    const reference = renderToolReference(listingOf([toolNamed('game_get_tree'), unsafeTool]));
+    const reference = renderToolReference(listingOf([toolNamed('game_get_tree'), unsafeTool, downloadingTool], { unsafeToolNames: ['game_eval'] }));
 
     expect(reference).toContain('### `game_get_tree`\n\n**Title of game_get_tree.** What game_get_tree does.\n\n*Read-only*\n\nNo parameters.\n');
-    expect(reference).toContain('*Makes changes · off by default; Claude Code asks before every call*');
+    expect(reference).toContain('### `game_eval`\n\n**Title of game_eval.** What game_eval does.\n\n*Makes changes · off by default; Claude Code asks before every call*');
+    expect(reference).toContain('### `test_install_framework`\n\n**Title of test_install_framework.** What test_install_framework does.\n\n*Makes changes · Claude Code asks before every call*');
+    expect(reference).toContain('Project → Tools → Godot MCP Tool → Allow Unsafe Tools in This Project');
   });
 
   it('marks required parameters and lists the choices of an enumeration', () => {

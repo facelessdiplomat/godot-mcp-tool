@@ -119,7 +119,7 @@ describe.skipIf(godotBinary === '')('unsafe tools that the editor does not allow
 
     expect(refused?.isError).toBe(true);
     expect(refused?.text).toBe(
-      'Unsafe tools are turned off in the editor for this project\nHint: The user can turn them on in the editor with Project → Tools → Godot MCP Tool → Allow Unsafe Tools.',
+      'Unsafe tools are turned off in the editor for this project\nHint: The user can turn them on in the editor with Project → Tools → Godot MCP Tool → Allow Unsafe Tools in This Project.',
     );
   });
 });

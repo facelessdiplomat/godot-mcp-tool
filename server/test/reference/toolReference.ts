@@ -39,6 +39,7 @@ export interface ServerListing {
   readonly prompts: readonly ListedPrompt[];
   readonly resources: readonly ListedResource[];
   readonly resourceTemplates: readonly ListedResourceTemplate[];
+  readonly unsafeToolNames: readonly string[];
 }
 
 interface ToolArea {
@@ -80,8 +81,10 @@ const introduction = [
   '- *Makes changes*: it changes the project, the editor or the running game.',
   '- *Loaded at the start*: Claude has it from the first message; Claude Code loads the other tools when a task needs',
   '  them.',
-  '- *Off by default*: one of the unsafe tools. They need `GODOT_MCP_UNSAFE=1` and Project → Tools → Godot MCP Tool →',
-  '  Allow Unsafe Tools in the editor, and Claude Code asks before every call.',
+  '- *Off by default*: one of the unsafe tools. They need `GODOT_MCP_UNSAFE=1` and, in the editor,',
+  '  Project → Tools → Godot MCP Tool → Allow Unsafe Tools in This Project.',
+  '- *Claude Code asks before every call*: the user confirms each call, as for the unsafe tools and for a tool that',
+  '  downloads code.',
 ];
 
 export function renderToolReference(listing: ServerListing): string {
@@ -98,7 +101,7 @@ export function renderToolReference(listing: ServerListing): string {
     ...(listing.prompts.length > 0 ? ['- [Prompts](#prompts)'] : []),
     ...(resourceCount > 0 ? ['- [Resources](#resources)'] : []),
     '',
-    ...areas.flatMap(areaLines),
+    ...areas.flatMap((area) => areaLines(area, new Set(listing.unsafeToolNames))),
     ...promptLines(listing.prompts),
     ...resourceLines(listing.resources, listing.resourceTemplates),
   ];
@@ -122,18 +125,18 @@ function anchorOf(title: string): string {
     .replace(/ /g, '-');
 }
 
-function areaLines(area: GroupedArea): string[] {
-  return [`## ${area.title}`, '', ...area.tools.flatMap(toolLines)];
+function areaLines(area: GroupedArea, unsafeToolNames: ReadonlySet<string>): string[] {
+  return [`## ${area.title}`, '', ...area.tools.flatMap((tool) => toolLines(tool, unsafeToolNames.has(tool.name)))];
 }
 
-function toolLines(tool: ListedTool): string[] {
+function toolLines(tool: ListedTool, unsafe: boolean): string[] {
   const parameters = propertyLines(tool.inputSchema, '');
   return [
     `### \`${tool.name}\``,
     '',
     titledText(tool.title, tool.description),
     '',
-    `*${marksOf(tool).join(' · ')}*`,
+    `*${marksOf(tool, unsafe).join(' · ')}*`,
     '',
     ...(parameters.length > 0 ? parameters : ['No parameters.']),
     '',
@@ -144,12 +147,14 @@ function titledText(title: string | undefined, description: string | undefined):
   return [title === undefined ? '' : `**${title}.**`, description ?? ''].filter((part) => part !== '').join(' ');
 }
 
-function marksOf(tool: ListedTool): string[] {
+function marksOf(tool: ListedTool, unsafe: boolean): string[] {
   const meta = tool._meta ?? {};
+  const asks = meta[requiresUserInteractionKey] === true;
+  const confirmation = [unsafe ? 'off by default' : '', asks ? 'Claude Code asks before every call' : ''].filter((mark) => mark !== '').join('; ');
   return [
     tool.annotations?.readOnlyHint === true ? 'Read-only' : 'Makes changes',
     ...(meta[alwaysLoadKey] === true ? ['loaded at the start'] : []),
-    ...(meta[requiresUserInteractionKey] === true ? ['off by default; Claude Code asks before every call'] : []),
+    ...(confirmation === '' ? [] : [confirmation]),
   ];
 }
 

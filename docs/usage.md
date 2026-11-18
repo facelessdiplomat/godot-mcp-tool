@@ -54,15 +54,16 @@ platform". Give large tasks in steps: the level first, then the player, then the
 - **Undo.** Every change Claude makes to a scene or a resource is one step of the editor's undo history, named
   "MCP: …". Scripts and other files are written to disk directly, so keep the project in Git.
 - **Claude Code asks first.** Claude Code asks before it uses a tool, until you allow that tool.
-- **Unsafe tools are off.** Four tools can do almost anything, so they are off by default:
+- **Unsafe tools are off.** Five tools can do almost anything or delete files, so they are off by default:
   - `editor_run_script` runs GDScript code inside the editor;
   - `node_call_method` calls any method of a node;
   - `game_eval` evaluates an expression in the running game;
-  - `filesystem_delete` moves project files to the system trash.
+  - `filesystem_delete` moves project files to the system trash;
+  - `user_data_delete` moves files that the game saved in `user://` to the system trash.
 
   To turn them on, set `GODOT_MCP_UNSAFE=1` for the server (see [Settings](setup.md#settings)) and allow them in
-  the editor: Project → Tools → Godot MCP Tool → Allow Unsafe Tools, or the switch in the Godot MCP panel. Claude
-  Code then asks you before every call of these tools.
+  the editor: Project → Tools → Godot MCP Tool → Allow Unsafe Tools in This Project, or the switch in the Godot MCP
+  panel. Claude Code then asks you before every call of these tools.
 - **Read-only mode.** With `GODOT_MCP_READ_ONLY=1` Claude can look at the project and the running game but cannot
   change anything.
 - **Single tools off.** `GODOT_MCP_DISABLE` turns off the tools you name, such as `export_project`.

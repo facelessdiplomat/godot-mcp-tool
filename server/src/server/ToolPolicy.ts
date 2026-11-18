@@ -13,6 +13,8 @@ export interface ToolSelection {
 
 const switchedOnValues = new Set(['1', 'true', 'yes', 'on']);
 
+export const allowUnsafeToolsMenuItem = 'Project → Tools → Godot MCP Tool → Allow Unsafe Tools in This Project';
+
 export function readToolPolicy(variables: Readonly<Record<string, string | undefined>>): ToolPolicy {
   return {
     readOnly: isSwitchedOn(variables['GODOT_MCP_READ_ONLY']),
@@ -27,7 +29,9 @@ export function readToolPolicy(variables: Readonly<Record<string, string | undef
 export function applyToolPolicy(tools: readonly Tool[], policy: ToolPolicy): ToolSelection {
   const disabled = new Set(policy.disabled);
   const knownNames = new Set(tools.map((tool) => tool.name));
-  const selected = tools.filter((tool) => !disabled.has(tool.name) && (!policy.readOnly || tool.definition.annotations.readOnlyHint === true));
+  const selected = tools.filter(
+    (tool) => !disabled.has(tool.name) && (policy.unsafe || tool.definition.unsafe !== true) && (!policy.readOnly || tool.definition.annotations.readOnlyHint === true),
+  );
   const notes: string[] = [];
   if (policy.readOnly) {
     notes.push('Read-only mode (GODOT_MCP_READ_ONLY): the tools that change the project or the game are left out.');
@@ -40,11 +44,9 @@ export function applyToolPolicy(tools: readonly Tool[], policy: ToolPolicy): Too
   if (unknownNames.length > 0) {
     notes.push(`GODOT_MCP_DISABLE names tools that do not exist: ${unknownNames.join(', ')}.`);
   }
-  const unsafeNames = selected.filter((tool) => tool.definition.requiresUserInteraction === true).map((tool) => tool.name);
+  const unsafeNames = selected.filter((tool) => tool.definition.unsafe === true).map((tool) => tool.name);
   if (unsafeNames.length > 0) {
-    notes.push(
-      `Unsafe tools are on (GODOT_MCP_UNSAFE): ${unsafeNames.join(', ')}. The editor must allow them too: Project → Tools → Godot MCP Tool → Allow Unsafe Tools.`,
-    );
+    notes.push(`Unsafe tools are on (GODOT_MCP_UNSAFE): ${unsafeNames.join(', ')}. The editor must allow them too: ${allowUnsafeToolsMenuItem}.`);
   }
   return { tools: selected, notes };
 }

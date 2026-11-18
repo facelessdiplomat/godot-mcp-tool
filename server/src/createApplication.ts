@@ -203,7 +203,11 @@ function createApplicationParts(environment: ApplicationEnvironment, createdProj
     createDebugBreakpointsTool(gameDebugger, readScript, errorSummary),
     createDebugStateTool(gameDebugger, readScript),
     createDebugContinueTool(gameDebugger, readScript),
-    ...(policy.unsafe ? [createEditorRunScriptTool(editor), createNodeCallMethodTool(editor), createGameEvalTool(gameGateway), createFilesystemDeleteTool(editor), createUserDataDeleteTool(editor)] : []),
+    createEditorRunScriptTool(editor),
+    createNodeCallMethodTool(editor),
+    createGameEvalTool(gameGateway),
+    createFilesystemDeleteTool(editor),
+    createUserDataDeleteTool(editor),
   ];
   const selection = applyToolPolicy(plainTools, policy);
   toolNotes.push(...selection.notes);

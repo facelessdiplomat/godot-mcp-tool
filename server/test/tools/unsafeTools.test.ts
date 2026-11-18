@@ -1,6 +1,6 @@
 import type { CallToolResult } from '@modelcontextprotocol/server';
 import { describe, expect, it } from 'vitest';
-import { createEditorRunScriptTool, createFilesystemDeleteTool, createGameEvalTool, createNodeCallMethodTool } from '../../src/tools/unsafeTools.js';
+import { createEditorRunScriptTool, createFilesystemDeleteTool, createGameEvalTool, createNodeCallMethodTool, createUserDataDeleteTool } from '../../src/tools/unsafeTools.js';
 import { FakeEditorGateway } from '../support/FakeEditorGateway.js';
 
 function textOf(result: CallToolResult): string {
@@ -153,10 +153,11 @@ describe('unsafe tools', () => {
     expect(textOf(result)).toBe(['Nothing was deleted.', 'Could not move to the trash:', '- res://locked.tres: Permission denied'].join('\n'));
   });
 
-  it('asks the user before every call', () => {
+  it('marks every unsafe tool as unsafe and asks the user before every call', () => {
     const editor = new FakeEditorGateway();
 
-    for (const tool of [createEditorRunScriptTool(editor), createNodeCallMethodTool(editor), createGameEvalTool(editor), createFilesystemDeleteTool(editor)]) {
+    for (const tool of [createEditorRunScriptTool(editor), createNodeCallMethodTool(editor), createGameEvalTool(editor), createFilesystemDeleteTool(editor), createUserDataDeleteTool(editor)]) {
+      expect(tool.definition.unsafe).toBe(true);
       expect(tool.definition.requiresUserInteraction).toBe(true);
       expect(tool.definition.annotations.destructiveHint).toBe(true);
     }

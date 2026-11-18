@@ -8,7 +8,7 @@
 **Starting point**
 
 A Godot project with the addon enabled, the editor running and unsafe tools allowed (`GODOT_MCP_UNSAFE=1` for the
-server and Project → Tools → Godot MCP Tool → Allow Unsafe Tools in the editor), with:
+server and Project → Tools → Godot MCP Tool → Allow Unsafe Tools in This Project in the editor), with:
 
 - `res://materials/ice.tres`, used by the `Mesh` of `res://crate.tscn` and preloaded by its script `res://crate.gd`;
 - `res://materials/old_ice.tres`, a material that nothing uses;

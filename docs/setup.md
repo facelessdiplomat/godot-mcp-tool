@@ -154,7 +154,7 @@ start it with the variable, such as `GODOT_MCP_READ_ONLY=1 claude`, or add the v
 | `GODOT_PROJECT_PATH` | The project folder, when Claude Code runs somewhere else. |
 | `GODOT_MCP_HEADLESS=1` | Windowless mode: games and the editor that Claude starts run without a window, so there are no screenshots. For servers and CI. |
 | `GODOT_MCP_READ_ONLY=1` | Read-only mode: only the tools that read are available. |
-| `GODOT_MCP_UNSAFE=1` | Turns on the four unsafe tools; see [Safety](usage.md#safety). |
+| `GODOT_MCP_UNSAFE=1` | Turns on the five unsafe tools; see [Safety](usage.md#safety). |
 | `GODOT_MCP_DISABLE` | Tools to turn off, separated by commas, such as `export_project,filesystem_move`. |
 | `GODOT_LSP_PORT`, `GODOT_DAP_PORT` | The ports of the editor's GDScript language server and debug adapter, when the editor uses others than in its settings, such as an editor started with `--lsp-port`. |
 | `GODOT_MCP_CACHE_DIR` | Where the server keeps the class reference it reads from Godot. |

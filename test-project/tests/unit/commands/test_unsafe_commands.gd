@@ -45,7 +45,7 @@ func test_runs_an_unsafe_command_only_when_the_editor_allows_it() -> void:
 	var refused: GodotMcpCommandError = await GodotMcpUnsafeCommand.new(GodotMcpPingCommand.new(), func() -> bool: return false).execute({})
 	var allowed: Variant = await GodotMcpUnsafeCommand.new(GodotMcpPingCommand.new(), func() -> bool: return true).execute({})
 	assert_eq(refused.code, GodotMcpJsonRpc.UNSAFE_DISABLED)
-	assert_string_contains(refused.hint, "Allow Unsafe Tools")
+	assert_string_contains(refused.hint, "Project → Tools → Godot MCP Tool → Allow Unsafe Tools in This Project")
 	assert_false(allowed is GodotMcpCommandError)
 
 
