@@ -304,3 +304,8 @@ arrows are from the third full run.
 After this rerun `window_size` began to reach the game: the Game view of an editor with a window had replaced
 `--resolution` with its own size, and a game without a window had taken the size of the project. A test now reads the
 size of `/root` in the running game, with and without a window.
+
+With that fix `hud-at-two-sizes` passed again with 21 tool calls and none failed, instead of 27 and 1, for $0.30 in
+32 s instead of $0.43 in 54 s. The agent ran the game with `window_size` [1024, 768], `game_run` reported no other
+size, and the game laid the HUD out in a viewport of 1152×864, as the stretch settings of the project scale that
+window; it no longer touched the size of `/root` or `content_scale_size`.
