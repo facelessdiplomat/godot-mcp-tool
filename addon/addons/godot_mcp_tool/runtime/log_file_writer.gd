@@ -23,8 +23,8 @@ func send_entries(entries: Array) -> void:
 		_write({"type": "log", "entry": entry})
 
 
-func send_ready(scene_path: String, windowless: bool) -> void:
-	_write({"type": "ready"}.merged(GodotMcpReadyMessage.build(scene_path, windowless)))
+func send_ready(scene_path: String, windowless: bool, window_size: Vector2i) -> void:
+	_write({"type": "ready"}.merged(GodotMcpReadyMessage.build(scene_path, windowless, window_size)))
 
 
 func close() -> void:

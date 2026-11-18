@@ -23,12 +23,12 @@ func _lines() -> Array:
 func test_writes_one_json_line_per_entry_and_one_for_readiness() -> void:
 	var writer := GodotMcpLogFileWriter.new(_path)
 	writer.send_entries([{"level": "info", "message": "Arena loaded"}, {"level": "error", "message": "Boom."}])
-	writer.send_ready("res://main.tscn", true)
+	writer.send_ready("res://main.tscn", true, Vector2i(1024, 768))
 	writer.close()
 	assert_eq(_lines(), [
 		{"type": "log", "entry": {"level": "info", "message": "Arena loaded"}},
 		{"type": "log", "entry": {"level": "error", "message": "Boom."}},
-		{"type": "ready", "scene": "res://main.tscn", "windowless": true},
+		{"type": "ready", "scene": "res://main.tscn", "windowless": true, "window_size": [1024.0, 768.0]},
 	])
 
 

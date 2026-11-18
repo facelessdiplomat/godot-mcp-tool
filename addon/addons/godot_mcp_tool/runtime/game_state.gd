@@ -13,6 +13,7 @@ var first_seq := 1
 var ready_count := 0
 var stop_count := 0
 var windowless := false
+var window_size := Vector2i.ZERO
 
 var _agent_run_request: GodotMcpRunRequest
 
@@ -31,13 +32,15 @@ func mark_started(run_first_seq: int) -> void:
 	state = STARTING
 	scene = ""
 	windowless = false
+	window_size = Vector2i.ZERO
 	first_seq = run_first_seq
 
 
-func mark_ready(scene_path: String, runs_without_window := false) -> void:
+func mark_ready(scene_path: String, runs_without_window := false, size_of_window := Vector2i.ZERO) -> void:
 	state = RUNNING
 	scene = scene_path
 	windowless = runs_without_window
+	window_size = size_of_window
 	ready_count += 1
 
 

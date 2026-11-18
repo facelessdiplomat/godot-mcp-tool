@@ -17,8 +17,12 @@ const GodotMcpPlainUndoHistory := preload("res://addons/godot_mcp_tool/scene/pla
 const GodotMcpRunRequest := preload("res://addons/godot_mcp_tool/runtime/run_request.gd")
 const GodotMcpRuntimeContext := preload("res://addons/godot_mcp_tool/runtime/runtime_context.gd")
 const GodotMcpVariantCodec := preload("res://addons/godot_mcp_tool/codec/variant_codec.gd")
+const GodotMcpWindowSizeOverride := preload("res://addons/godot_mcp_tool/runtime/window_size_override.gd")
 
 const MAIN_SCENE_SETTING := "application/run/main_scene"
+const OVERRIDE_FOLDER := "user://game_commands_override_test"
+const OVERRIDE_FILE := OVERRIDE_FOLDER + "/override.cfg"
+const OVERRIDE_RECORD := OVERRIDE_FOLDER + "/override_before_run.json"
 
 var _scenes: FakeSceneAccess
 var _scripts: FakeScriptEditorAccess
@@ -103,6 +107,31 @@ func test_refuses_a_fixed_frame_rate_out_of_range() -> void:
 	var result: GodotMcpCommandError = await _run({"fixed_fps": 0})
 	assert_eq(result.code, GodotMcpJsonRpc.INVALID_PARAMS)
 	assert_eq(_launcher.agent_runs.size(), 0)
+
+
+func test_asks_the_editor_for_the_window_size_and_reports_the_size_the_game_got() -> void:
+	DirAccess.make_dir_recursive_absolute(OVERRIDE_FOLDER)
+	var override := GodotMcpWindowSizeOverride.new(OVERRIDE_FILE, OVERRIDE_RECORD)
+	_runtime = GodotMcpRuntimeContext.new(_game, _log_store, _launcher, _channel, override)
+	_launcher.simulate_game = func(_target: String) -> void:
+		_game.mark_ready("res://main.tscn", false, Vector2i(1024, 768))
+	var result: Dictionary = await _run({"watch_ms": 0, "window_size": [1024, 768]})
+	var config := ConfigFile.new()
+	config.load(OVERRIDE_FILE)
+	assert_true(override.is_active())
+	assert_eq(int(config.get_value("display", "window/size/window_width_override", 0)), 1024)
+	assert_eq(result["window_size"], [1024, 768])
+	override.restore()
+
+
+func test_leaves_the_override_file_alone_without_a_window_size() -> void:
+	DirAccess.make_dir_recursive_absolute(OVERRIDE_FOLDER)
+	var override := GodotMcpWindowSizeOverride.new(OVERRIDE_FILE, OVERRIDE_RECORD)
+	_runtime = GodotMcpRuntimeContext.new(_game, _log_store, _launcher, _channel, override)
+	_launcher.simulate_game = _ready_game_printing("")
+	var result: Dictionary = await _run({"watch_ms": 0})
+	assert_false(override.is_active())
+	assert_false(result.has("window_size"))
 
 
 func test_asks_for_debug_drawing_arguments_a_window_size_and_a_locale() -> void:

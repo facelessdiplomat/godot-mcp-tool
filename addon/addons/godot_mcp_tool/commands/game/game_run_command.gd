@@ -61,6 +61,7 @@ func execute(params: Dictionary) -> Variant:
 	var first_seq := _runtime.log_store.last_seq + 1
 	var started_msec := Time.get_ticks_msec()
 	game.request_agent_run(request)
+	_ask_editor_for_window_size(request.window_size)
 	_play(target, scene_path)
 	await GodotMcpWaiting.until(func() -> bool: return game.ready_count != ready_count or game.stop_count != stop_count or game.state == GodotMcpGameState.PAUSED, startup_timeout_msec)
 	var outcome := _outcome(ready_count, stop_count)
@@ -71,7 +72,7 @@ func execute(params: Dictionary) -> Variant:
 			launcher.stop()
 			await GodotMcpWaiting.until(func() -> bool: return not launcher.is_playing() and game.stop_count != stop_count, STOP_TIMEOUT_MSEC)
 	var page := _runtime.log_store.entries_after(first_seq - 1, PackedStringArray(), OUTPUT_LIMIT)
-	return {
+	var result := {
 		"scene": game.scene if not game.scene.is_empty() else scene_path,
 		"outcome": outcome,
 		"state": game.state,
@@ -83,6 +84,19 @@ func execute(params: Dictionary) -> Variant:
 		"saved_scripts": saved_scripts,
 		"windowless": game.windowless,
 	}
+	if game.window_size != Vector2i.ZERO:
+		result["window_size"] = [game.window_size.x, game.window_size.y]
+	return result
+
+
+func _ask_editor_for_window_size(size: Vector2i) -> void:
+	var size_override := _runtime.window_size_override
+	if size_override == null:
+		return
+	if size == Vector2i.ZERO:
+		size_override.restore()
+	else:
+		size_override.apply(size)
 
 
 func _outcome(ready_count: int, stop_count: int) -> String:

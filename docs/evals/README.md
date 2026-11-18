@@ -277,3 +277,30 @@ corners of each crate's bottom in the running game; `godot_status` and `game_run
 window; and `game_set_properties` began to point to `window_size` of `game_run` when the game window keeps its size.
 The reference solution of `crates-on-the-hill` passes the new check, and by the positions and rotations that the agent
 of this run set, its crates meet it too.
+
+### The affected scenarios again, 2026-11-18
+
+The same model and versions after the fixes above, for the five scenarios that they touch; the numbers before the
+arrows are from the third full run.
+
+| Scenario | Checks | Failed tool calls | Tool calls | Cost, $ | Time, s |
+|---|---|---|---|---|---|
+| crates-on-the-hill | 3/3, was 2/3 | 1 → 0 | 27 → 23 | 0.43 → 0.34 | 65 → 46 |
+| follow-the-player | 5/5 | 1 → 0 | 42 → 35 | 0.61 → 0.51 | 101 → 81 |
+| paint-one-enemy | 4/4 | 2 → 0 | 17 → 9 | 0.28 → 0.19 | 30 → 18 |
+| fix-the-water-shader | 5/5 | 1 → 0 | 13 → 7 | 0.20 → 0.14 | 28 → 20 |
+| hud-at-two-sizes | 3/3 | 1 → 1 | 26 → 27 | 0.46 → 0.43 | 55 → 54 |
+| **Together** | | **6 → 1** | **125 → 101** | **1.98 → 1.60** | **279 → 219** |
+
+- `crates-on-the-hill` passed all three checks: the agent laid the ten crates with one call of `node_snap_to_floor`
+  with `align`, which tilted each crate to its slope.
+- After `godot_status` and `game_run` said that the game had no window, no agent of the four windowless scenarios
+  tried a screenshot.
+- In `hud-at-two-sizes` the agent ran the game with `window_size` [1280, 720] and then [1024, 768], but both games
+  came up at 1152×648, the size of the project, from an editor with a window on macOS. `game_set_properties` on the
+  size of `/root` was refused, its new hint pointed back to `window_size`, and the agent changed
+  `content_scale_size` instead. No test checked that `window_size` reaches the game, only the arguments that it adds.
+
+After this rerun `window_size` began to reach the game: the Game view of an editor with a window had replaced
+`--resolution` with its own size, and a game without a window had taken the size of the project. A test now reads the
+size of `/root` in the running game, with and without a window.

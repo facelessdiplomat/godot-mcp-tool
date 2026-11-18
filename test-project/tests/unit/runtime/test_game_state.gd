@@ -29,14 +29,17 @@ func test_follows_a_run_through_its_lifecycle() -> void:
 	assert_eq(_game.state, GodotMcpGameState.STOPPED)
 
 
-func test_remembers_whether_the_running_game_has_a_window() -> void:
+func test_remembers_whether_the_running_game_has_a_window_and_its_size() -> void:
 	_game.mark_started(1)
-	_game.mark_ready("res://main.tscn", true)
+	_game.mark_ready("res://main.tscn", true, Vector2i(1024, 768))
 	assert_true(_game.windowless)
+	assert_eq(_game.window_size, Vector2i(1024, 768))
 	_game.mark_started(2)
 	assert_false(_game.windowless)
+	assert_eq(_game.window_size, Vector2i.ZERO)
 	_game.mark_ready("res://main.tscn")
 	assert_false(_game.windowless)
+	assert_eq(_game.window_size, Vector2i.ZERO)
 
 
 func test_hands_out_an_agent_run_request_once() -> void:

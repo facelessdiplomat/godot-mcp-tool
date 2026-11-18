@@ -42,6 +42,7 @@ const gameRunSchema = z.object({
   saved_scenes: z.array(z.string()),
   saved_scripts: z.array(z.string()),
   windowless: z.boolean().optional(),
+  window_size: z.tuple([z.number(), z.number()]).optional(),
 });
 
 type GameRun = z.infer<typeof gameRunSchema>;
@@ -137,15 +138,23 @@ export function createGameRunTool(editor: EditorGateway, cursor: GameOutputCurso
     timeoutMs: ({ duration_ms }) => runAllowanceMs + (duration_ms ?? defaultWatchMs),
     present: (run, input) => {
       cursor.moveTo(run.next_after);
-      return textResult(describeRun(run, input.duration_ms, input.fixed_fps));
+      return textResult(describeRun(run, input));
     },
   });
 }
 
-function describeRun(run: GameRun, durationMs: number | undefined, fixedFps: number | undefined): string {
+type GameRunInput = z.infer<typeof gameRunInput>;
+
+function describeRun(run: GameRun, input: GameRunInput): string {
+  const { duration_ms: durationMs, fixed_fps: fixedFps, window_size: askedSize } = input;
   const lines = [describeOutcome(run, durationMs)];
   if (run.windowless === true && run.outcome === 'ready' && run.state !== 'stopped') {
     lines.push('It runs without a window, so game_screenshot cannot show it; check it with game_get_properties, game_get_tree and node_get_bounds.');
+  }
+  if (askedSize !== undefined && run.window_size !== undefined && (run.window_size[0] !== askedSize[0] || run.window_size[1] !== askedSize[1])) {
+    lines.push(
+      `The game window is ${formatSize(run.window_size)}, not the ${formatSize(askedSize)} asked for: the Game view of the editor sizes a game that it embeds, and keeps the asked size only in its Fixed size mode and when the view is large enough.`,
+    );
   }
   if (fixedFps !== undefined) {
     lines.push(`Every frame advances the game by exactly 1/${String(fixedFps)} s, however long it takes, so wait and hold for physics frames, not milliseconds.`);
@@ -163,6 +172,10 @@ function describeRun(run: GameRun, durationMs: number | undefined, fixedFps: num
     lines.push('More output follows; read it with game_get_output.');
   }
   return lines.join('\n');
+}
+
+function formatSize([width, height]: readonly [number, number]): string {
+  return `${String(width)}×${String(height)}`;
 }
 
 function describeOutcome(run: GameRun, durationMs: number | undefined): string {

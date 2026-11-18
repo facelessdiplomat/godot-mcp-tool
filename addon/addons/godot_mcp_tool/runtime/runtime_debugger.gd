@@ -34,7 +34,7 @@ func _capture(message: String, data: Array, _session_id: int) -> bool:
 					_log_store.append(entry, GAME_SOURCE)
 			return true
 		GodotMcpRuntimeProtocol.READY_MESSAGE:
-			_game.mark_ready(GodotMcpReadyMessage.scene_of(payload), GodotMcpReadyMessage.is_windowless(payload))
+			_game.mark_ready(GodotMcpReadyMessage.scene_of(payload), GodotMcpReadyMessage.is_windowless(payload), GodotMcpReadyMessage.window_size_of(payload))
 			return true
 		GodotMcpRuntimeProtocol.RESPONSE_MESSAGE:
 			channel.receive(payload)

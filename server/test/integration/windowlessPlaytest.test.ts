@@ -113,6 +113,15 @@ describe.skipIf(godotBinary === '')('playtesting without the editor or a window'
     expect(landed.text).toMatch(/became true on Player/);
   });
 
+  it('runs the game at the window size asked for', async () => {
+    const run = await tools().call('game_run', { window_size: [1024, 768] });
+    const root = await tools().call('game_get_properties', { path: '/root', names: ['size'] });
+
+    expect(run.text).not.toContain('The game window is');
+    expect(root.text).toContain('size = Vector2i(1024, 768)');
+    await tools().call('game_run');
+  });
+
   it('plays input into the game and reads what it did', async () => {
     const played = await tools().call('game_input', { steps: [{ key: 'Space', ms: 200 }] });
     const properties = await tools().call('game_get_properties', { path: 'Player', names: ['jumps'] });

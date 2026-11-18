@@ -31,6 +31,7 @@ const GodotMcpRuntimeLogger := preload("../runtime/runtime_logger.gd")
 const GodotMcpTokenGenerator := preload("../bridge/token_generator.gd")
 const GodotMcpUnsafeToolsSwitch := preload("unsafe_tools_switch.gd")
 const GodotMcpVariantCodec := preload("../codec/variant_codec.gd")
+const GodotMcpWindowSizeOverride := preload("../runtime/window_size_override.gd")
 
 const LANGUAGE_SERVER_PORT_SETTING := "network/language_server/remote_port"
 const DEBUG_ADAPTER_PORT_SETTING := "network/debug_adapter/remote_port"
@@ -54,6 +55,7 @@ var _unsafe_tools := GodotMcpUnsafeToolsSwitch.new()
 var _command_journal := GodotMcpCommandJournal.new()
 var _bridge_state := ""
 var _dock_panel: GodotMcpBottomPanel
+var _window_size_override := GodotMcpWindowSizeOverride.new()
 
 
 func _init(plugin: EditorPlugin) -> void:
@@ -65,7 +67,9 @@ func start() -> void:
 	var game := GodotMcpGameState.new()
 	_runtime_debugger = GodotMcpRuntimeDebugger.new(game, log_store)
 	_plugin.add_debugger_plugin(_runtime_debugger)
-	_runtime = GodotMcpRuntimeContext.new(game, log_store, GodotMcpEditorGameLauncher.new(), _runtime_debugger.channel)
+	_window_size_override.restore()
+	var size_override := null if GodotMcpHeadlessWindow.is_windowless() else _window_size_override
+	_runtime = GodotMcpRuntimeContext.new(game, log_store, GodotMcpEditorGameLauncher.new(), _runtime_debugger.channel, size_override)
 	_editor_logger = GodotMcpRuntimeLogger.new(false)
 	OS.add_logger(_editor_logger)
 	_ensure_runtime_autoload()
@@ -82,6 +86,8 @@ func start() -> void:
 
 func process() -> void:
 	_collect_editor_log()
+	if _window_size_override.is_active() and not _runtime.launcher.is_playing():
+		_window_size_override.restore()
 	if _bridge_server == null:
 		return
 	_bridge_server.poll()
@@ -89,6 +95,7 @@ func process() -> void:
 
 
 func stop() -> void:
+	_window_size_override.restore()
 	if _dock_panel != null:
 		_dock_panel.remove()
 		_dock_panel = null

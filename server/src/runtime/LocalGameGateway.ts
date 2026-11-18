@@ -84,7 +84,7 @@ const outputParamsSchema = z.object({
 type OutputParams = z.infer<typeof outputParamsSchema>;
 
 const logRecordSchema = z.object({ type: z.literal('log'), entry: z.record(z.string(), z.unknown()) });
-const readyRecordSchema = z.object({ type: z.literal('ready'), scene: z.string() });
+const readyRecordSchema = z.object({ type: z.literal('ready'), scene: z.string(), window_size: z.tuple([z.number(), z.number()]).optional() });
 
 export class LocalGameGateway implements EditorGateway {
   private readonly book = new LogBook();
@@ -92,6 +92,7 @@ export class LocalGameGateway implements EditorGateway {
   private process: LaunchedProcess | undefined;
   private channel: LocalGameChannel | undefined;
   private readyScene: string | undefined;
+  private readyWindowSize: readonly [number, number] | undefined;
   private runFirstSeq = 1;
   private stopRequested = false;
   private recentOutput: string[] = [];
@@ -199,6 +200,7 @@ export class LocalGameGateway implements EditorGateway {
       saved_scenes: [],
       saved_scripts: [],
       windowless: this.options.headless,
+      ...(this.readyWindowSize === undefined ? {} : { window_size: this.readyWindowSize }),
     };
   }
 
@@ -231,6 +233,7 @@ export class LocalGameGateway implements EditorGateway {
     records.reset();
     this.runFirstSeq = this.book.lastSeq + 1;
     this.readyScene = undefined;
+    this.readyWindowSize = undefined;
     this.stopRequested = false;
     this.recentOutput = [];
   }
@@ -247,6 +250,7 @@ export class LocalGameGateway implements EditorGateway {
       ...(params.scene === 'main' ? [] : [params.scene]),
       '--',
       ...params.arguments,
+      ...(params.window_size === undefined ? [] : [`--mcp-window-size=${String(params.window_size[0])}x${String(params.window_size[1])}`]),
       `--mcp-log-file=${logFile}`,
       `--mcp-port=${String(port)}`,
     ];
@@ -305,6 +309,7 @@ export class LocalGameGateway implements EditorGateway {
       const ready = readyRecordSchema.safeParse(record);
       if (ready.success) {
         this.readyScene = ready.data.scene;
+        this.readyWindowSize = ready.data.window_size;
       }
     }
   }

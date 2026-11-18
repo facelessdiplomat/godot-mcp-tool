@@ -1,5 +1,6 @@
 extends RefCounted
 
+const GodotMcpHeadlessWindow := preload("headless_window.gd")
 const GodotMcpRunRequest := preload("run_request.gd")
 
 const IGNORE_ERROR_BREAKS := "--ignore-error-breaks"
@@ -28,10 +29,13 @@ static func extend(arguments: PackedStringArray, agent_run: GodotMcpRunRequest, 
 		engine_arguments.append(HEADLESS)
 	if agent_run != null:
 		_add_requested_options(engine_arguments, agent_run)
-		if not agent_run.arguments.is_empty():
+		var game_arguments := agent_run.arguments.duplicate()
+		if agent_run.window_size != Vector2i.ZERO:
+			game_arguments.append(GodotMcpHeadlessWindow.window_size_argument(agent_run.window_size))
+		if not game_arguments.is_empty():
 			if user_arguments.is_empty():
 				user_arguments.append(USER_ARGUMENTS_SEPARATOR)
-			user_arguments.append_array(agent_run.arguments)
+			user_arguments.append_array(game_arguments)
 	return engine_arguments + user_arguments
 
 

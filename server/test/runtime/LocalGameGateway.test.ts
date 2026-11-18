@@ -116,7 +116,7 @@ describe('LocalGameGateway', () => {
       arguments: ['--level=3'],
     });
 
-    expect(launcher.calls[0]?.args.slice(0, 11)).toEqual([
+    expect(launcher.calls[0]?.args.slice(0, 12)).toEqual([
       '--path',
       projectRoot,
       '--debug-collisions',
@@ -127,6 +127,7 @@ describe('LocalGameGateway', () => {
       'pt_BR',
       '--',
       '--level=3',
+      '--mcp-window-size=800x600',
       `--mcp-log-file=${join(projectRoot, '.godot', 'godot_mcp_tool', 'local_game.ndjson')}`,
     ]);
   });
@@ -140,6 +141,16 @@ describe('LocalGameGateway', () => {
 
     expect(launcher.calls[0]?.args.slice(0, 4)).toEqual(['--path', projectRoot, '--headless', 'res://levels/arena.tscn']);
     expect(run).toMatchObject({ windowless: true });
+  });
+
+  it('reports the size of the window that the game says it has', async () => {
+    launcher.simulate = (_process, args) => {
+      writeRecords(logFileFrom(args), [{ type: 'ready', scene: 'res://main.tscn', windowless: true, window_size: [1024, 768] }]);
+    };
+
+    const run = await gateway({ headless: true }).request('game.run', { scene: 'main', watch_ms: 0, stop_after: false, window_size: [1024, 768] });
+
+    expect(run).toMatchObject({ window_size: [1024, 768] });
   });
 
   it('says that a game started with a window has one', async () => {

@@ -44,7 +44,7 @@ func test_adds_debug_drawing_a_window_size_a_locale_and_game_arguments() -> void
 	request.locale = "pt_BR"
 	request.arguments = PackedStringArray(["--level=3"])
 	var extended := GodotMcpRunArguments.extend(PackedStringArray(["--", "--cheats"]), request, false)
-	assert_eq(extended, PackedStringArray(["--ignore-error-breaks", "--debug-collisions", "--debug-paths", "--resolution", "800x600", "--language", "pt_BR", "--", "--cheats", "--level=3"]))
+	assert_eq(extended, PackedStringArray(["--ignore-error-breaks", "--debug-collisions", "--debug-paths", "--resolution", "800x600", "--language", "pt_BR", "--", "--cheats", "--level=3", "--mcp-window-size=800x600"]))
 
 
 func test_starts_the_game_arguments_when_the_editor_passes_none() -> void:

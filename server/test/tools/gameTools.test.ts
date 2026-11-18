@@ -47,6 +47,24 @@ describe('game tools', () => {
     );
   });
 
+  it('game_run says when the game window did not get the size asked for', async () => {
+    const editor = new FakeEditorGateway().respondTo('game.run', { ...quietRun, window_size: [1152, 648] });
+
+    const text = textOf(await createGameRunTool(editor, new GameOutputCursor()).execute({ window_size: [1024, 768] }));
+
+    expect(text).toContain(
+      'The game window is 1152×648, not the 1024×768 asked for: the Game view of the editor sizes a game that it embeds, and keeps the asked size only in its Fixed size mode and when the view is large enough.',
+    );
+  });
+
+  it('game_run stays quiet about a game window that got the size asked for', async () => {
+    const editor = new FakeEditorGateway().respondTo('game.run', { ...quietRun, window_size: [1024, 768] });
+
+    const text = textOf(await createGameRunTool(editor, new GameOutputCursor()).execute({ window_size: [1024, 768] }));
+
+    expect(text).not.toContain('The game window is');
+  });
+
   it('game_run asks the editor to stop the game at its first error', async () => {
     const editor = new FakeEditorGateway().respondTo('game.run', quietRun);
 

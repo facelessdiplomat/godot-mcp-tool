@@ -46,7 +46,7 @@ func _ready() -> void:
 	GodotMcpHeadlessWindow.give_project_size(get_tree().root)
 	await get_tree().process_frame
 	_flush()
-	_sink.send_ready(_current_scene_path(), GodotMcpHeadlessWindow.is_windowless())
+	_sink.send_ready(_current_scene_path(), GodotMcpHeadlessWindow.is_windowless(), get_tree().root.size)
 
 
 func _process(_delta: float) -> void:
