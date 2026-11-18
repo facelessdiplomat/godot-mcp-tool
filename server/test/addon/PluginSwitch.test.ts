@@ -61,6 +61,7 @@ describe('switching a plugin', () => {
         '[autoload]',
         '',
         'GutHelper="*res://addons/gut/helper.gd"',
+        'GutRunner="*uid://b1gutrunner"',
         'GameState="*res://game_state.gd"',
         '',
         '[editor_plugins]',
@@ -69,6 +70,8 @@ describe('switching a plugin', () => {
         '',
       ].join('\n'),
     );
+    mkdirSync(join(projectRoot, 'addons', 'gut', 'runner'), { recursive: true });
+    writeFileSync(join(projectRoot, 'addons', 'gut', 'runner', 'runner.gd.uid'), 'uid://b1gutrunner\n');
     const editor = new FakeEditor(true).respondTo('editor.set_plugin_enabled', {
       plugin: 'gut',
       enabled: false,
@@ -81,7 +84,16 @@ describe('switching a plugin', () => {
     const inFile = await new PluginSwitch(projectRoot, new FakeEditor(false)).setEnabled('gut', false);
 
     expect(inEditor.autoloadsLeft).toEqual([{ name: 'GutHelper', path: 'res://addons/gut/helper.gd' }]);
-    expect(inFile).toEqual({ plugin: 'gut', enabled: false, changed: true, through: 'project.godot', autoloadsLeft: [{ name: 'GutHelper', path: 'res://addons/gut/helper.gd' }] });
+    expect(inFile).toEqual({
+      plugin: 'gut',
+      enabled: false,
+      changed: true,
+      through: 'project.godot',
+      autoloadsLeft: [
+        { name: 'GutHelper', path: 'res://addons/gut/helper.gd' },
+        { name: 'GutRunner', path: 'res://addons/gut/runner/runner.gd' },
+      ],
+    });
   });
 
   it('refuses plugins that are missing or that carry these tools', async () => {

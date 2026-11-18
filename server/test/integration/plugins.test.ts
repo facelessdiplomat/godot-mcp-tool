@@ -22,7 +22,7 @@ const pluginScript = [
 const autosaveScript = ['extends Node', '', 'var saves := 0', ''].join('\n');
 
 const pluginPath = 'res://addons/autosave/plugin.cfg';
-const autoloadLine = 'Autosave="*res://addons/autosave/autosave.gd"';
+const autoloadPattern = /^Autosave="\*(?:res:\/\/addons\/autosave\/autosave\.gd|uid:\/\/\w+)"$/m;
 
 describe.skipIf(godotBinary === '')('turning a plugin on and off in the running editor', () => {
   let project: TemporaryProject | undefined;
@@ -64,9 +64,9 @@ describe.skipIf(godotBinary === '')('turning a plugin on and off in the running 
 
     expect(turnedOn.text).toBe('Turned the plugin autosave on in the editor.');
     expect(settingsWithThePlugin).toContain(`"${pluginPath}"`);
-    expect(settingsWithThePlugin).toContain(autoloadLine);
+    expect(settingsWithThePlugin).toMatch(autoloadPattern);
     expect(turnedOff.text.split('\n')[0]).toBe('Turned the plugin autosave off in the editor.');
     expect(settingsWithoutThePlugin).not.toContain(pluginPath);
-    expect(turnedOff.text.includes('Its autoload Autosave (res://addons/autosave/autosave.gd) is still in project.godot')).toBe(settingsWithoutThePlugin.includes(autoloadLine));
+    expect(turnedOff.text.includes('Its autoload Autosave (res://addons/autosave/autosave.gd) is still in project.godot')).toBe(autoloadPattern.test(settingsWithoutThePlugin));
   });
 });

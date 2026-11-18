@@ -1,5 +1,5 @@
 import { existsSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { join, relative } from 'node:path';
 import * as z from 'zod/v4';
 import type { EditorStatusProvider } from '../bridge/EditorConnection.js';
 import type { EditorGateway } from '../editor/EditorGateway.js';
@@ -37,6 +37,7 @@ const pathPrefix = 'res://addons/';
 const pathSuffix = '/plugin.cfg';
 const autoloadSection = 'autoload';
 const singletonMark = '*';
+const uidFileExtension = '.uid';
 
 export class PluginSwitch {
   constructor(
@@ -71,13 +72,35 @@ export class PluginSwitch {
     if (changed) {
       writeFileSync(projectPath, withPlugin(projectText, pluginPath, enabled));
     }
-    return { plugin, enabled, changed, through: 'project.godot', autoloadsLeft: enabled ? [] : autoloadsInside(projectText, `${pathPrefix}${plugin}/`) };
+    return { plugin, enabled, changed, through: 'project.godot', autoloadsLeft: enabled ? [] : autoloadsInside(projectText, this.projectRoot, plugin) };
   }
 }
 
-function autoloadsInside(projectText: string, folder: string): PluginAutoload[] {
+function autoloadsInside(projectText: string, projectRoot: string, plugin: string): PluginAutoload[] {
+  const folder = `${pathPrefix}${plugin}/`;
+  const pathsByUid = resourcePathsByUid(join(projectRoot, addonsFolder, plugin), folder);
   const autoloads = readConfigSections(projectText).find((section) => section.name === autoloadSection)?.values ?? new Map<string, string>();
-  return [...autoloads].map(([name, value]) => ({ name, path: value.startsWith(singletonMark) ? value.slice(singletonMark.length) : value })).filter((autoload) => autoload.path.startsWith(folder));
+  return [...autoloads]
+    .map(([name, value]) => {
+      const target = value.startsWith(singletonMark) ? value.slice(singletonMark.length) : value;
+      return { name, path: pathsByUid.get(target) ?? target };
+    })
+    .filter((autoload) => autoload.path.startsWith(folder));
+}
+
+function resourcePathsByUid(directory: string, resourceFolder: string): Map<string, string> {
+  const pathsByUid = new Map<string, string>();
+  if (!existsSync(directory)) {
+    return pathsByUid;
+  }
+  for (const entry of readdirSync(directory, { recursive: true, withFileTypes: true })) {
+    if (entry.isFile() && entry.name.endsWith(uidFileExtension)) {
+      const uidFile = join(entry.parentPath, entry.name);
+      const resourcePath = `${resourceFolder}${relative(directory, uidFile).replaceAll('\\', '/').slice(0, -uidFileExtension.length)}`;
+      pathsByUid.set(readFileSync(uidFile, 'utf8').trim(), resourcePath);
+    }
+  }
+  return pathsByUid;
 }
 
 function pluginsIn(projectRoot: string): string[] {

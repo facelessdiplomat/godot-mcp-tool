@@ -41,7 +41,7 @@ const autosaveScript = [
 ].join('\n');
 
 const enabledPluginPattern = /^enabled=PackedStringArray\([^)]*"res:\/\/addons\/autosave\/plugin\.cfg"/m;
-const autoloadLine = 'Autosave="*res://addons/autosave/autosave.gd"';
+const autoloadPattern = /^Autosave="\*(?:res:\/\/addons\/autosave\/autosave\.gd|uid:\/\/\w+)"$/m;
 
 export const turnOnAPlugin: Scenario = {
   name: 'turn-on-a-plugin',
@@ -64,7 +64,7 @@ export const turnOnAPlugin: Scenario = {
     const singleton = await tools.call('game_get_properties', { path: '/root/Autosave', names: ['interval'] });
     const checks: CheckResult[] = [
       checked('project.godot lists the plugin as enabled', enabledPluginPattern.test(settings), settings.split('\n').find((line) => line.startsWith('enabled=')) ?? 'no enabled plugins'),
-      checked('the plugin added its Autosave autoload when it was turned on', settings.includes(autoloadLine), settings.includes('[autoload]') ? 'project.godot has other autoloads' : 'project.godot has no autoloads'),
+      checked('the plugin added its Autosave autoload when it was turned on', autoloadPattern.test(settings), settings.includes('[autoload]') ? 'project.godot has other autoloads' : 'project.godot has no autoloads'),
       checked('the running game has the Autosave singleton', !singleton.isError && /interval = 30\b/.test(singleton.text), singleton.text.split('\n').slice(0, 2).join(' ')),
       ...agentUsed(agent, ['plugin_set_enabled'], 'the agent turned the plugin on with plugin_set_enabled'),
     ];

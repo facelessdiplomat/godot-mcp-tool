@@ -10,6 +10,8 @@ import { type Application, createApplication } from '../../src/createApplication
 
 export const godotBinary = process.env['GODOT_BIN'] ?? '';
 export const editorStartupTimeoutMs = 120_000;
+const removalRetries = 10;
+const removalRetryDelayMs = 100;
 
 const repositoryRoot = resolve(import.meta.dirname, '..', '..', '..');
 export const testProjectRoot = join(repositoryRoot, 'test-project');
@@ -230,7 +232,7 @@ export class TemporaryProject {
   }
 
   remove(): void {
-    rmSync(this.root, { recursive: true, force: true });
+    rmSync(this.root, { recursive: true, force: true, maxRetries: removalRetries, retryDelay: removalRetryDelayMs });
   }
 }
 
