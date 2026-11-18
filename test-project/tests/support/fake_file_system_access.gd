@@ -6,6 +6,7 @@ var applied := 0
 var reimported: Array = []
 var updated_files := PackedStringArray()
 var applies_scans_at_once := false
+var ignores_next_scan := false
 
 
 func is_scanning() -> bool:
@@ -14,6 +15,9 @@ func is_scanning() -> bool:
 
 func scan() -> void:
 	scan_requests += 1
+	if ignores_next_scan:
+		ignores_next_scan = false
+		return
 	if applies_scans_at_once:
 		applied += 1
 		return

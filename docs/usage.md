@@ -89,8 +89,9 @@ server `godot` of `.mcp.json`, and longer names with the plugin.
 - **A breakpoint stops the game.** The game waits at a breakpoint until Claude continues or stops it. Script errors
   do not stop the game: Claude reads them with file, line and stack.
 - **One editor per project.** When the same project is open in two editors, only the first one talks to Claude.
-- **GDScript and 3D.** C# is not supported. 2D scenes can be built with the node tools, but there are no tools for
-  2D, such as for TileMaps.
+- **GDScript, and 3D first.** C# is not supported. For 2D, besides the node tools and screenshots, there are tools
+  for tiles: `tileset_add_atlas` builds a TileSet from an image and `tilemap_set_cells` paints a `TileMapLayer`.
+  Navigation baking is for 3D only.
 
 ## All tools
 

@@ -109,6 +109,20 @@ func test_sets_properties_of_the_running_game() -> void:
 	assert_eq(_player.position, Vector3(0, 5, 0))
 
 
+func test_sets_script_variables_without_export_in_the_running_game() -> void:
+	var script := GDScript.new()
+	script.source_code = "extends Node\n\nvar best := 0\nvar saved := 0\nvar score := 0:\n\tset(value):\n\t\tscore = value\n\t\tsaved = value\n"
+	script.reload()
+	var keeper := Node.new()
+	keeper.name = "Score"
+	keeper.set_script(script)
+	_arena.add_child(keeper)
+	var result: Dictionary = await GodotMcpGamePropertiesSetCommand.new(_scene, _properties).execute({"path": "Score", "properties": {"best": 1234, "score": 7}})
+	assert_eq(result["applied"], ["best", "score"])
+	assert_eq(keeper.get("best"), 1234)
+	assert_eq(keeper.get("saved"), 7)
+
+
 func _build_menu() -> Control:
 	var menu := Control.new()
 	menu.name = "Menu"

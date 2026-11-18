@@ -53,7 +53,7 @@ export async function scriptsAreClean(tools: McpSession, paths: readonly string[
   return checked('the scripts have no errors', !outcome.isError && !/\berrors?\b/.test(summary), summary);
 }
 
-export async function findNodes(tools: McpSession, scene: string, criteria: Readonly<Record<string, string>>): Promise<string[]> {
+export async function findNodes(tools: McpSession, scene: string, criteria: Readonly<Record<string, string | boolean>>): Promise<string[]> {
   const outcome = await tools.call('node_find', { scene, ...criteria });
   return outcome.text
     .split('\n')

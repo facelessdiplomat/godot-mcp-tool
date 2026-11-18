@@ -1999,13 +1999,26 @@ Waiting for an evaluation or a user that needs them:
 
 - Light baking. Only `VoxelGI.bake()` is bound for scripts; `LightmapGI` and `OccluderInstance3D` have no bake
   method (API dump of 4.8 beta 2).
-- Audio bus layouts; translations beyond the `locale` of `game_run`; several instances of the game for multiplayer;
-  reading and clearing `user://` for tests of saved games.
+- Translations beyond the `locale` of `game_run`; several instances of the game for multiplayer.
+
+Five evaluation scenarios for this backlog ([results](evals/README.md#five-scenarios-for-the-backlog-2026-11-18))
+showed the need for editing the audio bus layout, painting the cells of a `GridMap`, building a `TileSet` from a
+texture and painting a `TileMapLayer` (the first tools for 2D), reading the `user://` folder of the game, and reading
+imported resources such as textures with `resource_get`. They also found a fault: `game_set_properties` does not set a
+script variable without `@export` in the running game. Translations need no new tool. All of it is done:
+`audio_buses_get` and `audio_buses_set`, `gridmap_get_cells` and `gridmap_set_cells`, `tileset_add_atlas`,
+`tilemap_get_cells` and `tilemap_set_cells`, `user_data_get` and the unsafe `user_data_delete`; `resource_get` reads
+imported textures with their size and getters such as `get_height()`, and `game_set_properties` sets script variables
+without `@export`, running their setters. Writing the texture test found that `editor_rescan` returned without
+importing a file added while the editor was still scanning; it now scans again until a scan that began after the call
+has been applied. With these tools the four scenarios that needed them passed again with 53 tool calls instead of
+130, none of them failed, for $0.93 instead of $2.15
+([results](evals/README.md#the-four-scenarios-again-with-their-tools-2026-11-18)).
 
 Open questions, for you to decide:
 
-- 2D. Full support — `TileMapLayer`, views of a `Camera2D`, 2D physics and navigation — is a milestone of its own,
-  about the size of milestone 7. It is a non-goal for the 3D game (§3) and a limitation that `docs/usage.md` names;
+- 2D. The tile tools are the first step; full support — views of a `Camera2D`, 2D physics and navigation — is a
+  milestone of its own, about the size of milestone 7. It is a non-goal for the 3D game (§3) and a limitation that `docs/usage.md` names;
   it pays off only if the published package is meant for other people's projects.
 - Whether `project_create` moves up into milestone 6, if new users matter more than the game.
 

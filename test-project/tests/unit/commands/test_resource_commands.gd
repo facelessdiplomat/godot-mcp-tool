@@ -119,6 +119,17 @@ func test_reads_the_type_and_changed_properties_of_a_resource() -> void:
 	assert_eq(result["dependencies"], [])
 
 
+func test_gives_the_size_of_a_texture_and_reads_its_getters() -> void:
+	var texture_path := _scratch_path("tiles.res")
+	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(_scratch_directory))
+	ResourceSaver.save(ImageTexture.create_from_image(Image.create(64, 32, false, Image.FORMAT_RGBA8)), texture_path)
+	var result: Dictionary = await GodotMcpResourceGetCommand.new(_context).execute({"path": texture_path, "names": ["get_width()", "get_hight()"]})
+	var properties: Array = result["properties"]
+	assert_eq(result["size"], [64, 32])
+	assert_eq((properties[0] as Dictionary)["value"], 64)
+	assert_string_contains((properties[1] as Dictionary)["error"], "Similar: get_height")
+
+
 func test_reads_named_properties_and_explains_unknown_names() -> void:
 	var result: Dictionary = await GodotMcpResourceGetCommand.new(_context).execute({"path": ORANGE_MATERIAL, "names": ["metallic", "metalic"]})
 	var properties: Array = result["properties"]

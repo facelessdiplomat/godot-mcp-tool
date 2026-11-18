@@ -65,6 +65,21 @@ describe('resource tools', () => {
     );
   });
 
+  it('resource_get gives the size of a texture and passes getters on', async () => {
+    const editor = new FakeEditorGateway().respondTo('resource.get', {
+      path: 'res://tiles.png',
+      type: 'CompressedTexture2D',
+      properties: [{ name: 'get_width()', type: 'int', value: 64 }],
+      dependencies: [],
+      size: [64, 32],
+    });
+
+    const result = await createResourceGetTool(editor).execute({ path: 'res://tiles.png', names: ['get_width()'] });
+
+    expect(editor.requests[0]?.params).toEqual({ path: 'res://tiles.png', names: ['get_width()'], include_defaults: false });
+    expect(textOf(result)).toBe(['res://tiles.png (CompressedTexture2D, 64×32 pixels)', 'get_width() = 64  [int]'].join('\n'));
+  });
+
   it('resource_get says when every property has its default value', async () => {
     const editor = new FakeEditorGateway().respondTo('resource.get', { path: 'res://materials/ice.tres', type: 'PhysicsMaterial', properties: [], dependencies: [] });
 

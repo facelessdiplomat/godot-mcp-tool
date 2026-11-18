@@ -1,4 +1,5 @@
 import type { Scenario } from '../Scenario.js';
+import { aLevelOfTiles } from './aLevelOfTiles.js';
 import { animateADoor } from './animateADoor.js';
 import { bringBackThePillars } from './bringBackThePillars.js';
 import { buildAnArena } from './buildAnArena.js';
@@ -20,16 +21,20 @@ import { gamepadControls } from './gamepadControls.js';
 import { healthBarHud } from './healthBarHud.js';
 import { hudAtTwoSizes } from './hudAtTwoSizes.js';
 import { importACharacter } from './importACharacter.js';
+import { keepTheBestScore } from './keepTheBestScore.js';
 import { landOnce } from './landOnce.js';
+import { musicOnItsOwnBus } from './musicOnItsOwnBus.js';
 import { patrolBetweenPoints } from './patrolBetweenPoints.js';
 import { paintOneEnemy } from './paintOneEnemy.js';
 import { pauseMenu } from './pauseMenu.js';
+import { paveTheCourtyard } from './paveTheCourtyard.js';
 import { playtestWithoutAWindow } from './playtestWithoutAWindow.js';
 import { renameEverywhere } from './renameEverywhere.js';
 import { resumeTheMenu } from './resumeTheMenu.js';
 import { stopTheSlowdown } from './stopTheSlowdown.js';
 import { thirdPersonPrototype } from './thirdPersonPrototype.js';
 import { tidyTheProject } from './tidyTheProject.js';
+import { translateTheMenu } from './translateTheMenu.js';
 import { turnOnAPlugin } from './turnOnAPlugin.js';
 
 export const allScenarios: readonly Scenario[] = [
@@ -65,4 +70,9 @@ export const allScenarios: readonly Scenario[] = [
   bringBackThePillars,
   turnOnAPlugin,
   exportsForWindowsAndLinux,
+  keepTheBestScore,
+  musicOnItsOwnBus,
+  translateTheMenu,
+  paveTheCourtyard,
+  aLevelOfTiles,
 ];

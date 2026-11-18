@@ -47,6 +47,11 @@ When running one, record whether it passed, the number of tool calls and the tok
 | [bring-back-the-pillars.md](bring-back-the-pillars.md) | `editor_undo` across an action that must stay |
 | [turn-on-a-plugin.md](turn-on-a-plugin.md) | `plugin_set_enabled` and a plugin that adds an autoload |
 | [exports-for-windows-and-linux.md](exports-for-windows-and-linux.md) | `export_preset_add`, packs with `export_project` |
+| [keep-the-best-score.md](keep-the-best-score.md) | saving to `user://` and loading it in the next run |
+| [music-on-its-own-bus.md](music-on-its-own-bus.md) | the audio bus layout of the project and the bus of each player |
+| [translate-the-menu.md](translate-the-menu.md) | a CSV translation and `game_run` with `locale` |
+| [pave-the-courtyard.md](pave-the-courtyard.md) | the cells of a `GridMap` in the saved scene |
+| [a-level-of-tiles.md](a-level-of-tiles.md) | a 2D level: a `TileSet`, the cells of a `TileMapLayer`, a `Camera2D` |
 
 ## Running them
 
@@ -309,3 +314,58 @@ With that fix `hud-at-two-sizes` passed again with 21 tool calls and none failed
 32 s instead of $0.43 in 54 s. The agent ran the game with `window_size` [1024, 768], `game_run` reported no other
 size, and the game laid the HUD out in a viewport of 1152×864, as the stretch settings of the project scale that
 window; it no longer touched the size of `/root` or `content_scale_size`.
+
+### Five scenarios for the backlog, 2026-11-18
+
+The same model and versions, five new scenarios for areas that the earlier ones leave out, one run each, with the tools
+that a user has by default, so without the unsafe ones.
+
+| Scenario | Checks | Tool calls | Failed tool calls | Cost, $ | Time, s |
+|---|---|---|---|---|---|
+| keep-the-best-score | 3/3 | 29 | 3 | 0.35 | 60 |
+| music-on-its-own-bus | 4/4 | 38 | 0 | 0.60 | 85 |
+| translate-the-menu | 3/3 | 17 | 0 | 0.24 | 30 |
+| pave-the-courtyard | 4/4 | 21 | 3 | 0.43 | 57 |
+| a-level-of-tiles | 4/5 | 42 | 2 | 0.77 | 96 |
+| **4 of 5 passed** | | **147** | **8** | **2.39** | **328** |
+
+- `a-level-of-tiles` failed on its own check: the agent stopped its camera at the edges of the level, and a walk of one
+  second from the left edge did not move it. The check now walks for 3 seconds and measures how far the camera moves;
+  a second run passed all 5 checks with 38 tool calls, 1 of them failed, for $0.73 in 82 s.
+- Only `translate-the-menu` needed nothing beyond the tools: a CSV, `editor_rescan` and `project_settings_set`.
+- In `keep-the-best-score` `game_set_properties` twice refused to set `best`, a script variable without `@export`,
+  since it takes only the properties that the inspector shows, so the agent wrote a test script; Claude Code kept it
+  from reading `save.json` in the folder of the user data, which no tool reads.
+- In `music-on-its-own-bus` no tool edits the audio bus layout: `resource_create` refuses `bus/<n>/…`, and the editor
+  drops a bus name that its own layout lacks, so no player can be put on a new bus. The agent wrote
+  `default_bus_layout.tres` and edited `arena.tscn` as text, which the instructions of the server forbid while the
+  editor is connected.
+- In `pave-the-courtyard` `node_set_properties` twice refused the `data` of the `GridMap`; the agent then wrote a
+  `@tool` script with a setter that paints the cells in the editor.
+- In `a-level-of-tiles` no tool adds tiles or collision polygons to a `TileSet` (`resource_set_properties` refused
+  `physics_layers`) or paints the cells of a `TileMapLayer`. Both runs wrote a one-off editor script that built them
+  and asked the user to delete it afterwards, since deleting files is an unsafe tool, and both asked `resource_get` for
+  the size of `res://tiles.png`, which it does not read.
+
+### The four scenarios again with their tools, 2026-11-18
+
+The tools that those runs asked for came next: `audio_buses_get` and `audio_buses_set`, `gridmap_get_cells` and
+`gridmap_set_cells`, `tileset_add_atlas`, `tilemap_get_cells` and `tilemap_set_cells`, `user_data_get`,
+`resource_get` reading textures, and `game_set_properties` setting script variables without `@export`. The reference
+solutions of the four scenarios that needed them now use them instead of writing text, and each scenario ran once more
+with an agent:
+
+| Scenario | Checks | Tool calls | Failed tool calls | Cost, $ | Time, s |
+|---|---|---|---|---|---|
+| keep-the-best-score | 3/3 | 16 | 0 | 0.25 | 33 |
+| music-on-its-own-bus | 4/4 | 12 | 0 | 0.21 | 20 |
+| pave-the-courtyard | 4/4 | 6 | 0 | 0.15 | 13 |
+| a-level-of-tiles | 5/5 | 19 | 0 | 0.32 | 32 |
+| **4 of 4 passed** | | **53** | **0** | **0.93** | **98** |
+
+- The first runs of the same four took 130 tool calls with 8 failed, $2.15 and 298 s.
+- No run wrote a scene or a resource as text, and none wrote an editor script: the agents added the buses with
+  `audio_buses_set` and put the players on them with `scene_batch_edit`, paved the courtyard with two boxes of
+  `gridmap_set_cells`, and built the level with `tileset_add_atlas`, collision included, and one `tilemap_set_cells`.
+- In `keep-the-best-score` `game_set_properties` set `best` at once, its setter saved the score, and `user_data_get`
+  showed `save.json`.

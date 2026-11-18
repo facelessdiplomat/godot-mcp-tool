@@ -31,9 +31,12 @@ are described in the files linked at the end.
    after a save, and do them again with `editor_redo`. Shared materials and other resources: `resource_create`,
    `resource_set_properties`. To change one instance of a scene only, such as making `Enemy2` red, set properties of
    its inner nodes (`Enemy2/Mesh`; `scene_get_tree` of `res://enemy.tscn` shows them); to change every instance,
-   edit the instanced scene itself.
+   edit the instanced scene itself. Paint levels of blocks with `gridmap_set_cells`; for 2D tiles build a TileSet from
+   an image with `tileset_add_atlas` and paint a `TileMapLayer` with `tilemap_set_cells`. Read the cells back with
+   `gridmap_get_cells` and `tilemap_get_cells`.
 3. **Project setup**: input actions with `input_map_set`, settings with `project_settings_set`, global singletons
-   with `autoload_add`, editor plugins of `res://addons` with `plugin_set_enabled`, groups with `node_set_groups`.
+   with `autoload_add`, editor plugins of `res://addons` with `plugin_set_enabled`, groups with `node_set_groups`,
+   audio buses such as Music and Effects with `audio_buses_set`.
    Move or rename files and folders with `filesystem_move`, never with shell commands: it updates the scenes,
    resources and settings that use them and lists the scripts to change. Before deleting a file, check with
    `resource_find_usages` that nothing uses it.
@@ -44,7 +47,7 @@ are described in the files linked at the end.
 6. **Observe** the running game: `game_input` for actions, keys, the mouse and the gamepad, with `read` steps for
    values at exact moments; `game_wait` for a state such as `is_on_floor()`; `game_get_properties` for values,
    getters included; `node_get_bounds` for placement and scale; `game_screenshot`, with `views` for 3D; `game_pause`
-   and `game_step` for frame-exact checks; `game_performance`.
+   and `game_step` for frame-exact checks; `game_performance`; `user_data_get` for what the game saved in `user://`.
 7. **Test** with GUT tests in `res://test` and `test_run`.
    To find why code misbehaves, stop the game on a line with `debug_breakpoints`, read the stack and the variables
    with `debug_state`, step with `debug_continue`, and remove the breakpoints when done.

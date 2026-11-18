@@ -25,7 +25,7 @@ func execute(params: Dictionary) -> Variant:
 	if resolved is GodotMcpCommandError:
 		return resolved
 	var node := resolved as Node
-	var report := _properties.assign(node, properties)
+	var report := _properties.assign_while_running(node, properties)
 	return {
 		"scene": _scene.scene_path(),
 		"path": _scene.path_of(node),

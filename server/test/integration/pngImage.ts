@@ -1,4 +1,4 @@
-import { inflateSync } from 'node:zlib';
+import { crc32, deflateSync, inflateSync } from 'node:zlib';
 
 export type Rgb = readonly [number, number, number];
 
@@ -12,6 +12,32 @@ const pngSignature = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a
 const chunkFrameBytes = 12;
 const rgbColorType = 2;
 const rgbaColorType = 6;
+const rgbaChannels = 4;
+const fullChannel = 255;
+const noRowFilter = 0;
+
+export function encodeWhitePng(width: number, height: number): Buffer {
+  const rows = Array.from({ length: height }, () => {
+    const row = Buffer.alloc(1 + width * rgbaChannels, fullChannel);
+    row[0] = noRowFilter;
+    return row;
+  });
+  const header = Buffer.alloc(13);
+  header.writeUInt32BE(width, 0);
+  header.writeUInt32BE(height, 4);
+  header.writeUInt8(8, 8);
+  header.writeUInt8(rgbaColorType, 9);
+  return Buffer.concat([pngSignature, pngChunk('IHDR', header), pngChunk('IDAT', deflateSync(Buffer.concat(rows))), pngChunk('IEND', Buffer.alloc(0))]);
+}
+
+function pngChunk(type: string, data: Buffer): Buffer {
+  const length = Buffer.alloc(4);
+  length.writeUInt32BE(data.length);
+  const body = Buffer.concat([Buffer.from(type, 'ascii'), data]);
+  const checksum = Buffer.alloc(4);
+  checksum.writeUInt32BE(crc32(body));
+  return Buffer.concat([length, body, checksum]);
+}
 
 export function decodePng(file: Buffer): PngImage {
   if (!file.subarray(0, pngSignature.length).equals(pngSignature)) {

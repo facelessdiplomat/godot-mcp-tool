@@ -55,9 +55,9 @@ type SchemaNode = Readonly<Record<string, unknown>>;
 
 const toolAreas: readonly ToolArea[] = [
   { title: 'Connection and editor', prefixes: ['godot_', 'editor_'] },
-  { title: 'Project', prefixes: ['project_', 'input_map_', 'autoload_', 'plugin_'] },
-  { title: 'Scenes and nodes', prefixes: ['scene_', 'node_', 'signal_'] },
-  { title: 'Resources and files', prefixes: ['resource_', 'asset_', 'filesystem_'] },
+  { title: 'Project', prefixes: ['project_', 'input_map_', 'autoload_', 'plugin_', 'audio_'] },
+  { title: 'Scenes and nodes', prefixes: ['scene_', 'node_', 'signal_', 'gridmap_', 'tilemap_'] },
+  { title: 'Resources and files', prefixes: ['resource_', 'asset_', 'filesystem_', 'tileset_', 'user_data_'] },
   { title: 'Animation and navigation', prefixes: ['animation_', 'navigation_'] },
   { title: 'Scripts, tests and exports', prefixes: ['script_', 'test_', 'export_'] },
   { title: 'The running game', prefixes: ['game_'] },

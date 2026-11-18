@@ -24,11 +24,27 @@ func execute(params: Dictionary) -> Variant:
 	if timeout_msec is GodotMcpCommandError:
 		return timeout_msec
 	var started_msec := Time.get_ticks_msec()
-	var applied_before := _file_system.applied_scans()
 	var reloaded_extensions := _extensions.take_reloaded()
-	if not _file_system.is_scanning():
+	while true:
+		if _file_system.is_scanning():
+			if not await _wait_for_a_scan_after(_file_system.applied_scans(), started_msec, timeout_msec):
+				return _timeout_error(timeout_msec)
+			continue
+		var applied_before := _file_system.applied_scans()
 		_file_system.scan()
-	if not await GodotMcpWaiting.until(func() -> bool: return _file_system.applied_scans() != applied_before, timeout_msec):
-		return GodotMcpCommandError.new(GodotMcpJsonRpc.TIMEOUT, "The file system scan did not finish within %d ms" % timeout_msec, "Large projects may need a longer timeout_ms.")
+		var scan_started := _file_system.is_scanning() or _file_system.applied_scans() != applied_before
+		if not await _wait_for_a_scan_after(applied_before, started_msec, timeout_msec):
+			return _timeout_error(timeout_msec)
+		if scan_started:
+			break
 	await _scripts.reload_open_files()
 	return {"duration_ms": Time.get_ticks_msec() - started_msec, "reloaded_extensions": reloaded_extensions}
+
+
+func _wait_for_a_scan_after(applied_before: int, started_msec: int, timeout_msec: int) -> bool:
+	var remaining_msec := maxi(timeout_msec - (Time.get_ticks_msec() - started_msec), 1)
+	return await GodotMcpWaiting.until(func() -> bool: return _file_system.applied_scans() != applied_before, remaining_msec)
+
+
+static func _timeout_error(timeout_msec: int) -> GodotMcpCommandError:
+	return GodotMcpCommandError.new(GodotMcpJsonRpc.TIMEOUT, "The file system scan did not finish within %d ms" % timeout_msec, "Large projects may need a longer timeout_ms.")

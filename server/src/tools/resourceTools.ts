@@ -15,6 +15,7 @@ const resourceDescriptionSchema = z.object({
   type: z.string(),
   properties: propertyDescriptionsSchema,
   dependencies: z.array(z.string()),
+  size: z.tuple([z.number(), z.number()]).optional(),
 });
 
 type ResourceDescription = z.infer<typeof resourceDescriptionSchema>;
@@ -58,7 +59,9 @@ const resourceGetInput = z.object({
   names: z
     .array(z.string())
     .optional()
-    .describe('Properties to read, such as ["albedo_color", "roughness"], or paths such as "next_pass:albedo_color". Default: every property whose value differs from its default.'),
+    .describe(
+      'Properties to read, such as ["albedo_color", "roughness"], paths such as "next_pass:albedo_color", or methods without arguments whose names start with is_, get_, has_ or can_, such as "get_length()". Default: every property whose value differs from its default.',
+    ),
   include_defaults: z.boolean().default(false).describe('Without names, also list properties at their default values. The list gets long.'),
 });
 
@@ -68,7 +71,7 @@ export function createResourceGetTool(editor: EditorGateway): BridgeTool<typeof 
     definition: {
       title: 'Read resource',
       description:
-        'Read a resource file such as a material, physics material or environment: its type, the properties that differ from their defaults or the ones named, each with its type in Godot syntax, and the files it depends on. Scenes are read with scene_get_tree instead.',
+        'Read a resource file such as a material, physics material or environment, or an imported one such as a texture: its type, the properties that differ from their defaults or the ones named, each with its type in Godot syntax, and the files it depends on; for a texture also its size in pixels. Scenes are read with scene_get_tree instead.',
       inputSchema: resourceGetInput,
       annotations: readingAnnotations,
       alwaysLoad: false,
@@ -80,7 +83,8 @@ export function createResourceGetTool(editor: EditorGateway): BridgeTool<typeof 
 }
 
 function describeResource(resource: ResourceDescription): string {
-  const lines = [`${resource.path} (${resource.type})`, ...formatPropertyLines(resource.properties)];
+  const size = resource.size === undefined ? '' : `, ${String(resource.size[0])}×${String(resource.size[1])} pixels`;
+  const lines = [`${resource.path} (${resource.type}${size})`, ...formatPropertyLines(resource.properties)];
   if (resource.dependencies.length > 0) {
     lines.push(`Depends on: ${resource.dependencies.join(', ')}`);
   }

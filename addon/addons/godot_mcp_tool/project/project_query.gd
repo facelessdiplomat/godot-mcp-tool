@@ -1,9 +1,13 @@
 extends SceneTree
 
+const GodotMcpAudioBusesGetCommand := preload("../commands/audio/audio_buses_get_command.gd")
+const GodotMcpAudioBusLayoutFile := preload("../audio/audio_bus_layout_file.gd")
 const GodotMcpCommandError := preload("../commands/command_error.gd")
 const GodotMcpCommandRouter := preload("../commands/command_router.gd")
 const GodotMcpEditingContext := preload("../scene/editing_context.gd")
+const GodotMcpFileSystemAccess := preload("../editor/file_system_access.gd")
 const GodotMcpGameRequestResponder := preload("../runtime/game_request_responder.gd")
+const GodotMcpGridMapGetCellsCommand := preload("../commands/grid/gridmap_get_cells_command.gd")
 const GodotMcpInputMapGetCommand := preload("../commands/input/input_map_get_command.gd")
 const GodotMcpJsonRpc := preload("../bridge/json_rpc.gd")
 const GodotMcpNodeFindCommand := preload("../commands/node/node_find_command.gd")
@@ -18,10 +22,12 @@ const GodotMcpScriptEditorAccess := preload("../editor/script_editor_access.gd")
 const GodotMcpScriptIndentation := preload("script_indentation.gd")
 const GodotMcpShaderValidateCommand := preload("../commands/shader/shader_validate_command.gd")
 const GodotMcpSignalListCommand := preload("../commands/signal/signal_list_command.gd")
+const GodotMcpTileMapGetCellsCommand := preload("../commands/grid/tilemap_get_cells_command.gd")
+const GodotMcpUserDataGetCommand := preload("../commands/project/user_data_get_command.gd")
 const GodotMcpVariantCodec := preload("../codec/variant_codec.gd")
 
 const ANSWER_MARKER := "GODOT_MCP_TOOL_ANSWER "
-const SCENE_READING_METHODS := ["scene.get_tree", "node.find", "node.get_properties", "node.get_bounds", "signal.list"]
+const SCENE_READING_METHODS := ["scene.get_tree", "node.find", "node.get_properties", "node.get_bounds", "gridmap.get_cells", "tilemap.get_cells", "signal.list"]
 
 
 class GodotMcpRunningGameOutOfReach:
@@ -58,11 +64,15 @@ static func _router() -> GodotMcpCommandRouter:
 	var router := GodotMcpCommandRouter.new()
 	router.register("project.info", GodotMcpProjectInfoCommand.new(GodotMcpScriptIndentation.of_project))
 	router.register("project.settings_get", GodotMcpProjectSettingsGetCommand.new(codec))
+	router.register("project.user_data_get", GodotMcpUserDataGetCommand.new())
 	router.register("input_map.get", GodotMcpInputMapGetCommand.new())
+	router.register("audio.buses_get", GodotMcpAudioBusesGetCommand.new(GodotMcpAudioBusLayoutFile.new(GodotMcpFileSystemAccess.new())))
 	router.register("shader.validate", GodotMcpShaderValidateCommand.new())
 	router.register("scene.get_tree", GodotMcpSceneGetTreeCommand.new(context))
 	router.register("node.find", GodotMcpNodeFindCommand.new(context))
 	router.register("node.get_properties", GodotMcpNodeGetPropertiesCommand.new(context))
 	router.register("node.get_bounds", GodotMcpNodeGetBoundsCommand.new(context, GodotMcpRunningGameOutOfReach.new()))
+	router.register("gridmap.get_cells", GodotMcpGridMapGetCellsCommand.new(context))
+	router.register("tilemap.get_cells", GodotMcpTileMapGetCellsCommand.new(context))
 	router.register("signal.list", GodotMcpSignalListCommand.new(context))
 	return router

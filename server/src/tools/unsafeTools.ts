@@ -202,3 +202,46 @@ function describeBrokenUses(usages: FileUsages): string[] {
     ...(usages.code.length === 0 ? [] : ['Scripts still name the deleted files:', ...formatCodeMentions(usages.code)]),
   ];
 }
+
+const userDataDeletionSchema = z.object({
+  folder: z.string(),
+  deleted: z.array(z.string()),
+  missing: z.array(z.string()),
+  failed: z.array(z.object({ path: z.string(), reason: z.string() })),
+});
+
+type UserDataDeletion = z.infer<typeof userDataDeletionSchema>;
+
+const userDataDeleteInput = z.object({
+  paths: z
+    .array(z.string().min(1))
+    .min(1)
+    .describe('Files or folders in the user data of the game, such as ["user://save.json", "user://saves"]; the user:// prefix may be left out.'),
+});
+
+export function createUserDataDeleteTool(editor: EditorGateway): BridgeTool<typeof userDataDeleteInput, UserDataDeletion> {
+  return new BridgeTool(editor, {
+    name: 'user_data_delete',
+    definition: {
+      title: 'Delete user data',
+      description:
+        'Delete files or folders of user://, the user data of the game, such as a saved game, by moving them to the system trash, so that the next game_run starts fresh. user_data_get lists them. The user confirms every call, and the editor must allow unsafe tools.',
+      inputSchema: userDataDeleteInput,
+      annotations: unsafeAnnotations,
+      alwaysLoad: false,
+      requiresUserInteraction: true,
+    },
+    method: 'project.user_data_delete',
+    responseSchema: userDataDeletionSchema,
+    present: (deletion) => describeUserDataDeletion(deletion),
+  });
+}
+
+function describeUserDataDeletion(deletion: UserDataDeletion): CallToolResult {
+  const lines = [
+    ...(deletion.deleted.length === 0 ? [] : [`Moved to the trash from the user data of the game: ${deletion.deleted.join(', ')}`]),
+    ...(deletion.missing.length === 0 ? [] : [`Not there: ${deletion.missing.join(', ')}`]),
+    ...deletion.failed.map((failure) => `Could not delete ${failure.path}: ${failure.reason}`),
+  ];
+  return deletion.deleted.length === 0 ? errorResult(['Nothing was deleted.', ...lines].join('\n')) : textResult(lines.join('\n'));
+}

@@ -60,7 +60,7 @@ import { createSceneGetTreeTool } from './tools/sceneTools.js';
 import { ScriptValidateTool } from './tools/scriptTools.js';
 import { TestRunTool } from './tools/TestRunTool.js';
 import type { Tool } from './tools/Tool.js';
-import { createEditorRunScriptTool, createFilesystemDeleteTool, createGameEvalTool, createNodeCallMethodTool } from './tools/unsafeTools.js';
+import { createEditorRunScriptTool, createFilesystemDeleteTool, createGameEvalTool, createNodeCallMethodTool, createUserDataDeleteTool } from './tools/unsafeTools.js';
 import { userCacheDirectory } from './util/CacheDirectory.js';
 import { parsePort } from './util/ports.js';
 
@@ -203,7 +203,7 @@ function createApplicationParts(environment: ApplicationEnvironment, createdProj
     createDebugBreakpointsTool(gameDebugger, readScript, errorSummary),
     createDebugStateTool(gameDebugger, readScript),
     createDebugContinueTool(gameDebugger, readScript),
-    ...(policy.unsafe ? [createEditorRunScriptTool(editor), createNodeCallMethodTool(editor), createGameEvalTool(gameGateway), createFilesystemDeleteTool(editor)] : []),
+    ...(policy.unsafe ? [createEditorRunScriptTool(editor), createNodeCallMethodTool(editor), createGameEvalTool(gameGateway), createFilesystemDeleteTool(editor), createUserDataDeleteTool(editor)] : []),
   ];
   const selection = applyToolPolicy(plainTools, policy);
   toolNotes.push(...selection.notes);

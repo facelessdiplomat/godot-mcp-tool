@@ -16,9 +16,9 @@ The line under each tool says what kind of tool it is:
 ## Contents
 
 - [Connection and editor](#connection-and-editor): `godot_status`, `editor_launch`, `editor_rescan`, `editor_screenshot`, `editor_select`, `editor_undo`, `editor_redo`, `editor_get_state`, `editor_run_script`
-- [Project](#project): `project_create`, `project_info`, `project_settings_get`, `project_settings_set`, `input_map_get`, `input_map_set`, `autoload_add`, `autoload_remove`, `plugin_set_enabled`
-- [Scenes and nodes](#scenes-and-nodes): `scene_create`, `scene_open`, `scene_save`, `scene_get_tree`, `scene_batch_edit`, `node_add`, `node_delete`, `node_duplicate`, `node_reparent`, `node_save_as_scene`, `node_make_local`, `node_find`, `node_get_properties`, `node_get_bounds`, `scene_raycast`, `node_snap_to_floor`, `node_add_collision`, `node_set_properties`, `signal_list`, `signal_connect`, `signal_disconnect`, `node_set_groups`, `scene_close`, `node_call_method`
-- [Resources and files](#resources-and-files): `resource_create`, `resource_get`, `resource_set_properties`, `resource_find_usages`, `filesystem_move`, `asset_import_settings_get`, `asset_import_settings_set`, `filesystem_delete`
+- [Project](#project): `project_create`, `project_info`, `project_settings_get`, `project_settings_set`, `input_map_get`, `input_map_set`, `audio_buses_get`, `audio_buses_set`, `autoload_add`, `autoload_remove`, `plugin_set_enabled`
+- [Scenes and nodes](#scenes-and-nodes): `scene_create`, `scene_open`, `scene_save`, `scene_get_tree`, `scene_batch_edit`, `node_add`, `node_delete`, `node_duplicate`, `node_reparent`, `node_save_as_scene`, `node_make_local`, `node_find`, `node_get_properties`, `node_get_bounds`, `scene_raycast`, `node_snap_to_floor`, `node_add_collision`, `node_set_properties`, `gridmap_get_cells`, `gridmap_set_cells`, `tilemap_get_cells`, `tilemap_set_cells`, `signal_list`, `signal_connect`, `signal_disconnect`, `node_set_groups`, `scene_close`, `node_call_method`
+- [Resources and files](#resources-and-files): `user_data_get`, `resource_create`, `resource_get`, `resource_set_properties`, `tileset_add_atlas`, `resource_find_usages`, `filesystem_move`, `asset_import_settings_get`, `asset_import_settings_set`, `filesystem_delete`, `user_data_delete`
 - [Animation and navigation](#animation-and-navigation): `navigation_bake`, `animation_get`, `animation_set`, `animation_delete`, `animation_tree_get`, `animation_tree_set`
 - [Scripts, tests and exports](#scripts-tests-and-exports): `script_rename_symbol`, `script_validate`, `test_install_framework`, `test_run`, `export_preset_add`, `export_project`
 - [The running game](#the-running-game): `game_run`, `game_stop`, `game_get_output`, `game_get_tree`, `game_get_properties`, `game_set_properties`, `game_wait`, `game_input`, `game_screenshot`, `game_pause`, `game_step`, `game_performance`, `game_eval`
@@ -180,6 +180,29 @@ No parameters.
 *Makes changes*
 
 - `actions` (required): object that maps names to values. Action names mapped to their full list of events, such as {"move_forward": ["W", "Up"], "jump": ["Space", {"type": "joypad_button", "button": "a"}]}. Events: key names such as "W", "Space", "Up" or "Ctrl+S"; {"type": "mouse_button", "button": "left"}; {"type": "joypad_button", "button": "a"}; {"type": "joypad_motion", "axis": "left_y", "direction": -1}. Use {"events": [...], "deadzone": 0.3} to set the deadzone, and null to remove an action.
+
+### `audio_buses_get`
+
+**Read audio buses.** Read the audio bus layout of the project, as the Audio panel of the editor shows it: each bus in order with its volume in dB, the bus it sends to, mute, solo, bypass and its effects, and the file the layout is saved in. Players such as AudioStreamPlayer pick a bus by name with their "bus" property. Works without the editor.
+
+*Read-only*
+
+No parameters.
+
+### `audio_buses_set`
+
+**Change audio buses.** Add, change and remove buses of the audio bus layout of the project, as the Audio panel of the editor does, and save the layout file at once, so that the game starts with them: such as a Music and an Effects bus, each with its own volume, both sending to Master. Then pick the bus of each player with node_set_properties, such as {"bus": "Music"}; a player whose bus does not exist plays on Master.
+
+*Makes changes*
+
+- `buses`: list of items. Buses to add or change, in order; settings that are left out keep their value. Example: [{"name": "Music", "volume_db": -6}, {"name": "Effects"}]. Each item has:
+  - `name` (required): string. The bus to add or change, such as "Music". A new bus is added after the others.
+  - `volume_db`: number. The volume in decibels: 0 leaves the sound as it is, -6 is about half as loud, -80 silent.
+  - `send`: string. The bus that this one sends its sound to, which must come before it in the layout. Default for a new bus: "Master".
+  - `mute`: boolean. Silence the bus.
+  - `solo`: boolean. Silence every bus that is not solo.
+  - `bypass_effects`: boolean. Let the sound through without the effects of the bus.
+- `remove`: list of strings. Buses to remove by name. Master stays.
 
 ### `autoload_add`
 
@@ -461,6 +484,68 @@ No parameters.
 - `properties` (required): object that maps names to values. Property names mapped to values, such as {"position": [0, 1, 0], "mesh": {"new": "BoxMesh", "size": [2, 1, 2]}}. Formats: numbers, booleans and text as JSON; vectors as [x, y, z] or "Vector3(0, 1, 0)"; rotation is in radians, rotation_degrees takes degrees; colors as "#ff8800", "orange" or [r, g, b, a] with channels from 0 to 1; enums by option name ("Double-Sided") or number; flags as a list of names; physics and render layers as layer numbers ([1, 3]); resources as a "res://…" path, or {"new": "Class", …properties} to create one; a script as "res://….gd"; node references as paths relative to the node ("../Player") or to the scene root ("Player"); Transform3D, Basis, AABB and Rect2 in Godot syntax ("Transform3D(…)"). Scripting properties such as global_position work too. A path changes one part only: "mesh:size" a property of the node's own mesh, "position:y" one coordinate. Every value is read back after it is set.
 - `scene`: string. The scene to change, as a res:// path or "main" for the main scene of the project; it is opened in the editor if it is not open yet. Default: the scene currently open in the editor.
 
+### `gridmap_get_cells`
+
+**Read GridMap cells.** Read the cells of a GridMap: the blocks of its mesh library by name and number, how many cells use each, the box the cells fill and the cells themselves with their block and orientation, ordered by y, then z, then x. Use it to check a level built of blocks, whole or one box at a time. Works without the editor when "scene" is given.
+
+*Read-only*
+
+- `path` (required): string. Path of the GridMap node relative to the scene root, such as "Level/Ground".
+- `from`: list of 3 values. One corner of the box of cells to read, [x, y, z] in cells, such as [-4, 0, -4]. Give "to" with it. Default: every cell.
+- `to`: list of 3 values. The opposite corner of the box, included, such as [3, 0, 3].
+- `max_cells`: integer from 1 to 10000, default `100`. The most cells to list; the counts cover every cell.
+- `scene`: string. The scene to read, as a res:// path or "main" for the main scene of the project; a scene that is not open is read from disk. Default: the scene currently open in the editor.
+
+### `gridmap_set_cells`
+
+**Paint GridMap cells.** Put blocks of the mesh library of a GridMap on its cells, or erase them, as one Undo step: whole boxes of cells, such as a floor or a wall, and single cells, with blocks named as in the library. Cells are whole numbers on the grid, not meters: cell [x, y, z] sits at [x, y, z] times cell_size. Read the blocks and cells with gridmap_get_cells first.
+
+*Makes changes*
+
+- `path` (required): string. Path of the GridMap node relative to the scene root, such as "Level/Ground".
+- `boxes`: list of items. Boxes of cells to fill with one block each, in order, so that a later box paints over an earlier one: a floor from [-4, 0, -4] to [3, 0, 3] is 64 cells; a ring of walls is a box of walls with a floor box inside it. Each item has:
+  - `from` (required): list of 3 values. One corner, [x, y, z] in cells.
+  - `to` (required): list of 3 values. The opposite corner, included.
+  - `item` (required): string, integer, at least 0 or null. The block: its name in the mesh library, such as "Wall", or its number; null erases the cells.
+  - `orientation`: integer from 0 to 23. How the block is turned, as an orthogonal index from 0 to 23. Turned around y: 0 for 0°, 16 for 90°, 10 for 180°, 22 for 270°. Default: 0, as in the mesh library.
+- `cells`: list of items. Single cells to set after the boxes. Each item has:
+  - `position` (required): list of 3 values. The cell, [x, y, z] in cells.
+  - `item` (required): string, integer, at least 0 or null. The block: its name in the mesh library, such as "Wall", or its number; null erases the cells.
+  - `orientation`: integer from 0 to 23. How the block is turned, as an orthogonal index from 0 to 23. Turned around y: 0 for 0°, 16 for 90°, 10 for 180°, 22 for 270°. Default: 0, as in the mesh library.
+- `scene`: string. The scene to change, as a res:// path or "main" for the main scene of the project; it is opened in the editor if it is not open yet. Default: the scene currently open in the editor.
+
+### `tilemap_get_cells`
+
+**Read TileMapLayer cells.** Read the cells of a TileMapLayer: its TileSet with the tile size, the physics layers and each source with its texture, tiles and how many of them collide; how many cells use each tile, the rectangle the cells fill and the cells themselves, ordered by y, then x. Use it to check a 2D level of tiles, whole or one rectangle at a time. Works without the editor when "scene" is given.
+
+*Read-only*
+
+- `path` (required): string. Path of the TileMapLayer node relative to the scene root, such as "Level/Ground".
+- `from`: list of 2 values. One corner of the rectangle of cells to read, [x, y] in cells, such as [0, 0]. Give "to" with it. Default: every cell.
+- `to`: list of 2 values. The opposite corner of the rectangle, included, such as [29, 15].
+- `max_cells`: integer from 1 to 10000, default `100`. The most cells to list; the counts cover every cell.
+- `scene`: string. The scene to read, as a res:// path or "main" for the main scene of the project; a scene that is not open is read from disk. Default: the scene currently open in the editor.
+
+### `tilemap_set_cells`
+
+**Paint TileMapLayer cells.** Paint tiles of the TileSet of a TileMapLayer on its cells, or erase them, as one Undo step: whole rectangles, such as the ground or a wall, and single cells, each tile given by its [column, row] in the atlas of its source. Cells are whole numbers on the grid, not pixels: cell [x, y] sits at [x, y] times the tile size, and y grows downward. Read the tiles and the cells with tilemap_get_cells first.
+
+*Makes changes*
+
+- `path` (required): string. Path of the TileMapLayer node relative to the scene root, such as "Level/Ground".
+- `rects`: list of items. Rectangles of cells to fill with one tile each, in order, so that a later one paints over an earlier one: ground 30 tiles wide is {"from": [0, 10], "to": [29, 10], "atlas": [0, 0]}. Each item has:
+  - `from` (required): list of 2 values. One corner, [x, y] in cells.
+  - `to` (required): list of 2 values. The opposite corner, included.
+  - `atlas` (required): list of 2 values or null. The tile as [column, row] in the atlas of its source, such as [0, 0] for the first one; null erases the cells.
+  - `source`: integer, at least 0. The source of the tile in the TileSet. Default: the only source, when the TileSet has one.
+  - `alternative`: integer, at least 0. An alternative of the tile, such as a flipped copy. Default: 0, the tile itself.
+- `cells`: list of items. Single cells to set after the rectangles. Each item has:
+  - `position` (required): list of 2 values. The cell, [x, y] in cells.
+  - `atlas` (required): list of 2 values or null. The tile as [column, row] in the atlas of its source, such as [0, 0] for the first one; null erases the cells.
+  - `source`: integer, at least 0. The source of the tile in the TileSet. Default: the only source, when the TileSet has one.
+  - `alternative`: integer, at least 0. An alternative of the tile, such as a flipped copy. Default: 0, the tile itself.
+- `scene`: string. The scene to change, as a res:// path or "main" for the main scene of the project; it is opened in the editor if it is not open yet. Default: the scene currently open in the editor.
+
 ### `signal_list`
 
 **Signals and connections.** List the signal connections saved in a scene, or every signal of one node with its arguments and connections. Use it before signal_connect to learn the signal names and the parameters a method needs.
@@ -530,6 +615,15 @@ No parameters.
 
 ## Resources and files
 
+### `user_data_get`
+
+**Read user data.** Read user://, the folder where the game keeps saved games, settings and logs: without a path, every file with its size and the time it changed; with a file, its text. Use it to check what the game saved after game_run. Works without the editor. To clear saves, delete them with user_data_delete when unsafe tools are on.
+
+*Read-only*
+
+- `path`: string. A file or folder in the user data, such as "user://save.json" or "saves"; the user:// prefix may be left out. Default: the whole folder, listed.
+- `max_bytes`: integer from 1 to 200000, default `8000`. The most bytes of a file to show.
+
 ### `resource_create`
 
 **Create resource.** Create a resource file (.tres) with its properties set at once and save it: a material, physics material, environment, curve, or a resource of a class of the project. Use it for resources that several nodes or scenes share and assign it to them by its res:// path; a resource that only one node uses can be created right in the node property with {"new": "Class", …} instead. The result reports which properties applied.
@@ -542,12 +636,12 @@ No parameters.
 
 ### `resource_get`
 
-**Read resource.** Read a resource file such as a material, physics material or environment: its type, the properties that differ from their defaults or the ones named, each with its type in Godot syntax, and the files it depends on. Scenes are read with scene_get_tree instead.
+**Read resource.** Read a resource file such as a material, physics material or environment, or an imported one such as a texture: its type, the properties that differ from their defaults or the ones named, each with its type in Godot syntax, and the files it depends on; for a texture also its size in pixels. Scenes are read with scene_get_tree instead.
 
 *Read-only*
 
 - `path` (required): string. The resource file, as a res:// path such as "res://materials/ice.tres".
-- `names`: list of strings. Properties to read, such as ["albedo_color", "roughness"], or paths such as "next_pass:albedo_color". Default: every property whose value differs from its default.
+- `names`: list of strings. Properties to read, such as ["albedo_color", "roughness"], paths such as "next_pass:albedo_color", or methods without arguments whose names start with is_, get_, has_ or can_, such as "get_length()". Default: every property whose value differs from its default.
 - `include_defaults`: boolean, default `false`. Without names, also list properties at their default values. The list gets long.
 
 ### `resource_set_properties`
@@ -558,6 +652,19 @@ No parameters.
 
 - `path` (required): string. The resource file, as a res:// path such as "res://materials/ice.tres".
 - `properties` (required): object that maps names to values. Property names mapped to values, such as {"position": [0, 1, 0], "mesh": {"new": "BoxMesh", "size": [2, 1, 2]}}. Formats: numbers, booleans and text as JSON; vectors as [x, y, z] or "Vector3(0, 1, 0)"; rotation is in radians, rotation_degrees takes degrees; colors as "#ff8800", "orange" or [r, g, b, a] with channels from 0 to 1; enums by option name ("Double-Sided") or number; flags as a list of names; physics and render layers as layer numbers ([1, 3]); resources as a "res://…" path, or {"new": "Class", …properties} to create one; a script as "res://….gd"; node references as paths relative to the node ("../Player") or to the scene root ("Player"); Transform3D, Basis, AABB and Rect2 in Godot syntax ("Transform3D(…)"). Scripting properties such as global_position work too. A path changes one part only: "mesh:size" a property of the node's own mesh, "position:y" one coordinate. Every value is read back after it is set.
+
+### `tileset_add_atlas`
+
+**Add a tile atlas.** Cut a texture into tiles and add them to a TileSet as one atlas source, creating the TileSet file when it does not exist, and save it: every tile of the given size that is not empty, each with a full square collision when asked, so that bodies stand on it. This is how a 2D level of tiles starts: then give the TileSet to a TileMapLayer and paint its cells with tilemap_set_cells.
+
+*Makes changes*
+
+- `path` (required): string. The TileSet file to create or add to, such as "res://tiles/ground.tres".
+- `texture` (required): string. The image of the tiles, such as "res://tiles.png", as the editor imported it.
+- `tile_size` (required): list of 2 values. The size of one tile in pixels, [width, height], such as [32, 32]. A new TileSet takes it as its tile_size.
+- `collision`: boolean. Give every tile a full square collision polygon on physics layer 0, added when the TileSet has none, so that bodies stand on the tiles. Default: false.
+- `margins`: list of 2 values. Pixels to skip at the left and the top of the texture before the first tile. Default: [0, 0].
+- `separation`: list of 2 values. Pixels between neighboring tiles in the texture. Default: [0, 0].
 
 ### `resource_find_usages`
 
@@ -602,6 +709,14 @@ No parameters.
 
 - `paths` (required): list of strings, at least 1. The files or folders to delete, as res:// paths such as ["res://materials/old_ice.tres", "res://levels/unused"].
 - `force`: boolean, default `false`. Delete even when the project uses the files, which leaves those references broken. Default: false.
+
+### `user_data_delete`
+
+**Delete user data.** Delete files or folders of user://, the user data of the game, such as a saved game, by moving them to the system trash, so that the next game_run starts fresh. user_data_get lists them. The user confirms every call, and the editor must allow unsafe tools.
+
+*Makes changes · off by default; Claude Code asks before every call*
+
+- `paths` (required): list of strings, at least 1. Files or folders in the user data of the game, such as ["user://save.json", "user://saves"]; the user:// prefix may be left out.
 
 ## Animation and navigation
 
@@ -825,7 +940,7 @@ No parameters.
 
 ### `game_set_properties`
 
-**Set running game properties.** Change properties of a node in the running game to try something out, such as moving the player or raising its speed. The change lasts until the game stops; scene files stay as they are. Every value is read back. Needs a game started with game_run, with or without the editor.
+**Set running game properties.** Change properties of a node in the running game to try something out, such as moving the player or raising its speed, including variables of its script without @export, such as a score; a setter of the variable runs. The change lasts until the game stops; scene files stay as they are. Every value is read back. Needs a game started with game_run, with or without the editor.
 
 *Makes changes*
 

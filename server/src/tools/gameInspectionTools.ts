@@ -152,7 +152,7 @@ export function createGameSetPropertiesTool(game: EditorGateway): BridgeTool<typ
     definition: {
       title: 'Set running game properties',
       description:
-        'Change properties of a node in the running game to try something out, such as moving the player or raising its speed. The change lasts until the game stops; scene files stay as they are. Every value is read back. Needs a game started with game_run, with or without the editor.',
+        'Change properties of a node in the running game to try something out, such as moving the player or raising its speed, including variables of its script without @export, such as a score; a setter of the variable runs. The change lasts until the game stops; scene files stay as they are. Every value is read back. Needs a game started with game_run, with or without the editor.',
       inputSchema: gameSetPropertiesInput,
       annotations: changingAnnotations({ destructive: false, idempotent: true }),
       alwaysLoad: false,

@@ -44,12 +44,31 @@ func test_starts_a_scan_when_none_is_running() -> void:
 	assert_true((_outcome as Dictionary).has("duration_ms"))
 
 
-func test_waits_for_a_scan_in_progress_instead_of_starting_another() -> void:
+func test_scans_again_after_a_scan_in_progress_that_began_before_the_files_changed() -> void:
 	_file_system.scanning = true
 	_rescan_in_background()
+	await wait_process_frames(2)
+	assert_eq(_file_system.scan_requests, 0)
+	_file_system.apply_scan()
+	await wait_process_frames(2)
+	assert_eq(_file_system.scan_requests, 1)
+	assert_false(_finished)
 	_file_system.apply_scan()
 	await _wait_until_finished()
-	assert_eq(_file_system.scan_requests, 0)
+	assert_true(_outcome is Dictionary)
+
+
+func test_asks_again_when_the_editor_ignores_a_scan_while_an_earlier_one_waits_to_be_applied() -> void:
+	_file_system.ignores_next_scan = true
+	_rescan_in_background()
+	await wait_process_frames(2)
+	assert_eq(_file_system.scan_requests, 1)
+	_file_system.apply_scan()
+	await wait_process_frames(2)
+	assert_eq(_file_system.scan_requests, 2)
+	assert_false(_finished)
+	_file_system.apply_scan()
+	await _wait_until_finished()
 	assert_true(_outcome is Dictionary)
 
 

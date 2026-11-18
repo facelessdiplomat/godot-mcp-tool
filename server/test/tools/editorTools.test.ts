@@ -12,10 +12,13 @@ describe('createEditorTools', () => {
       'project_info',
       'project_settings_get',
       'project_settings_set',
+      'user_data_get',
       'editor_rescan',
       'editor_screenshot',
       'input_map_get',
       'input_map_set',
+      'audio_buses_get',
+      'audio_buses_set',
       'scene_create',
       'scene_open',
       'scene_save',
@@ -34,12 +37,17 @@ describe('createEditorTools', () => {
       'node_snap_to_floor',
       'node_add_collision',
       'node_set_properties',
+      'gridmap_get_cells',
+      'gridmap_set_cells',
+      'tilemap_get_cells',
+      'tilemap_set_cells',
       'signal_list',
       'signal_connect',
       'signal_disconnect',
       'resource_create',
       'resource_get',
       'resource_set_properties',
+      'tileset_add_atlas',
       'resource_find_usages',
       'filesystem_move',
       'asset_import_settings_get',
@@ -74,11 +82,11 @@ describe('createEditorTools', () => {
   });
 
   it('reads the project and its scenes through the project reader, which works without the editor too', async () => {
-    const methods = ['project.info', 'project.settings_get', 'input_map.get', 'scene.get_tree', 'node.find', 'node.get_properties', 'node.get_bounds', 'signal.list'];
+    const methods = ['project.info', 'project.settings_get', 'input_map.get', 'audio.buses_get', 'scene.get_tree', 'node.find', 'node.get_properties', 'node.get_bounds', 'gridmap.get_cells', 'tilemap.get_cells', 'signal.list'];
     const editor = new FakeEditorGateway();
     const projectReader = methods.reduce((gateway, method) => gateway.respondTo(method, new BridgeRequestError('Read', -32010, undefined, undefined)), new FakeEditorGateway());
     const readingTools = createEditorTools(editor, projectReader, () => Buffer.alloc(0));
-    const readers = ['project_info', 'project_settings_get', 'input_map_get', 'scene_get_tree', 'node_find', 'node_get_properties', 'node_get_bounds', 'signal_list'];
+    const readers = ['project_info', 'project_settings_get', 'input_map_get', 'audio_buses_get', 'scene_get_tree', 'node_find', 'node_get_properties', 'node_get_bounds', 'gridmap_get_cells', 'tilemap_get_cells', 'signal_list'];
 
     for (const tool of readingTools.filter((candidate) => readers.includes(candidate.name))) {
       await tool.execute({ scene: 'main', path: 'Player', names: ['position'], node: 'Player' });

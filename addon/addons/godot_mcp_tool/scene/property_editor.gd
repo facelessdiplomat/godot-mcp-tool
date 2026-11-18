@@ -80,7 +80,7 @@ func describe(object: Object, requested_names: PackedStringArray, include_defaul
 
 
 func plan(object: Object, values: Dictionary, owning_file: String = "") -> Dictionary:
-	var decoding := _decode_all(object, values, owning_file)
+	var decoding := _decode_all(object, values, owning_file, settable_properties(object))
 	var decoded: Dictionary = decoding["decoded"]
 	var writes: Dictionary = decoding["writes"]
 	var implied := _layout_implied_by(object, decoded)
@@ -106,7 +106,18 @@ func apply(object: Object, values: Dictionary, history: GodotMcpUndoHistory, act
 
 
 func assign(object: Object, values: Dictionary, owning_file: String = "") -> Dictionary:
-	var decoding := _decode_all(object, values, owning_file)
+	return _assign_decoded(object, _decode_all(object, values, owning_file, settable_properties(object)))
+
+
+func assign_while_running(object: Object, values: Dictionary) -> Dictionary:
+	var properties := settable_properties(object)
+	for property in object.get_property_list():
+		if int(property["usage"]) & PROPERTY_USAGE_SCRIPT_VARIABLE and not properties.has(property["name"]):
+			properties[property["name"]] = property
+	return _assign_decoded(object, _decode_all(object, values, "", properties))
+
+
+func _assign_decoded(object: Object, decoding: Dictionary) -> Dictionary:
 	var decoded: Dictionary = decoding["decoded"]
 	var writes: Dictionary = decoding["writes"]
 	var implied := _layout_implied_by(object, decoded)
@@ -130,8 +141,7 @@ func report(object: Object, decoded: Dictionary, rejected: Array) -> Dictionary:
 	return {"applied": applied, "rejected": rejected, "not_applied": not_applied}
 
 
-func _decode_all(object: Object, values: Dictionary, owning_file: String) -> Dictionary:
-	var properties := settable_properties(object)
+func _decode_all(object: Object, values: Dictionary, owning_file: String, properties: Dictionary) -> Dictionary:
 	var decoded := {}
 	var writes := {}
 	var pending := {}

@@ -1,11 +1,13 @@
 import type { EditorGateway } from '../editor/EditorGateway.js';
 import { createAnimationDeleteTool, createAnimationGetTool, createAnimationSetTool } from './animationTools.js';
 import { createAnimationTreeGetTool, createAnimationTreeSetTool } from './animationTreeTools.js';
+import { createAudioBusesGetTool, createAudioBusesSetTool } from './audioTools.js';
 import { createAssetImportSettingsGetTool, createAssetImportSettingsSetTool } from './assetTools.js';
 import { createAutoloadAddTool, createAutoloadRemoveTool } from './autoloadTools.js';
 import { createSceneBatchEditTool } from './batchTools.js';
 import { type CaptureReader, createEditorScreenshotTool } from './captureTools.js';
 import { createFilesystemMoveTool, createResourceFindUsagesTool } from './fileTools.js';
+import { createGridMapGetCellsTool, createGridMapSetCellsTool } from './gridMapTools.js';
 import { createInputMapGetTool, createInputMapSetTool } from './inputTools.js';
 import { createNavigationBakeTool } from './navigationTools.js';
 import { createNodeDuplicateTool, createNodeMakeLocalTool, createNodeReparentTool, createNodeSaveAsSceneTool } from './nodeStructureTools.js';
@@ -30,18 +32,23 @@ import {
 import { createResourceCreateTool, createResourceGetTool, createResourceSetPropertiesTool } from './resourceTools.js';
 import { createSceneCloseTool, createSceneCreateTool, createSceneGetTreeTool, createSceneOpenTool, createSceneSaveTool } from './sceneTools.js';
 import { createSignalConnectTool, createSignalDisconnectTool, createSignalListTool } from './signalTools.js';
+import { createTileMapGetCellsTool, createTileMapSetCellsTool, createTileSetAddAtlasTool } from './tileTools.js';
 import type { Tool } from './Tool.js';
 import { createEditorRedoTool, createEditorUndoTool } from './historyTools.js';
+import { createUserDataGetTool } from './userDataTools.js';
 
 export function createEditorTools(editor: EditorGateway, projectReader: EditorGateway, readCapture: CaptureReader): Tool[] {
   return [
     createProjectInfoTool(projectReader),
     createProjectSettingsGetTool(projectReader),
     createProjectSettingsSetTool(editor),
+    createUserDataGetTool(projectReader),
     new EditorRescanTool(editor),
     createEditorScreenshotTool(editor, readCapture),
     createInputMapGetTool(projectReader),
     createInputMapSetTool(editor),
+    createAudioBusesGetTool(projectReader),
+    createAudioBusesSetTool(editor),
     createSceneCreateTool(editor),
     createSceneOpenTool(editor),
     createSceneSaveTool(editor),
@@ -60,12 +67,17 @@ export function createEditorTools(editor: EditorGateway, projectReader: EditorGa
     createNodeSnapToFloorTool(editor),
     createNodeAddCollisionTool(editor),
     createNodeSetPropertiesTool(editor),
+    createGridMapGetCellsTool(projectReader),
+    createGridMapSetCellsTool(editor),
+    createTileMapGetCellsTool(projectReader),
+    createTileMapSetCellsTool(editor),
     createSignalListTool(projectReader),
     createSignalConnectTool(editor),
     createSignalDisconnectTool(editor),
     createResourceCreateTool(editor),
     createResourceGetTool(editor),
     createResourceSetPropertiesTool(editor),
+    createTileSetAddAtlasTool(editor),
     createResourceFindUsagesTool(editor),
     createFilesystemMoveTool(editor),
     createAssetImportSettingsGetTool(editor),
