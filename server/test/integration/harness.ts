@@ -140,6 +140,7 @@ export class McpSession {
       workingDirectory: projectRoot,
       platform: process.platform,
       homeDirectory: homedir(),
+      bundledAddonDirectory: addonDirectory,
     });
     const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
     await application.createMcpServer().connect(serverTransport);

@@ -1,11 +1,11 @@
 import { readFileSync, writeFileSync } from 'node:fs';
-import { join, relative } from 'node:path';
+import { join } from 'node:path';
 import * as z from 'zod/v4';
 import type { LanguageServerAddress } from '../bridge/EditorConnection.js';
 import type { EditorGateway } from '../editor/EditorGateway.js';
 import type { LineEdit, SymbolPosition } from '../lsp/LanguageServerClient.js';
 import type { ScriptText } from '../lsp/LanguageServerClient.js';
-import { toResourcePath } from '../project/ProjectFiles.js';
+import { editorPathOf, resourcePathOfEditorPath } from '../project/EditorPaths.js';
 import { findScripts } from './ScriptFiles.js';
 import { findDeclaration, type SymbolKind } from './SymbolDeclaration.js';
 
@@ -90,7 +90,7 @@ export class ScriptRenamer {
     }
     await editor.request('editor.rescan', {}, { timeoutMs: rescanTimeoutMs });
     const scripts = findScripts(projectRoot, [resourcePrefix, script.resourcePath]);
-    const inEditor = (resourcePath: string): string => join(address.projectPath, resourcePath.slice(resourcePrefix.length));
+    const inEditor = (resourcePath: string): string => editorPathOf(address.projectPath, resourcePath);
     const session = await this.dependencies.connect(address);
     let edits: Map<string, LineEdit[]>;
     try {
@@ -105,7 +105,10 @@ export class ScriptRenamer {
     if (edits.size === 0) {
       throw new RenameError(`The language server found nothing to rename for ${request.symbol} in ${script.resourcePath}.`);
     }
-    const changedScripts = [...edits].map(([editorPath, lineEdits]) => applyEdits(projectRoot, toResourcePath(relative(address.projectPath, editorPath)), lineEdits));
+    const changedScripts = [...edits].flatMap(([editorPath, lineEdits]) => {
+      const resourcePath = resourcePathOfEditorPath(address.projectPath, editorPath);
+      return resourcePath === undefined ? [] : [applyEdits(projectRoot, resourcePath, lineEdits)];
+    });
     const kind = resourceKinds[declaration.kind];
     const resources =
       kind === undefined

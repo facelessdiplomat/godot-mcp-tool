@@ -1,4 +1,3 @@
-import { pathToFileURL } from 'node:url';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { LanguageServerClient, LanguageServerUnavailableError } from '../../src/lsp/LanguageServerClient.js';
 import { FakeLanguageServer } from '../support/FakeLanguageServer.js';
@@ -30,7 +29,7 @@ describe('LanguageServerClient', () => {
     await connect();
 
     const [initialize] = server.messages('initialize');
-    expect(initialize?.params?.['rootUri']).toBe(pathToFileURL(projectPath).href);
+    expect(initialize?.params?.['rootUri']).toBe('file:///projects/arena');
     await expect.poll(() => server.messages('initialized').length).toBe(1);
   });
 
@@ -103,9 +102,25 @@ describe('LanguageServerClient', () => {
     await expect(connected.diagnose([{ path: '/projects/arena/player.gd', text: 'extends Node\n' }])).rejects.toBeInstanceOf(LanguageServerUnavailableError);
   });
 
+  it('matches answers about Windows paths whatever case and encoding the server gives their drive letter', async () => {
+    server.publishedUriOf = (openedUri) => openedUri.replace('file:///C:/', 'file:///c%3A/');
+    server.diagnose = () => [{ line: 0, character: 0, severity: 1, message: 'Unexpected token.' }];
+    server.renameEdits = (params) => ({
+      changes: { 'file:///c%3A/projects/arena/enemy.gd': [{ range: { start: { line: 3, character: 5 }, end: { line: 3, character: 16 } }, newText: params['newName'] as string }] },
+    });
+    const connected = await connect();
+
+    const problems = await connected.diagnose([{ path: 'C:/projects/arena/player.gd', text: 'extends Node\n' }]);
+    const edits = await connected.rename([{ path: 'C:/projects/arena/enemy.gd', text: 'extends Node\n' }], { path: 'C:/projects/arena/enemy.gd', line: 3, character: 5 }, 'apply_damage');
+
+    expect(server.messages('textDocument/didOpen')[0]?.params?.['textDocument']).toMatchObject({ uri: 'file:///C:/projects/arena/player.gd' });
+    expect(problems.get('C:/projects/arena/player.gd')).toHaveLength(1);
+    expect([...edits.keys()]).toEqual(['C:/projects/arena/enemy.gd']);
+  });
+
   it('renames a symbol with every script open and returns the edits of each file', async () => {
-    const enemyUri = pathToFileURL('/projects/arena/enemy.gd').href;
-    const playerUri = pathToFileURL('/projects/arena/player.gd').href;
+    const enemyUri = 'file:///projects/arena/enemy.gd';
+    const playerUri = 'file:///projects/arena/player.gd';
     server.renameEdits = (params) => ({
       changes: {
         [enemyUri]: [{ range: { start: { line: 3, character: 5 }, end: { line: 3, character: 16 } }, newText: (params['newName'] as string) }],

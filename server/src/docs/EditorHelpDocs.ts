@@ -1,4 +1,4 @@
-import { dirname, join } from 'node:path';
+import { posix, win32 } from 'node:path';
 import * as z from 'zod/v4';
 import { type ClassDoc, type MethodDoc, parameterOf } from './ClassDoc.js';
 
@@ -78,19 +78,20 @@ export function withDefaultValues(classes: readonly ClassDoc[], defaults: Readon
 }
 
 export function editorHelpCacheCandidates(environment: HelpCacheEnvironment, versionBranch: string): string[] {
+  const paths = environment.platform === 'win32' ? win32 : posix;
   const fileName = `editor_doc_cache-${versionBranch}.res`;
   const systemFolder = systemCacheFolder(environment);
-  return [...(systemFolder === undefined ? [] : [join(systemFolder, fileName)]), join(dirname(environment.binaryPath), 'editor_data', 'cache', fileName)];
+  return [...(systemFolder === undefined ? [] : [paths.join(systemFolder, fileName)]), paths.join(paths.dirname(environment.binaryPath), 'editor_data', 'cache', fileName)];
 }
 
 function systemCacheFolder(environment: HelpCacheEnvironment): string | undefined {
   switch (environment.platform) {
     case 'darwin':
-      return join(environment.homeDirectory, 'Library', 'Caches', 'Godot');
+      return posix.join(environment.homeDirectory, 'Library', 'Caches', 'Godot');
     case 'win32':
-      return environment.variables['LOCALAPPDATA'] === undefined ? undefined : join(environment.variables['LOCALAPPDATA'], 'Godot');
+      return environment.variables['LOCALAPPDATA'] === undefined ? undefined : win32.join(environment.variables['LOCALAPPDATA'], 'Godot');
     default:
-      return join(environment.variables['XDG_CACHE_HOME'] ?? join(environment.homeDirectory, '.cache'), 'godot');
+      return posix.join(environment.variables['XDG_CACHE_HOME'] ?? posix.join(environment.homeDirectory, '.cache'), 'godot');
   }
 }
 

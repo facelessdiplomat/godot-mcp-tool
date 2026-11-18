@@ -80,8 +80,9 @@ describe('the help of the editor', () => {
     expect(editorHelpCacheCandidates({ platform: 'linux', homeDirectory: '/home/ada', variables: { XDG_CACHE_HOME: '/var/cache/ada' }, binaryPath: '/opt/godot' }, '4.7')[0]).toBe(
       '/var/cache/ada/godot/editor_doc_cache-4.7.res',
     );
-    expect(editorHelpCacheCandidates({ platform: 'win32', homeDirectory: 'C:\\Users\\ada', variables: { LOCALAPPDATA: 'C:\\Users\\ada\\AppData\\Local' }, binaryPath: 'C:\\godot.exe' }, '4.8')[0]).toContain(
-      'Godot',
-    );
+    expect(editorHelpCacheCandidates({ platform: 'win32', homeDirectory: 'C:\\Users\\ada', variables: { LOCALAPPDATA: 'C:\\Users\\ada\\AppData\\Local' }, binaryPath: 'C:\\Godot\\godot.exe' }, '4.8')).toEqual([
+      'C:\\Users\\ada\\AppData\\Local\\Godot\\editor_doc_cache-4.8.res',
+      'C:\\Godot\\editor_data\\cache\\editor_doc_cache-4.8.res',
+    ]);
   });
 });

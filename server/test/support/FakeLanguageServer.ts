@@ -21,6 +21,7 @@ export class FakeLanguageServer {
   answerOpenedFiles = true;
   diagnose: (text: string) => FakeDiagnostic[] = () => [];
   renameEdits: (params: Record<string, unknown>) => unknown = () => ({ changes: {} });
+  publishedUriOf: (openedUri: string) => string = (openedUri) => openedUri;
   private readonly server: Server;
   private readonly sockets = new Set<Socket>();
 
@@ -85,7 +86,7 @@ export class FakeLanguageServer {
         source: 'gdscript',
         message: diagnostic.message,
       }));
-      socket.write(encodeContentLengthMessage({ jsonrpc: '2.0', method: 'textDocument/publishDiagnostics', params: { uri: document.uri, diagnostics } }));
+      socket.write(encodeContentLengthMessage({ jsonrpc: '2.0', method: 'textDocument/publishDiagnostics', params: { uri: this.publishedUriOf(document.uri), diagnostics } }));
     }
   }
 }

@@ -1,7 +1,6 @@
 import { connect, type Socket } from 'node:net';
-import { normalize } from 'node:path';
-import { fileURLToPath, pathToFileURL } from 'node:url';
 import * as z from 'zod/v4';
+import { canonicalEditorPath, editorPathOfUri, fileUriOf, isSameEditorPath } from '../project/EditorPaths.js';
 import { describeError } from '../util/errors.js';
 import { ContentLengthMessageReader, encodeContentLengthMessage } from '../protocol/ContentLengthMessages.js';
 
@@ -102,11 +101,11 @@ export class LanguageServerClient {
     try {
       await client.request('initialize', {
         processId: process.pid,
-        rootUri: pathToFileURL(connection.projectPath).href,
+        rootUri: fileUriOf(connection.projectPath),
         rootPath: connection.projectPath,
         capabilities: {},
       });
-      if (client.otherWorkspace !== undefined && !isSamePath(client.otherWorkspace, connection.projectPath)) {
+      if (client.otherWorkspace !== undefined && !isSameEditorPath(client.otherWorkspace, connection.projectPath)) {
         throw new LanguageServerUnavailableError(
           `The language server on port ${String(connection.port)} belongs to another project (${client.otherWorkspace}).`,
         );
@@ -127,13 +126,13 @@ export class LanguageServerClient {
       }),
     );
     for (const script of scripts) {
-      this.notify('textDocument/didOpen', { textDocument: { uri: pathToFileURL(script.path).href, languageId: 'gdscript', version: 1, text: script.text } });
+      this.notify('textDocument/didOpen', { textDocument: { uri: fileUriOf(script.path), languageId: 'gdscript', version: 1, text: script.text } });
     }
     try {
       await Promise.all(arrivals);
     } finally {
       for (const script of scripts) {
-        this.notify('textDocument/didClose', { textDocument: { uri: pathToFileURL(script.path).href } });
+        this.notify('textDocument/didClose', { textDocument: { uri: fileUriOf(script.path) } });
       }
     }
     return results;
@@ -142,24 +141,24 @@ export class LanguageServerClient {
   async rename(scripts: readonly ScriptText[], target: SymbolPosition, newName: string): Promise<Map<string, LineEdit[]>> {
     const parsed = scripts.map((script) => this.waitForDiagnostics(script.path));
     for (const script of scripts) {
-      this.notify('textDocument/didOpen', { textDocument: { uri: pathToFileURL(script.path).href, languageId: 'gdscript', version: 1, text: script.text } });
+      this.notify('textDocument/didOpen', { textDocument: { uri: fileUriOf(script.path), languageId: 'gdscript', version: 1, text: script.text } });
     }
     try {
       await Promise.all(parsed);
       const workspaceEdit = workspaceEditSchema.parse(
-        await this.request('textDocument/rename', { textDocument: { uri: pathToFileURL(target.path).href }, position: { line: target.line, character: target.character }, newName }),
+        await this.request('textDocument/rename', { textDocument: { uri: fileUriOf(target.path) }, position: { line: target.line, character: target.character }, newName }),
       );
       const edits = new Map<string, LineEdit[]>();
       for (const [uri, changes] of Object.entries(workspaceEdit?.changes ?? {})) {
         edits.set(
-          fileURLToPath(uri),
+          editorPathOfUri(uri),
           changes.map((change) => ({ line: change.range.start.line, startCharacter: change.range.start.character, endCharacter: change.range.end.character, newText: change.newText })),
         );
       }
       return edits;
     } finally {
       for (const script of scripts) {
-        this.notify('textDocument/didClose', { textDocument: { uri: pathToFileURL(script.path).href } });
+        this.notify('textDocument/didClose', { textDocument: { uri: fileUriOf(script.path) } });
       }
     }
   }
@@ -201,7 +200,7 @@ export class LanguageServerClient {
   }
 
   private waitForDiagnostics(path: string): Promise<Diagnostic[]> {
-    const key = normalize(path);
+    const key = canonicalEditorPath(path);
     return new Promise((resolve, reject) => {
       const timer = setTimeout(() => {
         this.diagnosticsListeners.delete(key);
@@ -260,7 +259,7 @@ export class LanguageServerClient {
     if (!published.success) {
       return;
     }
-    const listener = this.diagnosticsListeners.get(normalize(fileURLToPath(published.data.uri)));
+    const listener = this.diagnosticsListeners.get(editorPathOfUri(published.data.uri));
     listener?.(uniqueByPlace(published.data.diagnostics.map(toDiagnostic)));
   }
 
@@ -317,6 +316,3 @@ function uniqueByPlace(diagnostics: readonly Diagnostic[]): Diagnostic[] {
   return unique.sort((left, right) => left.line - right.line || left.column - right.column);
 }
 
-function isSamePath(left: string, right: string): boolean {
-  return normalize(`${left}/`) === normalize(`${right}/`);
-}

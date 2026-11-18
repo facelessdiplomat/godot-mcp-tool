@@ -1,8 +1,8 @@
 import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
 import type { LanguageServerAddress } from '../bridge/EditorConnection.js';
 import type { EditorGateway } from '../editor/EditorGateway.js';
 import { LanguageServerUnavailableError, type ScriptText } from '../lsp/LanguageServerClient.js';
+import { editorPathOf } from '../project/EditorPaths.js';
 import { parseCheckOnlyOutput } from './CheckOnlyOutput.js';
 import { findScripts, type ScriptFile } from './ScriptFiles.js';
 import type { ScriptProblem } from './ScriptProblem.js';
@@ -41,7 +41,6 @@ export class ValidationUnavailableError extends Error {
   override readonly name = 'ValidationUnavailableError';
 }
 
-const resourcePrefix = 'res://';
 const rescanTimeoutMs = 90_000;
 const parallelChecks = 4;
 
@@ -72,7 +71,7 @@ export class ScriptValidator {
     await this.dependencies.editor.request('editor.rescan', {}, { timeoutMs: rescanTimeoutMs }).catch(() => undefined);
     const session = await this.dependencies.connectLanguageServer(address);
     try {
-      const texts = scripts.map((script) => ({ path: join(address.projectPath, script.resourcePath.slice(resourcePrefix.length)), text: readFileSync(script.absolutePath, 'utf8') }));
+      const texts = scripts.map((script) => ({ path: editorPathOf(address.projectPath, script.resourcePath), text: readFileSync(script.absolutePath, 'utf8') }));
       const problems = await session.diagnose(texts);
       return scripts.map((script, index) => ({ resourcePath: script.resourcePath, problems: problems.get(texts[index]?.path ?? '') ?? [] }));
     } finally {
