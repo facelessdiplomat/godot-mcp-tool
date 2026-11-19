@@ -9,7 +9,7 @@ import { DebugAdapterClient } from './debug/DebugAdapterClient.js';
 import { GameDebugger } from './debug/GameDebugger.js';
 import { ProjectExporter } from './export/ProjectExporter.js';
 import { AddonInstaller } from './addon/AddonInstaller.js';
-import type { EditorSession } from './bridge/EditorConnection.js';
+import type { EditorSession, LanguageServerAddress } from './bridge/EditorConnection.js';
 import { readAddonVersion } from './addon/InstalledAddon.js';
 import type { GodotBinaryLocator } from './godot/GodotBinaryLocator.js';
 import { GodotCli } from './godot/GodotCli.js';
@@ -20,6 +20,8 @@ import { ProjectLocator } from './project/ProjectLocator.js';
 import { type Adoption, ProjectCreateTool } from './tools/ProjectCreateTool.js';
 import { PluginSetEnabledTool, TestInstallFrameworkTool } from './tools/pluginTools.js';
 import { ExportPresetAddTool } from './tools/ExportPresetAddTool.js';
+import { ScriptFindReferencesTool } from './tools/ScriptFindReferencesTool.js';
+import { ScriptReferenceFinder } from './scripts/ScriptReferenceFinder.js';
 import { ScriptRenameTool } from './tools/ScriptRenameTool.js';
 import { ScriptRenamer } from './scripts/ScriptRenamer.js';
 import { LanguageServerClient } from './lsp/LanguageServerClient.js';
@@ -29,8 +31,11 @@ import { TestFrameworkInstaller } from './testing/TestFrameworkInstaller.js';
 import { NodeDetachedLauncher } from './process/DetachedLauncher.js';
 import { NodeProcessLauncher } from './process/ProcessLauncher.js';
 import { NodeProcessRunner } from './process/ProcessRunner.js';
+import { AddTestsPrompt } from './prompts/AddTestsPrompt.js';
 import { FixLastRunPrompt } from './prompts/FixLastRunPrompt.js';
 import { PlaytestPrompt } from './prompts/PlaytestPrompt.js';
+import { ProfilePrompt } from './prompts/ProfilePrompt.js';
+import { SetupCiPrompt } from './prompts/SetupCiPrompt.js';
 import { HeadlessProjectQuery } from './project/HeadlessProjectQuery.js';
 import { fileChangedAfter, listScenes } from './project/ProjectFiles.js';
 import { readScriptLines } from './project/ScriptLines.js';
@@ -116,6 +121,11 @@ function createApplicationParts(environment: ApplicationEnvironment, createdProj
     headless: windowless,
   });
   const gameGateway = new GameGatewayRouter(editor, localGame);
+  const languageServerPort = parsePort(environment.variables['GODOT_LSP_PORT']);
+  const languageServerAddress = async (): Promise<LanguageServerAddress | undefined> => {
+    const address = await editor.languageServer();
+    return address === undefined || languageServerPort === undefined ? address : { ...address, port: languageServerPort };
+  };
   const debugAdapterPort = parsePort(environment.variables['GODOT_DAP_PORT']);
   const gameDebugger = new GameDebugger({
     editor,
@@ -153,11 +163,15 @@ function createApplicationParts(environment: ApplicationEnvironment, createdProj
       new ScriptRenamer({
         projectRoot: project.found ? project.root : undefined,
         editor,
-        languageServerAddress: async () => {
-          const address = await editor.languageServer();
-          const port = parsePort(environment.variables['GODOT_LSP_PORT']);
-          return address === undefined || port === undefined ? address : { ...address, port };
-        },
+        languageServerAddress,
+        connect: (address) => LanguageServerClient.connect(address),
+      }),
+    ),
+    new ScriptFindReferencesTool(
+      new ScriptReferenceFinder({
+        projectRoot: project.found ? project.root : undefined,
+        editor,
+        languageServerAddress,
         connect: (address) => LanguageServerClient.connect(address),
       }),
     ),
@@ -224,7 +238,7 @@ function createApplicationParts(environment: ApplicationEnvironment, createdProj
     lastRunOutput: createGameGetOutputTool(gameGateway, new GameOutputCursor()),
     listScenes: () => (project.found ? listScenes(project.root) : []),
   });
-  const prompts = policy.readOnly ? [] : [new FixLastRunPrompt(gameGateway), new PlaytestPrompt()];
+  const prompts = policy.readOnly ? [] : [new FixLastRunPrompt(gameGateway), new PlaytestPrompt(), new ProfilePrompt(), new AddTestsPrompt(), new SetupCiPrompt()];
   const instructions = [
     serverInstructions,
     ...(policy.readOnly ? [readOnlyInstructions] : []),

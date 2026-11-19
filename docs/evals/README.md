@@ -63,6 +63,8 @@ When running one, record whether it passed, the number of tool calls and the tok
 | [silence-in-the-arena.md](silence-in-the-arena.md) | `audio_buses_get` with `in_game`: a muted bus and a player that never starts |
 | [why-is-it-dark.md](why-is-it-dark.md) | `render` modes of views: a room without light and a black material |
 | [same-look-after-the-refactor.md](same-look-after-the-refactor.md) | `compare_to` of `editor_screenshot` after turning nodes into instances |
+| [one-more-argument.md](one-more-argument.md) | `script_find_references` before a function gets a second argument: typed and untyped calls, a bound signal value, a method track |
+| [the-crate-by-the-ramp.md](the-crate-by-the-ramp.md) | a node named by where it stands: `markers` of a view, or the bounds in numbers |
 
 ## Running them
 
@@ -414,3 +416,17 @@ Writing the reference solutions found four gaps before any agent did:
   agent run decides whether T14 needs a tool.
 - Three pieces of engine knowledge went to the 3D page of the skill: a `CharacterBody3D` does not push rigid bodies,
   a `HingeJoint3D` turns around its own Z axis, and a burst of one-shot particles is checked by its `finished` signal.
+
+### A second argument for a function, 2026-11-19
+
+Task T15 added `script_find_references` and the scenario `one-more-argument`, which passes with its reference
+solution (6/6) and fails when nothing is done (Godot 4.8 at the pinned commit). Writing its reference solution found a
+gap: a windowless editor kept `enemy.gd` as it was after the file changed on disk, because no tab of the script editor
+showed it, so `signal_connect` refused the second bound value of the poison timer. `editor_rescan` now reloads such
+scripts and names them. The run with an agent is still to come.
+
+### Markers on views, 2026-11-19
+
+Task T12 added `markers` to the views of `editor_screenshot` and `game_screenshot` and the scenario
+`the-crate-by-the-ramp`, which passes with its reference solution (8/8) and fails when nothing is done (Godot 4.8 at
+the pinned commit). Markers are a hypothesis: the run with an agent decides whether the option stays.

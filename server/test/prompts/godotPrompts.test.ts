@@ -1,7 +1,11 @@
 import { describe, expect, it } from 'vitest';
+import type * as z from 'zod/v4';
 import { EditorUnavailableError } from '../../src/editor/EditorGateway.js';
+import { AddTestsPrompt } from '../../src/prompts/AddTestsPrompt.js';
 import { FixLastRunPrompt } from '../../src/prompts/FixLastRunPrompt.js';
 import { PlaytestPrompt } from '../../src/prompts/PlaytestPrompt.js';
+import { ProfilePrompt } from '../../src/prompts/ProfilePrompt.js';
+import { SetupCiPrompt } from '../../src/prompts/SetupCiPrompt.js';
 import { FakeEditorGateway } from '../support/FakeEditorGateway.js';
 
 const errorPage = {
@@ -60,5 +64,68 @@ describe('playtest', () => {
     expect(arena).toContain('Run it with game_run and scene: "res://levels/arena.tscn".');
     expect(arena).toContain('game_input');
     expect(arena).toContain('game_performance');
+  });
+});
+
+describe('profile', () => {
+  it('lays out a measurement of the game or of a scene that changes nothing', async () => {
+    const prompt = new ProfilePrompt();
+
+    const game = await prompt.render({});
+    const arena = await prompt.render({ scene: 'res://levels/arena.tscn' });
+
+    expect(game).toMatch(/^Profile the game and find what makes it slow\. Do not change the project/);
+    expect(game).toContain('Run it with game_run.');
+    expect(arena).toContain('Run it with game_run and scene: "res://levels/arena.tscn".');
+    expect(game).toContain('game_performance');
+    expect(game).toContain('function times');
+    expect(game).toContain('game_stop');
+    expect(game).toContain('without making it');
+  });
+});
+
+describe('add_tests', () => {
+  it('asks for tests of one script with the framework of the project, and runs them', async () => {
+    const text = await new AddTestsPrompt().render({ script: 'res://player/player.gd' });
+
+    expect(text).toMatch(/^Write tests for res:\/\/player\/player\.gd and run them\./);
+    expect(text).toContain('test_install_framework');
+    expect(text).toContain('script_validate');
+    expect(text).toContain('test_run');
+    expect(text).toContain('report it rather than hide it');
+  });
+
+  it('needs the script', () => {
+    expect(new AddTestsPrompt().definition.argsSchema.safeParse({}).success).toBe(false);
+  });
+});
+
+describe('setup_ci', () => {
+  it('asks for a GitHub Actions workflow that tests and exports the game, without pushing it', async () => {
+    const text = await new SetupCiPrompt().render();
+
+    expect(text).toMatch(/^Set up continuous integration on GitHub Actions for this game/);
+    expect(text).toContain('.github/workflows/godot.yml');
+    expect(text).toContain('SHA-512');
+    expect(text).toContain('export_preset_add');
+    expect(text).toContain('Do not push');
+  });
+});
+
+describe('the arguments of every prompt', () => {
+  it('are single words, since Claude Code splits the arguments of a command at spaces', () => {
+    const argumentShapes: readonly Readonly<Record<string, z.ZodType>>[] = [
+      new PlaytestPrompt().definition.argsSchema.shape,
+      new ProfilePrompt().definition.argsSchema.shape,
+      new AddTestsPrompt().definition.argsSchema.shape,
+      new SetupCiPrompt().definition.argsSchema.shape,
+    ];
+
+    for (const shape of argumentShapes) {
+      for (const [name, schema] of Object.entries(shape)) {
+        expect(name).toMatch(/^[a-z]+$/);
+        expect(schema.description?.length ?? 0).toBeGreaterThan(10);
+      }
+    }
   });
 });

@@ -160,6 +160,16 @@ describe.skipIf(godotBinary === '')('editing a project through the MCP tools', (
     expect(tree.text).toContain('Patrol: PatrolPoint');
   });
 
+  it('reloads a script that changed on disk while no tab of the script editor shows it', async () => {
+    project?.write('patrol_point.gd', ['class_name PatrolPoint', 'extends Marker3D', '', '@export var wait_seconds := 1.0', '@export var speed := 3.0', ''].join('\n'));
+
+    const rescan = await tools().call('editor_rescan');
+    const changed = await tools().call('node_set_properties', { path: 'Patrol', properties: { speed: 5 } });
+
+    expect(changed.text).toContain('Applied: speed');
+    expect(rescan.text).toContain('reloaded scripts changed on disk: res://patrol_point.gd.');
+  });
+
   it('deletes nodes', async () => {
     const deleted = await tools().call('node_delete', { paths: ['Sun'] });
     const tree = await tools().call('scene_get_tree');

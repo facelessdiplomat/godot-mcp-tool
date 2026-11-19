@@ -122,6 +122,46 @@ describe('capture tools', () => {
     expect(textOf(result)).toContain('iso, unshaded, iso');
   });
 
+  it('editor_screenshot forwards markers and lists where each marked node lands in the picture', async () => {
+    const editor = new FakeEditorGateway().respondTo('editor.screenshot', {
+      ...gameCapture,
+      views: ['iso', 'top of Crates'],
+      markers: [
+        {
+          view: 'iso',
+          marks: [
+            { number: 1, path: 'Crates/Crate1', position: [212, 140] },
+            { number: 2, path: 'Ramp', not_in_view: 'behind the camera' },
+          ],
+          left_out: 0,
+        },
+        { view: 'top of Crates', marks: [{ number: 1, path: 'Crates/Crate1', position: [801, 95] }], left_out: 18 },
+      ],
+    });
+
+    const result = await createEditorScreenshotTool(editor, readPng).execute({
+      views: [{ preset: 'iso', markers: ['Crates/Crate1', 'Ramp'] }, { preset: 'top', target: 'Crates', markers: 'children' }],
+    });
+
+    expect(editor.requests[0]?.params).toMatchObject({ views: [{ preset: 'iso', markers: ['Crates/Crate1', 'Ramp'] }, { preset: 'top', target: 'Crates', markers: 'children' }] });
+    expect(textOf(result)).toContain(
+      [
+        'Markers in iso: 1 Crates/Crate1 at (212, 140); 2 Ramp not in view (behind the camera).',
+        'Markers in top of Crates: 1 Crates/Crate1 at (801, 95); 18 more children are not marked.',
+      ].join('\n'),
+    );
+  });
+
+  it('game_screenshot refuses more than twelve markers in a view before asking the game', async () => {
+    const game = new FakeEditorGateway();
+    const markers = Array.from({ length: 13 }, (_, index) => `Crate${String(index)}`);
+
+    const result = await createGameScreenshotTool(game, readPng).execute({ views: [{ preset: 'iso', markers }] });
+
+    expect(result.isError).toBe(true);
+    expect(game.requests).toHaveLength(0);
+  });
+
   it('game_screenshot rejects an unknown render mode before asking the game', async () => {
     const game = new FakeEditorGateway();
 

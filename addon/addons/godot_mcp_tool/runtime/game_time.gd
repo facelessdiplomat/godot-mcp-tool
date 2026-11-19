@@ -7,6 +7,7 @@ const LAST_IN_PHYSICS_ORDER := 2147483647
 var frames := 0
 
 var _held := false
+var _delivering := false
 var _pending_events: Array[InputEvent] = []
 
 
@@ -50,6 +51,10 @@ func hold_again_if(was_held: bool) -> void:
 		get_tree().paused = true
 
 
+func is_delivering() -> bool:
+	return _delivering
+
+
 func deliver(event: InputEvent) -> void:
 	if is_held():
 		_pending_events.append(event)
@@ -64,6 +69,8 @@ func _deliver_pending_events() -> void:
 		_parse(event)
 
 
-static func _parse(event: InputEvent) -> void:
+func _parse(event: InputEvent) -> void:
+	_delivering = true
 	Input.parse_input_event(event)
 	Input.flush_buffered_events()
+	_delivering = false

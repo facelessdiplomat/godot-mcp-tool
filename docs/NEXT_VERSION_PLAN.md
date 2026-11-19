@@ -26,11 +26,14 @@ runs without an agent passes on the pinned 4.8 build; what each task still needs
 | T9 | done, with `reach-the-island` | its agent run |
 | T10 | done, with `silence-in-the-arena` | its agent run |
 | T11 | done, with `why-is-it-dark` | its agent run |
-| T12 | not started: a hypothesis that needs an agent run to decide | |
+| T12 | `markers` of a view in both screenshot tools, with `the-crate-by-the-ramp`; a marker lands where the engine's camera projects the center of the node, and the windowed test finds it on the crate | the agent run of `the-crate-by-the-ramp`, which decides whether the option stays |
 | T13 | done, with `same-look-after-the-refactor`; screenshots keep the last 100 captures | its agent run |
-| T14–T16 | not started | |
+| T14 | not started: decided by the agent run of `blocks-from-a-scene` | |
+| T15 | `script_find_references` (way B), with `one-more-argument`. The spike (spikes.md §12) keeps way A, a language server in the plugin, for later: Claude Code runs it over stdio only and does not document what happens while the editor is closed. The scenario found that a windowless editor kept a changed script that no tab showed; `editor_rescan` now reloads it | the agent run of `one-more-argument` |
+| T16 | `game_record_input`; the integration test `gameInputRecording.test.ts` presses keys in the game as a person would, and the recorded steps, replayed with `fixed_fps`, bring the player to the same place | one check by hand: a walk and a jump played at the keyboard come back as steps that replay to the same place |
 | T17 | the subagent `plugin/agents/playtester.md` with a test of its tools, and the page `ui.md` of the skill; the plugin validates | the measurement with and without the subagent (two agent runs of `playtest-without-a-window`) |
-| T18–T25 | not started | |
+| T18 | the prompts `profile`, `add_tests` and `setup_ci`, and the page `ci.md` of the skill; the workflow parses, and its archive names, sums and template layout match the 4.7.2 release. A probe found that GUT exits with 0 when a test script does not load, so the workflow looks for that error | one run of the workflow on a scratch repository with a small game |
+| T19–T25 | not started | |
 
 All checks above ran on the pinned `master` build only; CI runs them on 4.7.2 after the push. One window test fails
 on this machine at commit `d7f3ef3` as well, so before this work: the second test of `windowedRescan.test.ts`, whose
@@ -823,6 +826,8 @@ the check.
 | A yes to runs with an agent: about $3 (T7), a few dollars for the scenarios of single tasks, $8–10 (T20), $15 (T25) | T7, T9–T15, T20, T25 | before each batch |
 | A yes to installing `hi-godot/godot-ai` at a pinned version on this machine | T20 | before T20 |
 | The decision on T22, T23 and T24: in 0.3.0 or after | phase 6 | by the end of phase 2 |
+| A scratch repository on GitHub with a small game, or a yes to make one, to run the workflow of `ci.md` once | T18 | before the release |
+| A walk and a jump played at the keyboard while Claude records them with `game_record_input`, to see them replay to the same place | T16 | before the release |
 | The screen recording | T19 | phase 5 |
 | The submission to the Asset Store | T21 | after T19 |
 | `npm publish` | T25 | at the release |

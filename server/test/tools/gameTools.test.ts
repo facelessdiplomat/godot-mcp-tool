@@ -236,6 +236,7 @@ describe('game tools', () => {
       ['game_set_properties', false],
       ['game_wait', true],
       ['game_input', true],
+      ['game_record_input', false],
       ['game_screenshot', false],
       ['game_pause', false],
       ['game_step', false],

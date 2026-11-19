@@ -425,3 +425,78 @@ function releaseStepFor(heldLabel: string): string {
     ? `{"${kind}": "${nameParts.join(' ')}", "state": "up"}`
     : `{"action": "${heldLabel}", "state": "up"}`;
 }
+
+const maximumStepsPerCall = 200;
+
+const recordedStepSchema = z.record(z.string(), z.unknown());
+
+const recordingSchema = z.union([
+  z.object({ recording: z.literal(true), start_frame: z.number(), restarted: z.boolean() }),
+  z.object({
+    start_frame: z.number(),
+    stop_frame: z.number(),
+    physics_frames: z.number(),
+    events: z.number(),
+    count: z.number(),
+    steps: z.array(recordedStepSchema).optional(),
+    path: z.string().optional(),
+    first_steps: z.array(recordedStepSchema).optional(),
+  }),
+]);
+
+type Recording = z.infer<typeof recordingSchema>;
+
+type StoppedRecording = Exclude<Recording, { recording: true }>;
+
+const gameRecordInputInput = z.object({
+  state: z
+    .enum(['start', 'stop'])
+    .describe('"start" begins recording the input of the person who plays the running game; "stop" ends it and returns the steps.'),
+});
+
+export function createGameRecordInputTool(game: EditorGateway): BridgeTool<typeof gameRecordInputInput, Recording> {
+  return new BridgeTool(game, {
+    name: 'game_record_input',
+    definition: {
+      title: 'Record the input of the player',
+      description:
+        'Record what a person does in the running game, such as the walk and jump that make a bug happen, and get it back as steps of game_input: the input actions, keys, mouse, gamepad and touch input with the physics frames between them. Start it, let the person play, then stop it. Input that game_input itself plays is not recorded. Replayed from the same starting state with fixed_fps, the steps repeat the playthrough, so they can reproduce a bug or become a test. Needs a game started with game_run, with or without the editor.',
+      inputSchema: gameRecordInputInput,
+      annotations: readingAnnotations,
+      alwaysLoad: false,
+    },
+    method: 'game.record_input',
+    responseSchema: recordingSchema,
+    present: (recording) => textResult('recording' in recording ? describeStartedRecording(recording.start_frame, recording.restarted) : describeStoppedRecording(recording)),
+  });
+}
+
+function describeStartedRecording(startFrame: number, restarted: boolean): string {
+  const dropped = restarted ? ' The recording that was running before is dropped.' : '';
+  return `Recording the input of the running game from its physics frame ${String(startFrame)}.${dropped} Let the person play, then call game_record_input with state "stop". Input that game_input plays is not recorded.`;
+}
+
+function describeStoppedRecording(recording: StoppedRecording): string {
+  const span = `${describePhysicsFrames(recording.physics_frames)} (frames ${String(recording.start_frame)} to ${String(recording.stop_frame)})`;
+  if (recording.count === 0) {
+    return `No input was recorded in ${span}. The person plays in the game window, which needs the focus; input that game_input plays is not recorded.`;
+  }
+  const lines = [
+    `Recorded ${String(recording.count)} ${recording.count === 1 ? 'step' : 'steps'} from ${String(recording.events)} input events over ${span}.`,
+    'To replay them, start from the same state, such as game_run of the same scene with fixed_fps: 60 for a frame-exact run, then pass the steps to game_input; a test can play them the same way.',
+  ];
+  if (recording.path !== undefined) {
+    const firstSteps = recording.first_steps ?? [];
+    lines.push(
+      `One game_input call takes up to ${String(maximumStepsPerCall)} steps, so the steps are in ${recording.path}, a JSON list. Replay them in calls of up to ${String(maximumStepsPerCall)} steps while game_pause holds the game, so that no frame passes between the calls. The first ${String(firstSteps.length)}:`,
+      listedSteps(firstSteps),
+    );
+    return lines.join('\n');
+  }
+  lines.push(listedSteps(recording.steps ?? []));
+  return lines.join('\n');
+}
+
+function listedSteps(steps: readonly Readonly<Record<string, unknown>>[]): string {
+  return ['[', steps.map((step) => `  ${JSON.stringify(step)}`).join(',\n'), ']'].join('\n');
+}

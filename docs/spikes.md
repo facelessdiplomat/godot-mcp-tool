@@ -1,8 +1,8 @@
-# Milestone 0 spikes
+# Spikes
 
 Small throwaway experiments that check the assumptions of the [development plan](DEVELOPMENT_PLAN.md) against a real
 engine before we build on them. The spike code lived in a scratch project outside the repository and is not kept;
-this file records what we learned.
+this file records what we learned. Milestone 0 ran spikes 1 to 11 before the first code; later spikes go on from 12.
 
 ## Pinned engine
 
@@ -33,6 +33,7 @@ Update the engine deliberately: pull `master`, rebuild, rerun `npm test`, `npm r
 | 9 | Does the editor overwrite an agent's edit with a stale unsaved script tab? | Yes, both on `save_all_scenes()` and on running the game (`save_before_running` is on by default). `ScriptEditor.get_unsaved_files()` lists the file beforehand | Conflict detection before saving and running is mandatory in milestone 1 |
 | 10 | Does a symlinked addon work in a separate project? | Yes: `test-project` uses a relative symlink, the editor loads the plugin and imports work | Confirmed |
 | 11 | Can we render from an extra camera in the editor and in the game? | Yes, with a `SubViewport` that shares the scene's `World3D`: 19 ms in the game, 13–44 ms in an unfocused editor with `RenderingServer.force_draw()`. The editor's preview sun and sky belong to that world | Confirmed, with two corrections to the plan (§9.8) |
+| 12 | What does the language server answer to `references`, `definition` and `hover`, and can a Claude Code plugin hand it GDScript navigation? (0.3.0) | `references` finds the declaration and every use it can resolve across scripts, also in files that are not open, but not calls on untyped variables or names in strings. A plugin may declare a language server, but Claude Code runs it over stdio only, and what happens while the editor is closed is not documented | `script_find_references` ships; a language server in the plugin waits (details below) |
 
 ## Details
 
@@ -215,6 +216,43 @@ Two traps found on the way:
 - the editor's preview sun and sky live in the same `World3D` as the edited scene, so a render of a scene without its
   own lights from an extra camera is lit like the editor viewport. In the running game the same scene has no light.
   A render without gizmos needs only the default camera cull mask (the editor's gizmo layers are outside it).
+
+### 12. Finding references
+
+Checked on the pinned 4.8 build with a scratch project of two scripts: `enemy.gd` (`class_name Enemy`, a signal
+`died`, a variable `health`, `func take_damage`) and `player.gd`, which calls `take_damage` through a typed variable,
+through an `as Enemy` cast, through an untyped variable and by name in `has_method()` and `call()`. Each question was
+asked twice, with the scripts opened by `didOpen` and without.
+
+- `textDocument/references` at the declaration returns the declaration and the calls through the typed variable, the
+  cast and the class's own call, but not the call on the untyped variable and not the strings. Signals (`died.emit()`,
+  `target.died.connect(...)`) and variables are found the same way. Opening the scripts first changes nothing: every
+  connection parses the files from disk on demand (`get_parse_result` in `gdscript_language_protocol.cpp`, the same
+  in the source of 4.7.2), so a tool needs no `didOpen` and sees the files as saved.
+- `includeDeclaration: false` still returns the declaration: the server compares each use with the range of the whole
+  declaration, not of its name. `script_find_references` asks with `true` and takes the declaration out itself.
+- The name of a class inside a string is a use of the class: `Enemy` in a description string of an addon was listed.
+- `definition` and `declaration` at a use answer the declaration; at a call on an untyped variable they answer nothing,
+  unless the file is open, when they guess by name. `hover` answers the signature and the defining file.
+- A Claude Code plugin may declare language servers (`lspServers` in `plugin.json` or `.lsp.json`). Claude Code then
+  answers definitions, references, hover, symbols and call hierarchies through its own tool and reports diagnostics
+  after every edit. It accepts a `socket` transport but runs every server over stdio, so the editor's TCP port needs a
+  bridge command; the documentation does not say what happens when the server exits because the editor is closed
+  (`restartOnCrash` and `maxRestarts` exist, their defaults are not documented), and cloud sessions start no plugin
+  language servers.
+
+Decision: `script_find_references` ships in 0.3.0. It asks `references` at the declaration, adds the uses in scenes
+and resources from `script.find_in_resources` (the finder that `script_rename_symbol` also uses), and lists the lines
+that name the symbol where the language server could not trace it. The language server in the plugin waits for a
+bridge that keeps the stdio session alive while the editor is closed (answer `initialize` itself, connect to the editor
+when it appears), and for documented restarts; its diagnostics after every edit would also repeat what the
+`check-edited-script` hook reports.
+
+The scenario `one-more-argument` found one more thing: a windowless editor runs in command-line mode, where
+`EditorFileSystem` skips `_update_script_documentation`, the step that reloads a loaded script changed on disk when no
+tab of the script editor shows it. Until then such a script kept its old methods and properties in the editor, so
+`signal_connect` refused the new arguments of `take_damage`. `editor_rescan` now reloads those scripts itself
+(`changed_script_reloader.gd`) and names them.
 
 ### Other observations
 

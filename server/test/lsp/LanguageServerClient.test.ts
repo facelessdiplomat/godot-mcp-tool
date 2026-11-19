@@ -144,5 +144,30 @@ describe('LanguageServerClient', () => {
     expect(edits.get('/projects/arena/player.gd')).toEqual([{ line: 6, startCharacter: 7, endCharacter: 18, newText: 'apply_damage' }]);
     await expect.poll(() => server.messages('textDocument/didClose').length).toBe(2);
   });
-});
 
+  it('finds the references of a symbol, its declaration included, as places in each file', async () => {
+    const enemyUri = 'file:///projects/arena/enemy.gd';
+    const playerUri = 'file:///projects/arena/player.gd';
+    server.referenceLocations = () => [
+      { uri: playerUri, range: { start: { line: 6, character: 8 }, end: { line: 6, character: 19 } } },
+      { uri: enemyUri, range: { start: { line: 3, character: 5 }, end: { line: 3, character: 16 } } },
+    ];
+    const connected = await connect();
+
+    const places = await connected.references({ path: '/projects/arena/enemy.gd', line: 3, character: 5 });
+
+    const [referencesRequest] = server.messages('textDocument/references');
+    expect(referencesRequest?.params).toEqual({ textDocument: { uri: enemyUri }, position: { line: 3, character: 5 }, context: { includeDeclaration: true } });
+    expect(places).toEqual([
+      { path: '/projects/arena/player.gd', line: 6, character: 8 },
+      { path: '/projects/arena/enemy.gd', line: 3, character: 5 },
+    ]);
+  });
+
+  it('finds no references where the language server knows no symbol', async () => {
+    server.referenceLocations = () => null;
+    const connected = await connect();
+
+    expect(await connected.references({ path: '/projects/arena/enemy.gd', line: 0, character: 0 })).toEqual([]);
+  });
+});

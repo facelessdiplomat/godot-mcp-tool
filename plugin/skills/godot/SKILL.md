@@ -25,7 +25,9 @@ are described in the files linked at the end.
 1. **Scripts**: write `.gd` and `.gdshader` files with your own file tools, then check them with `script_validate`, which
    also compiles shaders and points at the line of their first error. After creating or
    changing scripts that scenes use, adding a `class_name` or rebuilding a GDExtension library, call `editor_rescan`:
-   it also reloads the rebuilt library, so scripts see its new classes and methods.
+   it also reloads the rebuilt library, so scripts see its new classes and methods. Before changing the arguments of
+   a function or removing it, list its uses with `script_find_references`: the calls in scripts, and the signal
+   connections and animation method tracks of scenes, which a text search misses. Rename with `script_rename_symbol`.
 2. **Scenes**: never edit `.tscn` or `.tres` files as text while the editor runs. Build with `scene_create` and
    `scene_batch_edit` (many changes as one Undo step; nothing changes when one of them fails), adjust with the
    `node_` tools, connect signals with `signal_connect`. Take changes of these tools back with `editor_undo`, also
@@ -81,6 +83,9 @@ are described in the files linked at the end.
   writing scripts when you are unsure of the syntax.
 - [3d.md](3d.md): axes, transforms, character controllers, cameras, collisions, lighting and scale. Read it before
   building 3D scenes or movement.
-- [testing.md](testing.md): GUT tests and `test_run`. Read it before writing or running tests.
+- [testing.md](testing.md): GUT tests and `test_run`, and a bug that the user plays, recorded with
+  `game_record_input` and replayed. Read it before writing or running tests.
 - [ui.md](ui.md): containers, anchors, HUDs, themes, focus, pause menus, and how to check a UI. Read it before
   building menus or a HUD.
+- [ci.md](ci.md): a GitHub Actions workflow that downloads Godot, runs the tests of the project and exports a
+  build. Read it before setting up continuous integration.

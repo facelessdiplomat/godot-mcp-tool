@@ -1,6 +1,6 @@
 import type { CallToolResult } from '@modelcontextprotocol/server';
 import { describe, expect, it } from 'vitest';
-import { createGameInputTool, createInputMapGetTool, createInputMapSetTool } from '../../src/tools/inputTools.js';
+import { createGameInputTool, createGameRecordInputTool, createInputMapGetTool, createInputMapSetTool } from '../../src/tools/inputTools.js';
 import { FakeEditorGateway } from '../support/FakeEditorGateway.js';
 
 function textOf(result: CallToolResult): string {
@@ -379,5 +379,65 @@ describe('input tools', () => {
         'The game is paused, so this input reaches it in the next frame that game_step, game_wait or game_input plays.',
       ].join('\n'),
     );
+  });
+
+  it('game_record_input starts recording the person who plays', async () => {
+    const game = new FakeEditorGateway().respondTo('game.record_input', { recording: true, start_frame: 120, restarted: false });
+
+    const text = textOf(await createGameRecordInputTool(game).execute({ state: 'start' }));
+
+    expect(game.requests[0]).toMatchObject({ method: 'game.record_input', params: { state: 'start' } });
+    expect(text).toBe(
+      'Recording the input of the running game from its physics frame 120. Let the person play, then call game_record_input with state "stop". Input that game_input plays is not recorded.',
+    );
+  });
+
+  it('game_record_input returns a short recording as steps of game_input, with what a replay needs', async () => {
+    const steps = [{ wait_physics_frames: 30 }, { action: 'move_forward', state: 'down' }, { wait_physics_frames: 12 }, { action: 'jump', physics_frames: 4 }];
+    const game = new FakeEditorGateway().respondTo('game.record_input', { start_frame: 120, stop_frame: 300, physics_frames: 180, events: 9, count: 4, steps });
+
+    const text = textOf(await createGameRecordInputTool(game).execute({ state: 'stop' }));
+
+    expect(text).toBe(
+      [
+        'Recorded 4 steps from 9 input events over 180 physics frames (frames 120 to 300).',
+        'To replay them, start from the same state, such as game_run of the same scene with fixed_fps: 60 for a frame-exact run, then pass the steps to game_input; a test can play them the same way.',
+        '[',
+        '  {"wait_physics_frames":30},',
+        '  {"action":"move_forward","state":"down"},',
+        '  {"wait_physics_frames":12},',
+        '  {"action":"jump","physics_frames":4}',
+        ']',
+      ].join('\n'),
+    );
+  });
+
+  it('game_record_input points to the file of a long recording and shows its first steps', async () => {
+    const firstSteps = [{ wait_physics_frames: 3 }, { mouse_motion: [12, -4] }];
+    const game = new FakeEditorGateway().respondTo('game.record_input', {
+      start_frame: 0,
+      stop_frame: 4000,
+      physics_frames: 4000,
+      events: 900,
+      count: 640,
+      path: '/game/.godot/godot_mcp_tool/recordings/recording-1795000000.json',
+      first_steps: firstSteps,
+    });
+
+    const text = textOf(await createGameRecordInputTool(game).execute({ state: 'stop' }));
+
+    expect(text).toContain('Recorded 640 steps from 900 input events over 4000 physics frames (frames 0 to 4000).');
+    expect(text).toContain(
+      'One game_input call takes up to 200 steps, so the steps are in /game/.godot/godot_mcp_tool/recordings/recording-1795000000.json, a JSON list. Replay them in calls of up to 200 steps while game_pause holds the game, so that no frame passes between the calls. The first 2:',
+    );
+    expect(text).toContain('  {"mouse_motion":[12,-4]}');
+  });
+
+  it('game_record_input says when nothing was recorded', async () => {
+    const game = new FakeEditorGateway().respondTo('game.record_input', { start_frame: 10, stop_frame: 70, physics_frames: 60, events: 0, count: 0, steps: [] });
+
+    const text = textOf(await createGameRecordInputTool(game).execute({ state: 'stop' }));
+
+    expect(text).toBe('No input was recorded in 60 physics frames (frames 10 to 70). The person plays in the game window, which needs the focus; input that game_input plays is not recorded.');
   });
 });

@@ -38,6 +38,7 @@ const gameRequests: Readonly<Record<string, string>> = {
   'game.set_properties': 'properties.set',
   'game.wait': 'wait',
   'game.input': 'input',
+  'game.record_input': 'record_input',
   'game.screenshot': 'screenshot',
   'game.pause': 'pause',
   'game.step': 'step',

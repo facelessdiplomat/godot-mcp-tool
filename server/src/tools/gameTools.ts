@@ -7,7 +7,7 @@ import { type CaptureReader, createGameScreenshotTool } from './captureTools.js'
 import { formatLogEntries, logEntrySchema } from './formatting/logEntries.js';
 import { createGamePauseTool, createGamePerformanceTool, createGameStepTool } from './gameControlTools.js';
 import { createGameGetPropertiesTool, createGameGetTreeTool, createGameSetPropertiesTool, createGameWaitTool } from './gameInspectionTools.js';
-import { createGameInputTool } from './inputTools.js';
+import { createGameInputTool, createGameRecordInputTool } from './inputTools.js';
 import { textResult } from './results.js';
 import type { Tool } from './Tool.js';
 
@@ -21,6 +21,7 @@ export function createGameTools(game: EditorGateway, cursor: GameOutputCursor, r
     createGameSetPropertiesTool(game),
     createGameWaitTool(game),
     createGameInputTool(game, readCapture),
+    createGameRecordInputTool(game),
     createGameScreenshotTool(game, readCapture),
     createGamePauseTool(game),
     createGameStepTool(game),

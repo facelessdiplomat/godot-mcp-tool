@@ -55,7 +55,7 @@ describe('tool modes', () => {
     const { names, resourceTemplates, prompts } = await listedTools({});
 
     expect(resourceTemplates).toEqual(['godot://scene/{+path}', 'godot://docs/{class}']);
-    expect(prompts).toEqual(['fix_last_run', 'playtest']);
+    expect(prompts).toEqual(['fix_last_run', 'playtest', 'profile', 'add_tests', 'setup_ci']);
 
     expect(names).toContain('node_add');
     expect(names).toContain('filesystem_move');

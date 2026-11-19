@@ -46,6 +46,10 @@ const workspaceEditSchema = z
   .object({ changes: z.record(z.string(), z.array(z.object({ range: z.object({ start: positionSchema, end: positionSchema }), newText: z.string() }))).optional() })
   .nullable();
 
+const locationsSchema = z
+  .array(z.object({ uri: z.string(), range: z.object({ start: positionSchema }) }))
+  .nullable();
+
 export interface SymbolPosition {
   readonly path: string;
   readonly line: number;
@@ -161,6 +165,17 @@ export class LanguageServerClient {
         this.notify('textDocument/didClose', { textDocument: { uri: fileUriOf(script.path) } });
       }
     }
+  }
+
+  async references(target: SymbolPosition): Promise<SymbolPosition[]> {
+    const locations = locationsSchema.parse(
+      await this.request('textDocument/references', {
+        textDocument: { uri: fileUriOf(target.path) },
+        position: { line: target.line, character: target.character },
+        context: { includeDeclaration: true },
+      }),
+    );
+    return (locations ?? []).map((location) => ({ path: editorPathOfUri(location.uri), line: location.range.start.line, character: location.range.start.character }));
   }
 
   close(): void {

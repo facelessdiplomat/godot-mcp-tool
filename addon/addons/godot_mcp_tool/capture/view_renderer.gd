@@ -6,6 +6,12 @@ const GodotMcpViewRequests := preload("view_requests.gd")
 const LABEL_FONT_SHARE := 1.0 / 24.0
 const MINIMUM_LABEL_FONT_SIZE := 14
 const MINIMUM_LABEL_OUTLINE := 2
+const MARKER_COLOR := Color(1.0, 0.84, 0.0)
+const MARKER_TEXT_COLOR := Color.BLACK
+const MARKER_BORDER := 2
+const MARKER_HEIGHT_SHARE := 1.5
+const MARKER_DIGIT_SHARE := 0.65
+const MARKER_PADDING_SHARE := 0.6
 
 var _host: Node
 var _draw_frame: Callable
@@ -49,6 +55,9 @@ func _open_viewport(world: World3D, view: Dictionary, size: Vector2i, labelled: 
 	viewport.add_child(camera)
 	if labelled:
 		viewport.add_child(label_for(view["label"], size))
+	for place: Dictionary in view.get("marker_places", []):
+		if place.has("pixel"):
+			viewport.add_child(marker_for(place["number"], place["pixel"], size))
 	_host.add_child(viewport)
 	camera.make_current()
 	camera.force_update_transform()
@@ -57,7 +66,7 @@ func _open_viewport(world: World3D, view: Dictionary, size: Vector2i, labelled: 
 
 
 static func label_for(text: String, cell_size: Vector2i) -> Label:
-	var font_size := maxi(MINIMUM_LABEL_FONT_SIZE, roundi(cell_size.y * LABEL_FONT_SHARE))
+	var font_size := _label_font_size(cell_size)
 	var label := Label.new()
 	label.text = text
 	label.position = Vector2.ONE * roundi(font_size / 2.0)
@@ -66,3 +75,29 @@ static func label_for(text: String, cell_size: Vector2i) -> Label:
 	label.add_theme_color_override("font_outline_color", Color.BLACK)
 	label.add_theme_constant_override("outline_size", maxi(MINIMUM_LABEL_OUTLINE, roundi(font_size / 4.0)))
 	return label
+
+
+static func marker_for(number: int, pixel: Vector2, cell_size: Vector2i) -> Label:
+	var font_size := _label_font_size(cell_size)
+	var text := str(number)
+	var height := roundf(font_size * MARKER_HEIGHT_SHARE)
+	var box := Vector2(maxf(height, roundf(font_size * (MARKER_PADDING_SHARE + MARKER_DIGIT_SHARE * text.length()))), height)
+	var style := StyleBoxFlat.new()
+	style.bg_color = MARKER_COLOR
+	style.border_color = MARKER_TEXT_COLOR
+	style.set_border_width_all(MARKER_BORDER)
+	style.set_corner_radius_all(roundi(height / 2.0))
+	var marker := Label.new()
+	marker.text = text
+	marker.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	marker.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	marker.add_theme_font_size_override("font_size", font_size)
+	marker.add_theme_color_override("font_color", MARKER_TEXT_COLOR)
+	marker.add_theme_stylebox_override("normal", style)
+	marker.size = box
+	marker.position = (pixel - box / 2.0).clamp(Vector2.ZERO, Vector2(cell_size) - box)
+	return marker
+
+
+static func _label_font_size(cell_size: Vector2i) -> int:
+	return maxi(MINIMUM_LABEL_FONT_SIZE, roundi(cell_size.y * LABEL_FONT_SHARE))

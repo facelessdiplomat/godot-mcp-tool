@@ -25,6 +25,8 @@ import { importACharacter } from './importACharacter.js';
 import { keepTheBestScore } from './keepTheBestScore.js';
 import { landOnce } from './landOnce.js';
 import { musicOnItsOwnBus } from './musicOnItsOwnBus.js';
+import { oneMoreArgument } from './oneMoreArgument.js';
+import { theCrateByTheRamp } from './theCrateByTheRamp.js';
 import { onlyThePlayerOpensTheDoor } from './onlyThePlayerOpensTheDoor.js';
 import { patrolBetweenPoints } from './patrolBetweenPoints.js';
 import { paintOneEnemy } from './paintOneEnemy.js';
@@ -97,4 +99,6 @@ export const allScenarios: readonly Scenario[] = [
   silenceInTheArena,
   whyIsItDark,
   sameLookAfterTheRefactor,
+  oneMoreArgument,
+  theCrateByTheRamp,
 ];

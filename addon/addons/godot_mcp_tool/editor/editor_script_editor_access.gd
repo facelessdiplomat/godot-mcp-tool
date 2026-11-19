@@ -1,5 +1,7 @@
 extends "script_editor_access.gd"
 
+const GodotMcpChangedScriptReloader := preload("changed_script_reloader.gd")
+
 const EXTERNAL_CHANGE_DIALOG_TITLE := "Files have been modified outside Godot"
 const MAXIMUM_SELECTION_LENGTH := 2000
 
@@ -24,6 +26,10 @@ func reload_open_files() -> void:
 	var tree := Engine.get_main_loop() as SceneTree
 	await tree.process_frame
 	await tree.process_frame
+
+
+func reload_changed_closed_scripts() -> PackedStringArray:
+	return GodotMcpChangedScriptReloader.reload_changed(GodotMcpChangedScriptReloader.project_scripts("res://"), open_script_paths())
 
 
 func files_changed_outside() -> PackedStringArray:

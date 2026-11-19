@@ -62,6 +62,18 @@ func _horizontal_speed() -> float:
 - New `class_name` classes are known in tests once the editor has rescanned the project or Godot has imported it;
   `test_run` takes care of both.
 
+## A bug that the user plays
+
+- When the user can show a bug by playing it, run the game with `fixed_fps: 60`, start `game_record_input` with
+  `state: "start"`, let the user play, then stop it with `state: "stop"`: the result lists the input as steps of
+  `game_input`, with the physics frames between them.
+- Replay the steps with `game_input` after `game_run` of the same scene with `fixed_fps: 60`, so that the game starts
+  from the same state and runs frame by frame as it did. Read the result with a `read` step at the end, such as the
+  position of the player.
+- To keep the bug fixed, make the replay a test: press the same actions with `Input.action_press()` and
+  `Input.action_release()` and wait the same physics frames with `await wait_physics_frames(n)`, then assert what the
+  bug broke.
+
 ## gdUnit4
 
 - Test suites extend `GdUnitTestSuite`, test functions start with `test_`, and asserts are fluent:

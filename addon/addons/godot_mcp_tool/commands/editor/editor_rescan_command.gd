@@ -38,7 +38,8 @@ func execute(params: Dictionary) -> Variant:
 		if scan_started:
 			break
 	await _scripts.reload_open_files()
-	return {"duration_ms": Time.get_ticks_msec() - started_msec, "reloaded_extensions": reloaded_extensions}
+	var reloaded_scripts := _scripts.reload_changed_closed_scripts()
+	return {"duration_ms": Time.get_ticks_msec() - started_msec, "reloaded_extensions": reloaded_extensions, "reloaded_scripts": reloaded_scripts}
 
 
 func _wait_for_a_scan_after(applied_before: int, started_msec: int, timeout_msec: int) -> bool:

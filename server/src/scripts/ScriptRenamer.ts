@@ -6,8 +6,10 @@ import type { EditorGateway } from '../editor/EditorGateway.js';
 import type { LineEdit, SymbolPosition } from '../lsp/LanguageServerClient.js';
 import type { ScriptText } from '../lsp/LanguageServerClient.js';
 import { editorPathOf, resourcePathOfEditorPath } from '../project/EditorPaths.js';
+import { filesInFolder } from '../project/ProjectFiles.js';
 import { findScripts } from './ScriptFiles.js';
-import { findDeclaration, type SymbolKind } from './SymbolDeclaration.js';
+import { sceneKindOf, type SymbolKind } from './SymbolDeclaration.js';
+import { locateSymbol, occurrencesOf } from './SymbolLocation.js';
 
 export interface RenameSession {
   rename(scripts: readonly ScriptText[], target: SymbolPosition, newName: string): Promise<Map<string, LineEdit[]>>;
@@ -56,7 +58,7 @@ const identifierPattern = /^[A-Za-z_]\w*$/;
 const resourcePrefix = 'res://';
 const rescanTimeoutMs = 90_000;
 const maximumMentions = 10;
-const resourceKinds: Readonly<Partial<Record<SymbolKind, string>>> = { function: 'function', signal: 'signal', variable: 'variable' };
+const scriptExtension = '.gd';
 const unsavedFilesSchema = z.object({ scenes: z.array(z.string()), scripts: z.array(z.string()) });
 const renamedResourcesSchema = z.object({ files: z.array(z.object({ path: z.string(), changes: z.record(z.string(), z.number()) })) });
 
@@ -71,14 +73,7 @@ export class ScriptRenamer {
     if (!identifierPattern.test(request.newName) || request.newName === request.symbol) {
       throw new RenameError(`"${request.newName}" is not a new name for ${request.symbol}; use letters, digits and _, not starting with a digit.`);
     }
-    const [script] = findScripts(projectRoot, [request.path]);
-    if (script === undefined) {
-      throw new RenameError(`${request.path} is not a .gd script.`);
-    }
-    const declaration = findDeclaration(readFileSync(script.absolutePath, 'utf8'), request.symbol);
-    if (declaration === undefined) {
-      throw new RenameError(`${script.resourcePath} declares no ${request.symbol}; pass the script that declares it, such as the one with "func ${request.symbol}(".`);
-    }
+    const { script, declaration } = locateSymbol(projectRoot, request.path, request.symbol);
     const address = await this.dependencies.languageServerAddress();
     if (address === undefined) {
       throw new RenameError('Renaming needs the language server of the Godot editor, and the editor is not connected. Start it with editor_launch.');
@@ -109,7 +104,7 @@ export class ScriptRenamer {
       const resourcePath = resourcePathOfEditorPath(address.projectPath, editorPath);
       return resourcePath === undefined ? [] : [applyEdits(projectRoot, resourcePath, lineEdits)];
     });
-    const kind = resourceKinds[declaration.kind];
+    const kind = sceneKindOf(declaration.kind);
     const resources =
       kind === undefined
         ? []
@@ -142,15 +137,14 @@ function applyEdits(projectRoot: string, resourcePath: string, lineEdits: readon
 }
 
 function mentionsOf(projectRoot: string, symbol: string): Mention[] {
-  const wholeWord = new RegExp(`\\b${symbol}\\b`);
-  const mentions: Mention[] = [];
-  for (const script of findScripts(projectRoot, [resourcePrefix])) {
-    const lines = readFileSync(script.absolutePath, 'utf8').split('\n');
-    for (const [index, line] of lines.entries()) {
-      if (wholeWord.test(line) && mentions.length < maximumMentions) {
-        mentions.push({ resourcePath: script.resourcePath, line: index + 1, text: line.trim() });
-      }
-    }
-  }
-  return mentions;
+  const seenLines = new Set<string>();
+  return occurrencesOf(filesInFolder(projectRoot, projectRoot, [scriptExtension]), symbol)
+    .filter((occurrence) => {
+      const key = `${occurrence.resourcePath}:${String(occurrence.line)}`;
+      const isNew = !seenLines.has(key);
+      seenLines.add(key);
+      return isNew;
+    })
+    .slice(0, maximumMentions)
+    .map((occurrence) => ({ resourcePath: occurrence.resourcePath, line: occurrence.line + 1, text: occurrence.text }));
 }

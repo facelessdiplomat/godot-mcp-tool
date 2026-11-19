@@ -438,7 +438,7 @@ reads either one.
 
 | Tool | What it does | M | Kind | Needs |
 |---|---|---|---|---|
-| `editor_rescan` | Sync the editor with the disk (§9.3): reload rebuilt GDExtensions, scan, reimport, reload open scripts; wait until done | 1 | W (idempotent) | E (C: `--headless --import`) |
+| `editor_rescan` | Sync the editor with the disk (§9.3): reload rebuilt GDExtensions, scan, reimport, reload the open scripts and the loaded scripts changed on disk; wait until done | 1 | W (idempotent) | E (C: `--headless --import`) |
 | `editor_launch` | Launch the editor for the project and wait until the addon connects; with a window unless `headless`; refuses to start a second editor while one is registered in the discovery file | 2 | W | C |
 | `editor_screenshot` | Render of the 3D scene open in the editor from the editor camera or from given views (§8.9), without the grid and gizmos; says when the editor's preview sun and sky light it. 2D scenes and UI are checked with `game_screenshot`; a capture of the whole editor window is not planned yet | 2 | R | E |
 | `editor_select` | Select nodes or files so the user sees what the agent is talking about | 3 | W (harmless) | E |
@@ -627,6 +627,7 @@ right angles and in structured spatial checks.
 | `navigation_get_path` (0.3.0) | The path that a `NavigationAgent3D` would get from one point to another, on given navigation layers: whether it reaches the target, its length and points, where it stops short and how far the ends lie from the mesh. Asks a copy of the scene in a `SubViewport` with its own map, without the editor too, or with `in_game` the running game | — | R | E/G |
 | `render` of a view (0.3.0) | Draw a view of `editor_screenshot` or `game_screenshot` unshaded, lighting only, as overdraw, as a wireframe (editor only) or as normals (Forward+ only) | — | R | E/G |
 | `compare_to` of the screenshots (0.3.0) | Compare a new picture with an earlier capture or an image of the project: the share of pixels changed beyond a `tolerance`, the rectangle that holds them, outlined in the picture, and the mean difference | — | R | E/G |
+| `markers` of a view (0.3.0) | Number up to 12 nodes, or the 3D children of the target, in a view of `editor_screenshot` or `game_screenshot`: each number sits at the projected center of the node's bounds, and the result lists the number, the path and the pixel position in the picture, or says that the node is behind the camera or outside the frame. The projection is the camera's own (`view_markers.gd`, checked against `Camera3D.unproject_position`). A hypothesis of T12: an agent run decides whether it stays | — | R | E/G |
 | `gridmap_set_cells` / `gridmap_get_cells` | `GridMap` (3D tiles) — only if evaluations show it's needed | 4 | R/W | E |
 | `animation_get` / `animation_set` / `animation_delete` | Animations of an `AnimationPlayer`: list them or read one track by track with its keys; create or replace one from property tracks (`Door:position`, `Door:position:y`, `.:visible`) with interpolation, update mode and loop by name, keying the current values of newly animated properties in `RESET` as the editor does; delete one, clearing an `autoplay` that names it. Each change is one Undo step | 4 | R/W | E |
 | `animation_tree_get` / `animation_tree_set` | An `AnimationTree` as a state machine: read its states, transitions and conditions; set it up whole from states that each play an animation and transitions with a condition, an expression, a cross-fade, a switch mode and a priority, as one Undo step | 4 | R/W | E |
@@ -661,14 +662,25 @@ most — so verification from several angles matters.
     `script_validate`, then `game_run` again until a run has no errors;
   - `playtest [scene]` asks to playtest the game or one scene without changing the project: the input map and the
     scene tree, `game_run`, screenshots from several views, input, waits and property reads, pause and step,
-    `game_performance`, then a report of what works and what does not.
+    `game_performance`, then a report of what works and what does not;
+  - `profile [scene]` asks to measure the game or one scene without changing it: `game_run`, input or a wait for
+    the load, `game_performance` with the function times of its scripts, then the slowest part with a fix and the
+    gain to expect;
+  - `add_tests <script>` asks for tests of one script with the framework of the project, or GUT from
+    `test_install_framework`, by the conventions of the skill's `testing.md`, then `test_run` until they pass or a
+    failure points at a bug, which it reports rather than hides;
+  - `setup_ci` asks for `.github/workflows/godot.yml` from the skill's `ci.md`: the official Godot build checked by
+    its SHA-512 sum, the import, the tests with the command line of `test_run` (GUT also exits with 0 when a test
+    script does not load, so the workflow looks for that error in the output), the export templates of the same
+    version from a cache, a Linux export kept as an artifact, and actions pinned by commit; it pushes nothing.
 
-  Prompts are left out in the read-only mode: both need tools that the mode turns off.
+  Prompts are left out in the read-only mode: they all need tools that the mode turns off.
 - **Skill** `plugin/skills/godot/`: `SKILL.md` (the "edit → validate → run → observe" loop with the tools and the
   rules that prevent most mistakes) and the files it links, read on demand: `gdscript.md` (GDScript 4 idioms and the
-  Godot 3 code to avoid), `3d.md` (axes, units, a `CharacterBody3D` controller, cameras, collisions, light) and
-  `testing.md` (GUT tests and `test_run`). Claude Code truncates server instructions at 4,096 characters, so the longer
-  guidance lives here. The folder has the layout of a Claude Code plugin (`skills/<name>/SKILL.md`); milestone 5 adds
+  Godot 3 code to avoid), `3d.md` (axes, units, a `CharacterBody3D` controller, cameras, collisions, light),
+  `testing.md` (GUT tests and `test_run`), `ui.md` (containers, anchors, themes, focus, checking a UI) and `ci.md` (a
+  GitHub Actions workflow that tests and exports the game). Claude Code truncates server instructions at 4,096
+  characters, so the longer guidance lives here. The folder has the layout of a Claude Code plugin (`skills/<name>/SKILL.md`); milestone 5 adds
   the manifest and `.mcp.json`. A unit test checks the frontmatter, the links, that `SKILL.md` stays under 500 lines,
   that every tool it names exists and that GDScript samples are indented with tabs; the samples were compiled with
   `--check-only` and the sample GUT test run against a scratch project.
@@ -776,6 +788,8 @@ New tools:
 | `plugin_set_enabled` | Enable or disable an editor plugin of the project | 8 | W | E |
 | `editor_undo` / `editor_redo` | Undo or redo the last actions of a scene's history and return their names; by default only the agent's own | 8 | W | E |
 | `script_rename_symbol` | Rename a function, variable, signal or class across the project, also where the language server does not look: the method names in signal connections of scenes and in method tracks of animations | 9 | W | E |
+| `script_find_references` (0.3.0) | Where a function, signal, variable, constant, enum or class is declared and used: the uses that the language server traces in scripts, the signal connections, method track keys, saved values and animated properties of scenes and resources that use the script (the finder of `script_rename_symbol`), and the lines that name it where the language server could not trace it, such as calls on untyped variables and strings in `call()`. Reads only; goes on when Hold Changes refuses its rescan | — | R | E |
+| `game_record_input` (0.3.0) | Record what a person does in the running game, from `state: "start"` to `state: "stop"`, as steps of `game_input`: input actions where the event matches one of the project, otherwise keys, mouse, wheel, gamepad buttons and sticks and touch, with the physics frames between them; a press and its release become one hold, mouse motion is summed over 6 frames, sticks keep steps of 0.1 outside a dead zone of 0.2. Input that `game_input` delivers is left out. More than 200 steps go to a JSON file under `.godot/godot_mcp_tool/recordings/` | — | R | G |
 
 `gridmap_get_cells` / `gridmap_set_cells` (§8.9) stay planned for the evaluation that needs them.
 
@@ -901,6 +915,11 @@ What we do:
 - GDExtension libraries rebuilt on disk: `editor_rescan` first asks the editor to reload them the way it does when
   its window gets focus, so scripts see the new classes and methods without the user clicking into the editor
   (ADR-13).
+- Scripts that a scene uses but no tab of the script editor shows: after a scan the editor reloads them in
+  `_update_script_documentation`, which a windowless editor skips, since it runs in command-line mode. Such a
+  script kept its old methods and properties in the editor, so the node tools and `signal_connect` worked with the old
+  version. Since 0.3.0 `editor_rescan` reloads every loaded script outside `res://addons` whose text differs from
+  the file and that no tab shows (`editor/changed_script_reloader.gd`), and names it in its result.
 
 How it is implemented (milestone 1): the addon relies on the engine's own check. `ScriptEditor.reload_open_files()`
 compares each open tab's last known modification time with the disk; tabs without unsaved changes reload silently
@@ -1331,7 +1350,7 @@ godot-mcp-tool/
 │   ├── .mcp.json                 starts the server with npx
 │   ├── hooks/hooks.json          checks every .gd file that Claude writes, guards scenes and resources
 │   ├── agents/playtester.md      a subagent that playtests with the game tools and reports back
-│   └── skills/godot/             the companion skill: SKILL.md, gdscript.md, 3d.md, testing.md, ui.md
+│   └── skills/godot/             the companion skill: SKILL.md, gdscript.md, 3d.md, testing.md, ui.md, ci.md
 ├── test-project/                 3D Godot project for integration tests (addon symlinked)
 └── scripts/                      dev scripts: install GUT and gdUnit4, run the addon tests, release
 ```
@@ -2402,6 +2421,9 @@ Checked against the sources in `~/Software/godot` (`master`, 4.8-beta, commit `6
 | A language server client must close a document before opening it again; `didOpen` parses the sent text and always publishes diagnostics, even an empty list | `modules/gdscript/language_server/gdscript_language_protocol.cpp` |
 | `Input.parse_input_event` may buffer events until the next frame; `Input.flush_buffered_events()` delivers them at once. An `InputEventAction` is matched to its action by name, so it sets the action state and reaches `_input` too. The headless display server also delivers events to the window | `core/input/input.cpp`, `core/input/input_map.cpp`, `servers/display/display_server_headless.cpp` |
 | A `SceneTreeTimer` counts frame time, so it can end before the same wall-clock time has passed; real-time waits poll `Time.get_ticks_msec()` | observed in GUT runs |
+| A `Window` emits `window_input` with every event it receives before it pushes the event through `_input`, the GUI and `_unhandled_input`, so a listener sees events that game code later marks as handled; in a game without a window too. Events that a script sends with `Input.parse_input_event` reach it as well, after the next flush, so `game_record_input` tells the events of `game_input` by the moment of their delivery, which flushes at once | `scene/main/window.cpp`, `core/input/input.cpp`, observed on 4.8 |
+| A windowless editor runs in command-line mode (`DisplayServer` named "headless"), and `EditorFileSystem` then skips `_update_script_documentation`, which is also where it reloads a loaded script changed on disk that no tab of the script editor shows; the script keeps its old methods and properties until something reloads it | `editor/file_system/editor_file_system.cpp`, `editor/editor_node.cpp`, observed on 4.8 |
+| The language server answers `textDocument/references` for scripts that are not open: each connection parses the files from disk on demand. It finds calls through typed variables, casts and class names, but not calls on untyped variables or names in strings, and it returns the declaration even with `includeDeclaration: false` | `modules/gdscript/language_server/gdscript_workspace.cpp`, `gdscript_text_document.cpp`, observed on 4.8, the same code in 4.7.2 |
 | `InputEvent.as_text()` is not uniform for physical keys ("W - Physical", "Up"); the addon writes its own short text ("W", "Ctrl+S", "Mouse left", "Joypad a") | observed on 4.8 |
 | A static function on a preloaded script is shadowed by a `Resource` or `Object` method of the same name (`is_built_in`, `get_name`, …), because the call goes to the script resource itself | observed on 4.8 |
 | `TCPServer.listen(port, bind_address = "*")` listens on all interfaces by default; `get_local_port()` | `doc/classes/TCPServer.xml` |

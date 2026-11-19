@@ -113,3 +113,14 @@ func test_reports_no_extensions_when_none_was_rebuilt() -> void:
 	_file_system.apply_scan()
 	await _wait_until_finished()
 	assert_eq((_outcome as Dictionary)["reloaded_extensions"], PackedStringArray())
+
+
+func test_reloads_the_changed_scripts_that_the_script_editor_does_not_show_and_reports_them() -> void:
+	_scripts.changed_closed_scripts = PackedStringArray(["res://enemy.gd"])
+	_rescan_in_background()
+	await wait_process_frames(2)
+	assert_eq(_scripts.closed_script_reloads, 0)
+	_file_system.apply_scan()
+	await _wait_until_finished()
+	assert_eq(_scripts.closed_script_reloads, 1)
+	assert_eq((_outcome as Dictionary)["reloaded_scripts"], PackedStringArray(["res://enemy.gd"]))

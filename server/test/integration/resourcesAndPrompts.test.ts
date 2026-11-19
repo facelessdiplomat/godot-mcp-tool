@@ -68,6 +68,18 @@ describe.skipIf(godotBinary === '')('MCP resources and prompts', () => {
     expect(await read('godot://docs/CharacterBody3D')).toContain('move_and_slide');
   });
 
+  it('offers the prompts with one-word arguments, as slash commands take them', async () => {
+    const { prompts } = await connected().client.listPrompts();
+
+    expect(prompts.map((prompt) => [prompt.name, (prompt.arguments ?? []).map((argument) => `${argument.name}${argument.required === true ? '' : '?'}`)])).toEqual([
+      ['fix_last_run', []],
+      ['playtest', ['scene?']],
+      ['profile', ['scene?']],
+      ['add_tests', ['script']],
+      ['setup_ci', []],
+    ]);
+  });
+
   it('hands the errors of the last run to fix_last_run', async () => {
     await connected().call('game_run');
 

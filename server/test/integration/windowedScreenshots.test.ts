@@ -77,6 +77,16 @@ function centerOf(image: PngImage): Rgb {
   return image.pixel(Math.floor(image.width / 2), Math.floor(image.height / 2));
 }
 
+function isMarker([red, green, blue]: Rgb): boolean {
+  return red > 230 && green > 180 && green < 235 && blue < 50;
+}
+
+function markedPosition(text: string, view: string, path: string): [number, number] | undefined {
+  const line = text.split('\n').find((candidate) => candidate.startsWith(`Markers in ${view}: `)) ?? '';
+  const match = new RegExp(`\\d+ ${path} at \\((?<x>\\d+), (?<y>\\d+)\\)`).exec(line)?.groups;
+  return match === undefined ? undefined : [Number(match['x']), Number(match['y'])];
+}
+
 function isRed([red, green, blue]: Rgb): boolean {
   return red > 200 && green < 60 && blue < 60;
 }
@@ -143,6 +153,23 @@ describe.skipIf(godotBinary === '' || !windowTestsEnabled)('screenshots with a w
     expect(earlier).toMatch(/\.png$/);
     expect(same.text).toContain(`Compared with ${earlier}: no pixel changed by more than 0.1, so the pictures match`);
     expect(moved.text).toMatch(/Compared with .+: [\d.]+% of the pixels changed by more than 0\.1, all within \[\d+, \d+, \d+, \d+\]/);
+  });
+
+  it('numbers a node on the view where it is in sight and says where it is not', async () => {
+    const outcome = await tools().callForImage('editor_screenshot', {
+      views: [
+        { position: [0, 6, 14], look_at: [0, 0, 0], label: 'overview', markers: ['Crate', 'Player'] },
+        { position: [4, 1, 3], look_at: [4, 1, 10], label: 'away', markers: ['Crate'] },
+      ],
+    });
+    const image = decodedImage(outcome);
+    const [x, y] = markedPosition(outcome.text, 'overview', 'Crate') ?? [-1, -1];
+
+    expect(outcome.text).toContain('Markers in away: 1 Crate not in view (behind the camera).');
+    expect(markedPosition(outcome.text, 'overview', 'Player')).toBeDefined();
+    expect(isMarker(image.pixel(x - 6, y - 6))).toBe(true);
+    expect(isRed(image.pixel(x - 16, y))).toBe(true);
+    expect(isRed(image.pixel(x + 16, y))).toBe(true);
   });
 
   it('lays several editor views out in one image', async () => {

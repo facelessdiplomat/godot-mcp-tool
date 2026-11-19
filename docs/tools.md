@@ -24,8 +24,8 @@ The line under each tool says what kind of tool it is:
 - [Scenes and nodes](#scenes-and-nodes): `scene_create`, `scene_open`, `scene_save`, `scene_get_tree`, `scene_batch_edit`, `node_add`, `node_delete`, `node_duplicate`, `node_reparent`, `node_save_as_scene`, `node_make_local`, `node_find`, `node_get_properties`, `node_get_bounds`, `scene_raycast`, `node_snap_to_floor`, `node_add_collision`, `node_set_properties`, `gridmap_get_cells`, `gridmap_set_cells`, `tilemap_get_cells`, `tilemap_set_cells`, `signal_list`, `signal_connect`, `signal_disconnect`, `node_set_groups`, `scene_close`, `node_call_method`
 - [Resources and files](#resources-and-files): `user_data_get`, `resource_create`, `resource_get`, `resource_set_properties`, `tileset_add_atlas`, `resource_find_usages`, `filesystem_move`, `asset_import_settings_get`, `asset_import_settings_set`, `filesystem_delete`, `user_data_delete`
 - [Animation and navigation](#animation-and-navigation): `navigation_bake`, `navigation_get_path`, `animation_get`, `animation_set`, `animation_delete`, `animation_tree_get`, `animation_tree_set`
-- [Scripts, tests and exports](#scripts-tests-and-exports): `script_rename_symbol`, `script_validate`, `test_install_framework`, `test_run`, `export_preset_add`, `export_project`
-- [The running game](#the-running-game): `game_run`, `game_stop`, `game_get_output`, `game_get_tree`, `game_get_properties`, `game_set_properties`, `game_wait`, `game_input`, `game_screenshot`, `game_pause`, `game_step`, `game_performance`, `game_eval`
+- [Scripts, tests and exports](#scripts-tests-and-exports): `script_rename_symbol`, `script_find_references`, `script_validate`, `test_install_framework`, `test_run`, `export_preset_add`, `export_project`
+- [The running game](#the-running-game): `game_run`, `game_stop`, `game_get_output`, `game_get_tree`, `game_get_properties`, `game_set_properties`, `game_wait`, `game_input`, `game_record_input`, `game_screenshot`, `game_pause`, `game_step`, `game_performance`, `game_eval`
 - [Debugging](#debugging): `debug_breakpoints`, `debug_state`, `debug_continue`
 - [Engine reference](#engine-reference): `docs_class`, `docs_search`
 - [Prompts](#prompts)
@@ -63,7 +63,7 @@ No parameters.
 
 *Read-only*
 
-- `views`: list of 1 to 6 items. Render the 3D scene from these angles instead of the editor camera, up to 6 in one labelled image: a preset "front" (from +Z), "back", "left" (from -X), "right", "top" or "iso", framed on the whole scene; {"preset": "front", "target": "Player"} to frame one node; or {"position": [0, 8, 12], "look_at": [0, 0, 0]} for a camera at a point. Each view also takes "fov", "label" and "render", such as {"preset": "iso", "render": "unshaded"}. Each item is one of:
+- `views`: list of 1 to 6 items. Render the 3D scene from these angles instead of the editor camera, up to 6 in one labelled image: a preset "front" (from +Z), "back", "left" (from -X), "right", "top" or "iso", framed on the whole scene; {"preset": "front", "target": "Player"} to frame one node; or {"position": [0, 8, 12], "look_at": [0, 0, 0]} for a camera at a point. Each view also takes "fov", "label", "render" and "markers", such as {"preset": "iso", "render": "unshaded"} or {"preset": "top", "target": "Crates", "markers": "children"}. Each item is one of:
   - "front", "back", "left", "right", "top" or "iso".
   - an object with:
     - `preset` (required): "front", "back", "left", "right", "top" or "iso".
@@ -71,6 +71,7 @@ No parameters.
     - `fov`: number from 1 to 179. Vertical field of view in degrees. Default: 50.
     - `label`: string. Caption of the view in the image.
     - `render`: "unshaded", "lighting", "overdraw", "wireframe" or "normals". Draw this view as a debug view of the 3D viewport instead of with materials and light: "unshaded" shows colors without light, to tell a dark room from a black material; "lighting" shows only the light; "overdraw" shows where transparent surfaces pile up; "wireframe" shows the triangles (editor_screenshot only); "normals" shows the surface normals (Forward+ only).
+    - `markers`: list of strings, 1 to 12 or "children". Number these nodes in the view, such as ["Crates/Crate1", "Ramp"], or "children" for the 3D children of target, up to 12: each gets a number at the center of its bounds, and the result lists the number, the path and the pixel position of each, or why it is not in view. Use it to tell which object in the picture is which node; a number covers a small object, so the same view without markers shows the objects themselves.
   - an object with:
     - `position` (required): list of 3 numbers. Camera position [x, y, z] in world coordinates.
     - `look_at`: list of 3 numbers. The point the camera looks at. Default: the center of target, or of the whole scene.
@@ -78,6 +79,7 @@ No parameters.
     - `fov`: number from 1 to 179. Vertical field of view in degrees. Default: 50.
     - `label`: string. Caption of the view in the image.
     - `render`: "unshaded", "lighting", "overdraw", "wireframe" or "normals". Draw this view as a debug view of the 3D viewport instead of with materials and light: "unshaded" shows colors without light, to tell a dark room from a black material; "lighting" shows only the light; "overdraw" shows where transparent surfaces pile up; "wireframe" shows the triangles (editor_screenshot only); "normals" shows the surface normals (Forward+ only).
+    - `markers`: list of strings, 1 to 12 or "children". Number these nodes in the view, such as ["Crates/Crate1", "Ramp"], or "children" for the 3D children of target, up to 12: each gets a number at the center of its bounds, and the result lists the number, the path and the pixel position of each, or why it is not in view. Use it to tell which object in the picture is which node; a number covers a small object, so the same view without markers shows the objects themselves.
 - `animation`: object. Render the poses of an animation at given times without running the game, one labelled image per time in one picture, from the editor camera or from one given view. Method calls and sounds of the animation stay silent, and the animated values are put back afterwards. It has:
   - `player` (required): string. Path of the AnimationPlayer relative to the scene root, such as "Hero/AnimationPlayer".
   - `name` (required): string. The animation to pose, such as "walk".
@@ -856,6 +858,15 @@ No parameters.
 - `symbol` (required): string. The function, signal, variable, constant, enum or class_name to rename, such as "take_damage".
 - `new_name` (required): string. The new name, such as "apply_damage".
 
+### `script_find_references`
+
+**Find references.** Find where a function, signal, variable, constant, enum or class_name is declared and used across the project, such as before changing the arguments of a function or removing it. The editor's language server traces the uses in scripts, also through typed variables and class names; then come the signal connections, method track keys, saved values and animated properties of scenes and resources that use the script, which the language server does not see, and the lines that name the symbol where it could not be traced, such as calls on untyped variables or strings in call() and has_method(). Lines count from 1. Needs the editor.
+
+*Read-only*
+
+- `path` (required): string. The script that declares the symbol, as a res:// path, such as "res://enemy.gd".
+- `symbol` (required): string. The function, signal, variable, constant, enum or class_name to look for, such as "take_damage".
+
 ### `script_validate`
 
 **Check scripts.** Check GDScript files for errors and warnings without running the game, as the Godot editor does: syntax, types, unknown identifiers, unused variables; and compile .gdshader files with Godot's shader compiler, which reports the first error of each shader with its line, also inside included files. Call it after writing or changing .gd or .gdshader files, before game_run. Scripts are checked with the editor's language server, or godot --check-only when the editor is not connected; shaders in the editor, or in Godot without a window.
@@ -1055,13 +1066,21 @@ No parameters.
   - `node`: string. The node that emits the signal, such as "Player". Default: the current scene root.
   - `signal` (required): string. The signal, such as "landed".
 
+### `game_record_input`
+
+**Record the input of the player.** Record what a person does in the running game, such as the walk and jump that make a bug happen, and get it back as steps of game_input: the input actions, keys, mouse, gamepad and touch input with the physics frames between them. Start it, let the person play, then stop it. Input that game_input itself plays is not recorded. Replayed from the same starting state with fixed_fps, the steps repeat the playthrough, so they can reproduce a bug or become a test. Needs a game started with game_run, with or without the editor.
+
+*Read-only*
+
+- `state` (required): "start" or "stop". "start" begins recording the input of the person who plays the running game; "stop" ends it and returns the steps.
+
 ### `game_screenshot`
 
 **Game screenshot.** See the running game: a screenshot of its window with the UI, a strip of frames a given number of physics frames apart, or renders of its 3D world from other angles that leave the game camera alone. Returns the image and the path of its file. Pixel positions in a screenshot of the window are the positions that game_input clicks use. Needs a game started with game_run that has a window, with or without the editor.
 
 *Read-only*
 
-- `views`: list of 1 to 6 items. Render the 3D scene from these angles instead of the game window, up to 6 in one labelled image: a preset "front" (from +Z), "back", "left" (from -X), "right", "top" or "iso", framed on the whole scene; {"preset": "front", "target": "Player"} to frame one node; or {"position": [0, 8, 12], "look_at": [0, 0, 0]} for a camera at a point. Each view also takes "fov", "label" and "render", such as {"preset": "iso", "render": "unshaded"}. Each item is one of:
+- `views`: list of 1 to 6 items. Render the 3D scene from these angles instead of the game window, up to 6 in one labelled image: a preset "front" (from +Z), "back", "left" (from -X), "right", "top" or "iso", framed on the whole scene; {"preset": "front", "target": "Player"} to frame one node; or {"position": [0, 8, 12], "look_at": [0, 0, 0]} for a camera at a point. Each view also takes "fov", "label", "render" and "markers", such as {"preset": "iso", "render": "unshaded"} or {"preset": "top", "target": "Crates", "markers": "children"}. Each item is one of:
   - "front", "back", "left", "right", "top" or "iso".
   - an object with:
     - `preset` (required): "front", "back", "left", "right", "top" or "iso".
@@ -1069,6 +1088,7 @@ No parameters.
     - `fov`: number from 1 to 179. Vertical field of view in degrees. Default: 50.
     - `label`: string. Caption of the view in the image.
     - `render`: "unshaded", "lighting", "overdraw", "wireframe" or "normals". Draw this view as a debug view of the 3D viewport instead of with materials and light: "unshaded" shows colors without light, to tell a dark room from a black material; "lighting" shows only the light; "overdraw" shows where transparent surfaces pile up; "wireframe" shows the triangles (editor_screenshot only); "normals" shows the surface normals (Forward+ only).
+    - `markers`: list of strings, 1 to 12 or "children". Number these nodes in the view, such as ["Crates/Crate1", "Ramp"], or "children" for the 3D children of target, up to 12: each gets a number at the center of its bounds, and the result lists the number, the path and the pixel position of each, or why it is not in view. Use it to tell which object in the picture is which node; a number covers a small object, so the same view without markers shows the objects themselves.
   - an object with:
     - `position` (required): list of 3 numbers. Camera position [x, y, z] in world coordinates.
     - `look_at`: list of 3 numbers. The point the camera looks at. Default: the center of target, or of the whole scene.
@@ -1076,6 +1096,7 @@ No parameters.
     - `fov`: number from 1 to 179. Vertical field of view in degrees. Default: 50.
     - `label`: string. Caption of the view in the image.
     - `render`: "unshaded", "lighting", "overdraw", "wireframe" or "normals". Draw this view as a debug view of the 3D viewport instead of with materials and light: "unshaded" shows colors without light, to tell a dark room from a black material; "lighting" shows only the light; "overdraw" shows where transparent surfaces pile up; "wireframe" shows the triangles (editor_screenshot only); "normals" shows the surface normals (Forward+ only).
+    - `markers`: list of strings, 1 to 12 or "children". Number these nodes in the view, such as ["Crates/Crate1", "Ramp"], or "children" for the 3D children of target, up to 12: each gets a number at the center of its bounds, and the result lists the number, the path and the pixel position of each, or why it is not in view. Use it to tell which object in the picture is which node; a number covers a small object, so the same view without markers shows the objects themselves.
 - `frames`: integer from 2 to 6. Instead of one moment, take this many screenshots of the game window, every_physics_frames apart, as one labelled image, to see motion such as a jump, an animation or a camera move. While game_pause holds the game, it plays exactly those frames and pauses again.
 - `every_physics_frames`: integer from 1 to 600. Physics frames between the screenshots of frames. Default: 5.
 - `max_size`: integer from 256 to 2560, default `1280`. The longest side of the image in pixels. Default: 1280.
@@ -1181,6 +1202,24 @@ No arguments.
 **Playtest.** Playtest the game, or one scene of it, through the game tools and report what works, what does not, the errors and the performance, without changing the project.
 
 - `scene`: The scene to playtest, as a res:// path. Default: the main scene.
+
+### `profile`
+
+**Profile.** Profile the game, or one scene of it, with game_performance and the function times of its scripts, and name the slowest part with a fix, without changing the project.
+
+- `scene`: The scene to profile, as a res:// path. Default: the main scene.
+
+### `add_tests`
+
+**Add tests.** Write tests for one script with the test framework of the project, installing GUT when there is none, and run them with test_run.
+
+- `script` (required): The script to test, as a res:// path, such as res://player/player.gd.
+
+### `setup_ci`
+
+**Set up CI.** Write a GitHub Actions workflow that downloads the official Godot build with its checksum, imports the project, runs its tests as test_run does and exports a build.
+
+No arguments.
 
 ## Resources
 

@@ -9,7 +9,7 @@ import type { Tool, ToolDefinition } from './Tool.js';
 
 const inputSchema = z.object({});
 
-const rescanSchema = z.object({ duration_ms: z.number(), reloaded_extensions: z.array(z.string()).default([]) });
+const rescanSchema = z.object({ duration_ms: z.number(), reloaded_extensions: z.array(z.string()).default([]), reloaded_scripts: z.array(z.string()).default([]) });
 
 type Rescan = z.infer<typeof rescanSchema>;
 
@@ -38,7 +38,7 @@ export class EditorRescanTool implements Tool<typeof inputSchema> {
       method: 'editor.rescan',
       responseSchema: rescanSchema,
       timeoutMs: rescanTimeoutMs,
-      present: ({ duration_ms, reloaded_extensions }) => textResult(describeRescan(duration_ms, reloaded_extensions)),
+      present: (rescan) => textResult(describeRescan(rescan)),
     });
   }
 
@@ -60,10 +60,11 @@ export class EditorRescanTool implements Tool<typeof inputSchema> {
   }
 }
 
-function describeRescan(durationMs: number, reloadedExtensions: string[]): string {
-  const rescan = `The editor rescanned the project files in ${String(durationMs)} ms and reloaded scripts changed on disk.`;
-  if (reloadedExtensions.length === 0) {
-    return rescan;
+function describeRescan(rescan: Rescan): string {
+  const scripts = rescan.reloaded_scripts.length === 0 ? '' : `: ${rescan.reloaded_scripts.join(', ')}`;
+  const scanned = `The editor rescanned the project files in ${String(rescan.duration_ms)} ms and reloaded scripts changed on disk${scripts}.`;
+  if (rescan.reloaded_extensions.length === 0) {
+    return scanned;
   }
-  return `${rescan} It also reloaded the GDExtension libraries rebuilt on disk: ${reloadedExtensions.join(', ')}.`;
+  return `${scanned} It also reloaded the GDExtension libraries rebuilt on disk: ${rescan.reloaded_extensions.join(', ')}.`;
 }

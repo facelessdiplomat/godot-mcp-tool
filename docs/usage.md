@@ -39,6 +39,14 @@ Find and fix errors:
 
 > After the first hit, the enemy never takes damage again. Find out why with the debugger and fix it.
 
+Show a bug by playing it:
+
+> Record what I do in the game: I'll walk to the ledge and jump, and the player falls through the floor. Then make it
+> a test.
+
+Claude starts `game_record_input`, you play in the game window, and when you say you are done it gets your input
+back as steps of `game_input`, which replay the same playthrough frame by frame.
+
 Run the tests:
 
 > Write a GUT test for Player.dash() and run all the tests.
@@ -76,12 +84,19 @@ platform". Give large tasks in steps: the level first, then the player, then the
 
 ## Slash commands
 
-The server brings two ready-made tasks. Type `/` in Claude Code and find them in the list, marked (MCP):
+The server brings five ready-made tasks. Type `/` in Claude Code and find them in the list, marked (MCP):
 
 - **playtest** plays the game, or the scene you name after the command, and reports what works, what does not, the
   errors and the performance, without changing the project.
 - **fix_last_run** hands Claude the errors of the last game run, with file, line and stack, and asks it to fix them
   and run the game again.
+- **profile** measures the game, or the scene you name, with the frame times and the function times of its scripts,
+  and names the slowest part with a fix and the gain to expect, without changing the project.
+- **add_tests** writes tests for the script you name, such as `res://player/player.gd`, with the test framework of
+  the project (GUT when there is none), and runs them.
+- **setup_ci** writes a GitHub Actions workflow that downloads the official Godot build, checked by its SHA-512 sum,
+  imports the project, runs its tests and exports a Linux build. It pushes nothing; look at the first run of the
+  workflow after you push it.
 
 Their full names depend on how the server was added: `/mcp__godot__playtest` and `/mcp__godot__fix_last_run` for the
 server `godot` of `.mcp.json`, and longer names with the plugin.

@@ -5,6 +5,7 @@ import { EditorUnavailableError } from '../editor/EditorGateway.js';
 import { LanguageServerUnavailableError } from '../lsp/LanguageServerClient.js';
 import { ScriptPathError } from '../scripts/ScriptFiles.js';
 import { type ChangedFile, RenameError, type RenameReport, type RenameRequest } from '../scripts/ScriptRenamer.js';
+import { SymbolLookupError } from '../scripts/SymbolLocation.js';
 import { changingAnnotations } from './annotations.js';
 import { describeRequestFailure } from './bridge/BridgeTool.js';
 import { errorResult, textResult } from './results.js';
@@ -49,7 +50,7 @@ export class ScriptRenameTool implements Tool<typeof scriptRenameInput> {
     try {
       return textResult(describeRename(await this.renamer.rename({ path: parsedInput.data.path, symbol: parsedInput.data.symbol, newName: parsedInput.data.new_name })));
     } catch (error) {
-      if (error instanceof RenameError || error instanceof ScriptPathError || error instanceof LanguageServerUnavailableError) {
+      if (error instanceof RenameError || error instanceof SymbolLookupError || error instanceof ScriptPathError || error instanceof LanguageServerUnavailableError) {
         return errorResult(error.message);
       }
       if (error instanceof EditorUnavailableError || error instanceof BridgeRequestError || error instanceof BridgeConnectionError || error instanceof BridgeProtocolError) {

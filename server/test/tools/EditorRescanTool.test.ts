@@ -18,6 +18,16 @@ describe('editor_rescan', () => {
     expect(text).toBe('The editor rescanned the project files in 120 ms and reloaded scripts changed on disk.');
   });
 
+  it('names the scripts it reloaded that no tab of the script editor shows, which a windowless editor would keep as they were', async () => {
+    const editor = new FakeEditorGateway()
+      .respondTo('editor.reload_extensions', {})
+      .respondTo('editor.rescan', { duration_ms: 120, reloaded_extensions: [], reloaded_scripts: ['res://enemy.gd', 'res://player.gd'] });
+
+    const text = textOf(await new EditorRescanTool(editor).execute({}));
+
+    expect(text).toBe('The editor rescanned the project files in 120 ms and reloaded scripts changed on disk: res://enemy.gd, res://player.gd.');
+  });
+
   it('asks the editor to reload rebuilt GDExtensions before it rescans, in a request of its own', async () => {
     const editor = new FakeEditorGateway().respondTo('editor.reload_extensions', {}).respondTo('editor.rescan', { duration_ms: 120 });
 

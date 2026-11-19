@@ -32,3 +32,11 @@ export function findDeclaration(text: string, symbol: string): SymbolDeclaration
   }
   return undefined;
 }
+
+export type SceneSymbolKind = 'function' | 'signal' | 'variable';
+
+const sceneKinds: Readonly<Partial<Record<SymbolKind, SceneSymbolKind>>> = { function: 'function', signal: 'signal', variable: 'variable' };
+
+export function sceneKindOf(kind: SymbolKind): SceneSymbolKind | undefined {
+  return sceneKinds[kind];
+}

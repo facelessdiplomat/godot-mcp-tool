@@ -13,6 +13,10 @@ func reload_open_files() -> void:
 	pass
 
 
+func reload_changed_closed_scripts() -> PackedStringArray:
+	return PackedStringArray()
+
+
 func files_changed_outside() -> PackedStringArray:
 	return PackedStringArray()
 
