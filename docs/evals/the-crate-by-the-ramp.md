@@ -18,12 +18,11 @@ behind its high end, and the others stand around the arena. No name says which c
 
 **Notes**
 
-- The crate is named by where it stands, not by its node. The agent can find it in numbers, from the bounds of the
-  ramp and of the crates, or in pictures: `markers` of a view, such as
-  `{"preset": "top", "target": "Crates", "markers": "children"}`, numbers each crate in the picture and lists which
-  number is which node.
+- The crate is named by where it stands, not by its node. The agent can find it in numbers, from the positions or
+  the bounds of the ramp and of the crates, or in pictures from several views.
 - The crates share their material, so a change of the material paints all of them; `material_override` of one crate,
   as in `paint-one-enemy`, paints only that one.
-- Whether markers help is a hypothesis of task T12: if the agent does not use them, or does no better with them, the
-  option goes again.
+- The scenario was written for `markers` of a view, a hypothesis of task T12 that numbered the nodes in a picture. The
+  run with an agent on 2026-11-19 used no markers: one `node_get_properties` with `paths` read the positions of the
+  ramp and of the crates, and the agent painted `Crate5` in 5 calls. By the rule of T12 the option was removed.
 - Evaluation run: `server/test/evals/scenarios/theCrateByTheRamp.ts`.

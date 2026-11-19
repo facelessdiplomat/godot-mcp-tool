@@ -63,8 +63,8 @@ When running one, record whether it passed, the number of tool calls and the tok
 | [silence-in-the-arena.md](silence-in-the-arena.md) | `audio_buses_get` with `in_game`: a muted bus and a player that never starts |
 | [why-is-it-dark.md](why-is-it-dark.md) | `render` modes of views: a room without light and a black material |
 | [same-look-after-the-refactor.md](same-look-after-the-refactor.md) | `compare_to` of `editor_screenshot` after turning nodes into instances |
-| [one-more-argument.md](one-more-argument.md) | `script_find_references` before a function gets a second argument: typed and untyped calls, a bound signal value, a method track |
-| [the-crate-by-the-ramp.md](the-crate-by-the-ramp.md) | a node named by where it stands: `markers` of a view, or the bounds in numbers |
+| [one-more-argument.md](one-more-argument.md) | `script_find_references` before a function gets a second argument: typed and untyped calls, a bound signal value, a method track, and a barrel with a `take_damage` of its own |
+| [the-crate-by-the-ramp.md](the-crate-by-the-ramp.md) | a node named by where it stands, found from positions in numbers or in pictures |
 
 ## Running them
 
@@ -480,3 +480,45 @@ the other solution. One rerun with the same model and Claude Code:
 | blocks-from-a-scene | 6/6 | 33 → 13 | 0.62 → 0.23 | 83 → 28 |
 
 The agent found the tool with its first `ToolSearch`, built the library in one call and needed no script of its own.
+
+### No markers, and a barrel in one-more-argument, 2026-11-19
+
+- T12: `markers` of a view are gone again, by the rule of T12: the run of `the-crate-by-the-ramp` answered with
+  numbers in one call and used no markers. The scenario stays, as a request that names a node by where it stands.
+- T15: `script_find_references` stays. In the first run of `one-more-argument` one `Grep` found every caller, since a
+  search over all files also reads the connection and the method track key of `arena.tscn` as text. The scenario now
+  has a barrel with a `take_damage(amount: int)` of its own: the sword hits it through a variable typed `Barrel`, and
+  the timer `Fuse` is connected to it with a bound value. A text search mixes these two uses in with the goblin's, and
+  a second argument there breaks the barrel. Two checks were added: `barrel.gd` keeps its `take_damage`, and both
+  hits on the barrel land. The scenario passes with its reference solution (8/8) and fails when nothing is done.
+- Writing it found that `script_find_references` listed the barrel's call among the lines to check by hand. It now
+  also asks the language server for the uses of every other declaration of the name, names those scripts and leaves
+  their uses out, so on this project it lists the four uses to change and nothing else: the typed call, the
+  connection of `Poison`, the method track key and, among the lines to check, the call on the untyped variable. The
+  description of the tool and the line of the skill now say that this is what sets it apart from a text search; the
+  skill had said that a text search misses the uses in scenes, which the run disproved.
+- The rerun with an agent, with the same model and Claude Code:
+
+  | Scenario | Checks | Tool calls | Cost, $ | Time, s |
+  |---|---|---|---|---|
+  | one-more-argument, with the barrel | 8/9 | 21 | 0.59 | 47 |
+
+  The agent again began with one `Grep`, read `barrel.gd` and `arena.tscn`, left both uses of the barrel alone and
+  passed every check of the game, but not the one of the tool. It did not load the skill, and it saw
+  `script_find_references` only by its name among the deferred tools; nothing in the server instructions names it.
+  The higher cost comes from writing the prompt cache anew (54k tokens against 18k), not from more work: both runs
+  took 22 turns.
+- The server instructions then got one line: before changing a function's arguments or removing it, find its uses
+  with `script_find_references`, not Grep, since it tells apart same-named functions of other classes. Together with
+  the instructions of the unsafe tools they now hold 4,061 of the 4,096 characters that Claude Code loads, and a unit
+  test guards that sum. One more run:
+
+  | Scenario | Checks | Tool calls | Cost, $ | Time, s |
+  |---|---|---|---|---|
+  | one-more-argument, with the line in the instructions | 9/9 | 26 | 0.41 | 55 |
+
+  This time the agent loaded the skill first, found `script_find_references` with one `ToolSearch` and took its answer
+  as the list of callers: it changed the typed call, the untyped one, the connection of `Poison` and the method track
+  key, and left the barrel alone. It still read the scripts, which `Edit` needs before a change, and checked
+  `arena.tscn` with a `Grep` and a read, so it took five calls more than the runs with `Grep` alone. All three runs
+  got the callers right.

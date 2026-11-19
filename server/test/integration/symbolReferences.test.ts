@@ -37,6 +37,10 @@ const playerScript = [
   '',
 ].join('\n');
 
+const barrelScript = ['class_name Barrel', 'extends Node3D', '', 'var durability := 20', '', '', 'func take_damage(amount: int) -> void:', '\tdurability -= amount', ''].join('\n');
+
+const swordScript = ['extends Node3D', '', 'var barrel: Barrel', '', '', 'func swing() -> void:', '\tbarrel.take_damage(5)', ''].join('\n');
+
 describe.skipIf(godotBinary === '')('finding the uses of a symbol across scripts and scenes', () => {
   let project: TemporaryProject | undefined;
   let editorProcess: ChildProcess | undefined;
@@ -53,6 +57,8 @@ describe.skipIf(godotBinary === '')('finding the uses of a symbol across scripts
     project = new TemporaryProject('MCP references', { mainScene: 'res://arena.tscn' });
     project.write('enemy.gd', enemyScript);
     project.write('player.gd', playerScript);
+    project.write('barrel.gd', barrelScript);
+    project.write('sword.gd', swordScript);
     const languageServerPort = await findFreePort();
     editorProcess = await startHeadlessEditor(project.root, { languageServer: languageServerPort });
     session = await McpSession.connect(project.root, { GODOT_LSP_PORT: String(languageServerPort) });
@@ -94,6 +100,15 @@ describe.skipIf(godotBinary === '')('finding the uses of a symbol across scripts
     expect(lines).toContain('- res://player.gd:9: anything.take_damage(4)');
     expect(lines).toContain('- res://player.gd:10: if target.has_method("take_damage"):');
     expect(lines).toContain('- res://player.gd:11: target.call("take_damage", 3)');
+  });
+
+  it('leaves out the calls that the language server traces to the take_damage of another class', async () => {
+    const found = await tools().call('script_find_references', { path: 'res://enemy.gd', symbol: 'take_damage' });
+
+    const lines = found.text.split('\n');
+    expect(lines).toContain('Left out: other scripts declare their own take_damage, and the language server traces these uses to them:');
+    expect(lines).toContain('- res://barrel.gd:7: func take_damage(amount: int) -> void: — used at res://sword.gd:7');
+    expect(lines.filter((line) => line.startsWith('- res://sword.gd') || line.startsWith('- res://barrel.gd:7:') && !line.includes('— used at'))).toEqual([]);
   });
 
   it('finds where a signal is emitted and connected', async () => {

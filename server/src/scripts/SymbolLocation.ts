@@ -30,6 +30,16 @@ export function locateSymbol(projectRoot: string, path: string, symbol: string):
   return { script, declaration };
 }
 
+export function otherDeclarationsOf(scripts: readonly ScriptFile[], symbol: string, declaringScript: ScriptFile): LocatedSymbol[] {
+  return scripts.flatMap((script) => {
+    if (script.resourcePath === declaringScript.resourcePath) {
+      return [];
+    }
+    const declaration = findDeclaration(readFileSync(script.absolutePath, 'utf8'), symbol);
+    return declaration === undefined ? [] : [{ script, declaration }];
+  });
+}
+
 export function occurrencesOf(scripts: readonly ScriptFile[], symbol: string): WordOccurrence[] {
   const wholeWord = new RegExp(`(?<![\\w])${symbol}(?![\\w])`, 'g');
   return scripts.flatMap((script) =>

@@ -5,6 +5,7 @@ export const serverInstructions = [
   '- Write GDScript for Godot 4 only: @export, @onready, await, signal.connect(callable), CharacterBody3D, Node3D. When unsure about an engine API, read it with docs_class (or find it with docs_search) before writing code: it is the reference of the installed Godot build.',
   '- While the editor is connected, change scenes and resources only with the scene_, node_ and resource_ tools, never by editing .tscn or .tres files as text. Edit .gd files with your own file tools; after creating or changing scripts that scenes use, call editor_rescan.',
   '- Move or rename project files with filesystem_move rather than shell commands: it updates the scenes, resources and project settings that use them. Check what uses a file with resource_find_usages.',
+  "- Before changing a function's arguments or removing it, find its uses with script_find_references, not Grep: it tells apart same-named functions of other classes.",
   '- Learn node paths with scene_get_tree or node_find before changing a scene. rotation is in radians; use rotation_degrees for degrees.',
   '- Build or rework a scene with scene_batch_edit: many node and signal changes in one call and one Undo step, and nothing changes if one of them fails. Connect signals with signal_connect once the method exists in the script.',
   '- Changes stay unsaved until scene_save, as in the editor. Save when a logical change is complete; game_run saves first, like the editor does.',

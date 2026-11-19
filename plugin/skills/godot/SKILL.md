@@ -26,8 +26,9 @@ are described in the files linked at the end.
    also compiles shaders and points at the line of their first error. After creating or
    changing scripts that scenes use, adding a `class_name` or rebuilding a GDExtension library, call `editor_rescan`:
    it also reloads the rebuilt library, so scripts see its new classes and methods. Before changing the arguments of
-   a function or removing it, list its uses with `script_find_references`: the calls in scripts, and the signal
-   connections and animation method tracks of scenes, which a text search misses. Rename with `script_rename_symbol`.
+   a function or removing it, list its uses with `script_find_references` rather than a text search: it tells them
+   from the uses of a function of the same name in another class, and lists the signal connections and animation
+   method tracks of scenes. Rename with `script_rename_symbol`.
 2. **Scenes**: never edit `.tscn` or `.tres` files as text while the editor runs. Build with `scene_create` and
    `scene_batch_edit` (many changes as one Undo step; nothing changes when one of them fails), adjust with the
    `node_` tools, connect signals with `signal_connect`. Take changes of these tools back with `editor_undo`, also

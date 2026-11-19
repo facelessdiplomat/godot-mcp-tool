@@ -2,12 +2,20 @@ import { Client } from '@modelcontextprotocol/client';
 import { InMemoryTransport } from '@modelcontextprotocol/server';
 import { describe, expect, it } from 'vitest';
 import { createApplication } from '../../src/createApplication.js';
-import { serverInstructions } from '../../src/server/serverInstructions.js';
+import { serverInstructions, unsafeInstructions } from '../../src/server/serverInstructions.js';
 import { registeredToolNames } from '../support/registeredToolNames.js';
 
 describe('serverInstructions', () => {
   it('fits in what Claude Code loads at startup', () => {
     expect(serverInstructions.length).toBeLessThan(4096);
+  });
+
+  it('still fits with the instructions of the unsafe tools', () => {
+    expect([serverInstructions, unsafeInstructions].join('\n').length).toBeLessThan(4096);
+  });
+
+  it('sends the search for the uses of a function through script_find_references rather than Grep', () => {
+    expect(serverInstructions).toContain("Before changing a function's arguments or removing it, find its uses with script_find_references, not Grep");
   });
 
   it('tells how to catch a short moment of the running game', () => {

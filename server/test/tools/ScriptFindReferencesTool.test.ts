@@ -28,6 +28,7 @@ const report: ReferenceReport = {
     },
   ],
   mentions: [{ resourcePath: 'res://player.gd', line: 10, text: 'if target.has_method("take_damage"):' }],
+  otherDeclarations: [],
   unsavedFiles: [],
 };
 
@@ -105,15 +106,44 @@ describe('script_find_references', () => {
     expect(textOf(await tool.execute({ path: 'res://enemy.gd', symbol: 'MAX_HEALTH' }))).not.toContain('scenes and resources');
   });
 
+  it('names the other scripts with their own take_damage and the uses that go to them, which it leaves out', async () => {
+    const { tool } = toolAnswering({
+      ...report,
+      otherDeclarations: [
+        {
+          declaration: { resourcePath: 'res://barrel.gd', line: 5, text: 'func take_damage(amount: int) -> void:' },
+          uses: [
+            { resourcePath: 'res://sword.gd', line: 7, text: 'barrel.take_damage(5)' },
+            { resourcePath: 'res://sword.gd', line: 12, text: 'barrel.take_damage(1)' },
+          ],
+        },
+        { declaration: { resourcePath: 'res://crate.gd', line: 9, text: 'func take_damage(amount: float) -> void:' }, uses: [] },
+      ],
+    });
+
+    const lines = textOf(await tool.execute({ path: 'res://enemy.gd', symbol: 'take_damage' })).split('\n');
+    const leftOut = lines.findIndex((line) => line.startsWith('Left out:'));
+
+    expect(lines.slice(leftOut - 1, leftOut + 4)).toEqual([
+      '- res://arena.tscn:29: a signal connection to Goblin: [connection signal="body_entered" from="Spikes" to="Goblin" method="take_damage"]',
+      'Left out: other scripts declare their own take_damage, and the language server traces these uses to them:',
+      '- res://barrel.gd:5: func take_damage(amount: int) -> void: — used at res://sword.gd:7, res://sword.gd:12',
+      '- res://crate.gd:9: func take_damage(amount: float) -> void: — no use',
+      'Named take_damage where the language server could not trace it — calls on untyped variables, strings such as call("take_damage"), comments, or another class with its own take_damage; check each:',
+    ]);
+  });
+
   it('keeps long lists short', async () => {
     const many = Array.from({ length: 130 }, (_, index) => ({ resourcePath: 'res://player.gd', line: index + 1, text: 'target.take_damage(1)' }));
-    const { tool } = toolAnswering({ ...report, code: many, mentions: many.slice(0, 25) });
+    const barrel = { declaration: { resourcePath: 'res://barrel.gd', line: 5, text: 'func take_damage(amount: int) -> void:' }, uses: many.slice(0, 12) };
+    const { tool } = toolAnswering({ ...report, code: many, mentions: many.slice(0, 25), otherDeclarations: [barrel] });
 
     const text = textOf(await tool.execute({ path: 'res://enemy.gd', symbol: 'take_damage' }));
 
     expect(text).toContain('Used in code, as the language server traces it (130 places):');
     expect(text).toContain('- … and 30 more places in code');
     expect(text).toContain('- … and 5 more');
+    expect(text).toContain('res://player.gd:9, res://player.gd:10 and 2 more\n');
   });
 
   it('explains what it cannot search', async () => {

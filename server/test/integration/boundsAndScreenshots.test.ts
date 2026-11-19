@@ -98,17 +98,6 @@ describe.skipIf(godotBinary === '')('bounds and screenshots without a window', (
     expect(plain.text).toContain('without a window');
   });
 
-  it('checks the markers of a view before it needs a window', async () => {
-    const misspelled = await tools().call('game_screenshot', { views: [{ preset: 'front', markers: ['Crate', 'Playr'] }] });
-    const withoutTarget = await tools().call('editor_screenshot', { views: [{ preset: 'front', markers: 'children' }] });
-
-    expect(misspelled.isError).toBe(true);
-    expect(misspelled.text).toContain('Node "Playr" not found');
-    expect(misspelled.text).toContain('Similar: Player');
-    expect(withoutTarget.isError).toBe(true);
-    expect(withoutTarget.text).toContain('View 1: markers "children" marks the children of target; give a target');
-  });
-
   it('plays input even when the screenshot after it cannot be taken', async () => {
     const played = await tools().call('game_input', { steps: [{ wait_ms: 50 }], screenshot: true });
 

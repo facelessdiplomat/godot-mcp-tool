@@ -11,7 +11,6 @@ export type CaptureReader = (path: string) => Buffer;
 
 export const screenshotAllowanceMs = 40_000;
 const maximumViews = 6;
-const maximumMarkers = 12;
 const viewPresets = ['front', 'back', 'left', 'right', 'top', 'iso'] as const;
 const imageTypes: Readonly<Record<string, string>> = { '.png': 'image/png', '.jpg': 'image/jpeg' };
 
@@ -26,15 +25,6 @@ export const captureSchema = z.object({
   moments: z.array(z.string()).optional(),
   sizes: z.array(z.string()).optional(),
   note: z.string().optional(),
-  markers: z
-    .array(
-      z.object({
-        view: z.string(),
-        marks: z.array(z.object({ number: z.number(), path: z.string(), position: z.array(z.number()).optional(), not_in_view: z.string().optional() })),
-        left_out: z.number(),
-      }),
-    )
-    .optional(),
   comparison: z
     .object({
       earlier: z.string(),
@@ -52,8 +42,6 @@ export type Capture = z.infer<typeof captureSchema>;
 
 type Comparison = NonNullable<Capture['comparison']>;
 
-type ViewMarkers = NonNullable<Capture['markers']>[number];
-
 const point = z.array(z.number()).length(3);
 
 const viewTarget = z.string().min(1).optional().describe('A node to frame instead of the whole scene, such as "Player".');
@@ -68,12 +56,6 @@ const viewSettings = {
     .optional()
     .describe(
       'Draw this view as a debug view of the 3D viewport instead of with materials and light: "unshaded" shows colors without light, to tell a dark room from a black material; "lighting" shows only the light; "overdraw" shows where transparent surfaces pile up; "wireframe" shows the triangles (editor_screenshot only); "normals" shows the surface normals (Forward+ only).',
-    ),
-  markers: z
-    .union([z.array(z.string().min(1)).min(1).max(maximumMarkers), z.literal('children')])
-    .optional()
-    .describe(
-      `Number these nodes in the view, such as ["Crates/Crate1", "Ramp"], or "children" for the 3D children of target, up to ${String(maximumMarkers)}: each gets a number at the center of its bounds, and the result lists the number, the path and the pixel position of each, or why it is not in view. Use it to tell which object in the picture is which node; a number covers a small object, so the same view without markers shows the objects themselves.`,
     ),
 };
 
@@ -95,7 +77,7 @@ function viewsParameter(instead: string) {
     .max(maximumViews)
     .optional()
     .describe(
-      `Render the 3D scene from these angles instead of ${instead}, up to ${String(maximumViews)} in one labelled image: a preset "front" (from +Z), "back", "left" (from -X), "right", "top" or "iso", framed on the whole scene; {"preset": "front", "target": "Player"} to frame one node; or {"position": [0, 8, 12], "look_at": [0, 0, 0]} for a camera at a point. Each view also takes "fov", "label", "render" and "markers", such as {"preset": "iso", "render": "unshaded"} or {"preset": "top", "target": "Crates", "markers": "children"}.`,
+      `Render the 3D scene from these angles instead of ${instead}, up to ${String(maximumViews)} in one labelled image: a preset "front" (from +Z), "back", "left" (from -X), "right", "top" or "iso", framed on the whole scene; {"preset": "front", "target": "Player"} to frame one node; or {"position": [0, 8, 12], "look_at": [0, 0, 0]} for a camera at a point. Each view also takes "fov", "label" and "render", such as {"preset": "iso", "render": "unshaded"}.`,
     );
 }
 
@@ -206,13 +188,7 @@ export function presentCapture(capture: Capture, summary: string, readCapture: C
   } catch (error) {
     return errorResult(`${summary}\nThe screenshot was saved to ${capture.path}, but it could not be read: ${describeError(error)}`);
   }
-  const lines = [
-    summary,
-    ...(capture.markers ?? []).map(describeMarkers),
-    ...(capture.note === undefined ? [] : [capture.note]),
-    ...(capture.comparison === undefined ? [] : [describeComparison(capture.comparison)]),
-    `Saved to ${capture.path}`,
-  ];
+  const lines = [summary, ...(capture.note === undefined ? [] : [capture.note]), ...(capture.comparison === undefined ? [] : [describeComparison(capture.comparison)]), `Saved to ${capture.path}`];
   return {
     content: [
       { type: 'image', data: image.toString('base64'), mimeType: imageTypes[extname(capture.path).toLowerCase()] ?? 'image/png' },
@@ -254,15 +230,6 @@ function describeViews(capture: Capture, subject: string): string {
 
 function withoutUnusedTolerance(input: Readonly<Record<string, unknown>>): Record<string, unknown> {
   return input['compare_to'] === undefined ? Object.fromEntries(Object.entries(input).filter(([name]) => name !== 'tolerance')) : { ...input };
-}
-
-function describeMarkers(markers: ViewMarkers): string {
-  const marks = markers.marks.map((mark) => {
-    const [x = 0, y = 0] = mark.position ?? [];
-    return `${String(mark.number)} ${mark.path} ${mark.position === undefined ? `not in view (${mark.not_in_view ?? 'unknown'})` : `at (${String(x)}, ${String(y)})`}`;
-  });
-  const leftOut = markers.left_out > 0 ? [`${String(markers.left_out)} more children are not marked`] : [];
-  return `Markers in ${markers.view}: ${[...marks, ...leftOut].join('; ')}.`;
 }
 
 function describeComparison(comparison: Comparison): string {

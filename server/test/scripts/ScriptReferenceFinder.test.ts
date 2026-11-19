@@ -121,8 +121,28 @@ describe('ScriptReferenceFinder', () => {
         { resourcePath: 'res://player.gd', line: 10, text: 'if target.has_method("take_damage"):' },
         { resourcePath: 'res://player.gd', line: 11, text: 'target.call("take_damage", 3)' },
       ],
+      otherDeclarations: [],
       unsavedFiles: [],
     });
+  });
+
+  it('leaves out the uses that the language server traces to another script with its own symbol of the same name', async () => {
+    write('barrel.gd', ['class_name Barrel', 'extends Node3D', '', '', 'func take_damage(amount: int) -> void:', '\tpass', ''].join('\n'));
+    write('sword.gd', ['extends Node3D', '', 'var barrel: Barrel', '', '', 'func swing() -> void:', '\tbarrel.take_damage(5)', ''].join('\n'));
+    editor.respondTo('script.find_in_resources', { files: [] });
+    const tracedToEnemy = traced;
+    traced = (target) => (target.path.endsWith('/barrel.gd') ? [inEditor('barrel.gd', 4, 5), inEditor('sword.gd', 6, 8)] : tracedToEnemy(target));
+
+    const report = await finder().find({ path: 'res://enemy.gd', symbol: 'take_damage' });
+
+    expect(asked).toEqual([inEditor('enemy.gd', 8, 5), inEditor('barrel.gd', 4, 5)]);
+    expect(report.mentions.map((place) => place.resourcePath)).toEqual(['res://player.gd', 'res://player.gd', 'res://player.gd']);
+    expect(report.otherDeclarations).toEqual([
+      {
+        declaration: { resourcePath: 'res://barrel.gd', line: 5, text: 'func take_damage(amount: int) -> void:' },
+        uses: [{ resourcePath: 'res://sword.gd', line: 7, text: 'barrel.take_damage(5)' }],
+      },
+    ]);
   });
 
   it('looks in scenes only for functions, signals and variables', async () => {

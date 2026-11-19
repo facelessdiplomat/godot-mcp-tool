@@ -13,7 +13,6 @@ const GodotMcpNodeLocator := preload("../../scene/node_locator.gd")
 const GodotMcpPoseRequest := preload("../../capture/pose_request.gd")
 const GodotMcpPreviewLighting := preload("../../capture/preview_lighting.gd")
 const GodotMcpScreenshotFile := preload("../../capture/screenshot_file.gd")
-const GodotMcpViewMarkers := preload("../../capture/view_markers.gd")
 const GodotMcpViewRenderer := preload("../../capture/view_renderer.gd")
 const GodotMcpRenderModes := preload("../../capture/render_modes.gd")
 const GodotMcpViewRequests := preload("../../capture/view_requests.gd")
@@ -51,9 +50,6 @@ func execute(params: Dictionary) -> Variant:
 	var views: Variant = GodotMcpViewRequests.parse(options["views"], _bounds_in.bind(scene_root))
 	if views is GodotMcpCommandError:
 		return views
-	var marked: Variant = GodotMcpViewMarkers.read(views, options["views"], _bounds_in.bind(scene_root), _children_in.bind(scene_root))
-	if marked is GodotMcpCommandError:
-		return marked
 	var unrenderable := GodotMcpRenderModes.refusal_for(views, GodotMcpRenderModes.current_renderer(), false)
 	if not unrenderable.is_empty():
 		return GodotMcpCommandError.new(GodotMcpJsonRpc.INVALID_PARAMS, unrenderable, "Render modes: %s; normals needs Forward+, and wireframe works in editor_screenshot only." % GodotMcpRenderModes.names())
@@ -64,8 +60,6 @@ func execute(params: Dictionary) -> Variant:
 			return poses
 		if (views as Array).size() > 1:
 			return GodotMcpCommandError.new(GodotMcpJsonRpc.INVALID_PARAMS, "With animation, give at most one view: the image shows that view once for every time", "Example: {\"views\": [\"front\"], \"animation\": {\"player\": \"AnimationPlayer\", \"name\": \"walk\"}}")
-		if (views as Array).any(func(view: Dictionary) -> bool: return view.has("markers")):
-			return GodotMcpCommandError.new(GodotMcpJsonRpc.INVALID_PARAMS, "markers are drawn on views without animation", "Take the poses and the markers in two calls.")
 	if DisplayServer.get_name() == HEADLESS_DISPLAY:
 		return GodotMcpCommandError.new(
 			GodotMcpJsonRpc.OPERATION_FAILED,
@@ -83,16 +77,12 @@ func execute(params: Dictionary) -> Variant:
 		var size := GodotMcpImageFitter.fitted_size(_viewport.viewport_size(), options["max_size"])
 		image = (await renderer.render(_viewport.world(), views, size, false))[0]
 	else:
-		GodotMcpViewMarkers.place(views, GodotMcpViewRequests.cell_size_for((views as Array).size(), options["max_size"]))
 		image = await renderer.render_sheet(_viewport.world(), views, options["max_size"])
 	var saved: Variant = GodotMcpScreenshotFile.write(image, options, _store, CAPTURE_PREFIX)
 	if saved is GodotMcpCommandError:
 		return saved
 	saved["scene"] = scene_root.scene_file_path
 	saved["views"] = GodotMcpViewRequests.labels_of(views)
-	var legend := GodotMcpViewMarkers.legend_of_capture(views, options["max_size"], saved)
-	if not legend.is_empty():
-		saved["markers"] = legend
 	if poses != null:
 		saved["moments"] = _pose_labels(poses)
 	var note := GodotMcpPreviewLighting.note_for(scene_root)
@@ -152,10 +142,3 @@ static func _bounds_in(target: String, scene_root: Node) -> Variant:
 	if node == null:
 		return GodotMcpCommandError.new(GodotMcpJsonRpc.NOT_FOUND, "Node \"%s\" not found" % target, GodotMcpNodeLocator.not_found_hint(scene_root, target))
 	return GodotMcpBoundsReport.framing_bounds(node, node == scene_root)
-
-
-static func _children_in(target: String, scene_root: Node) -> Variant:
-	var node := GodotMcpNodeLocator.find(scene_root, target)
-	if node == null:
-		return GodotMcpCommandError.new(GodotMcpJsonRpc.NOT_FOUND, "Node \"%s\" not found" % target, GodotMcpNodeLocator.not_found_hint(scene_root, target))
-	return node.get_children().filter(func(child: Node) -> bool: return child is Node3D).map(func(child: Node) -> String: return GodotMcpNodeLocator.path_of(scene_root, child))

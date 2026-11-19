@@ -4,7 +4,7 @@ import { BridgeConnectionError, BridgeProtocolError, BridgeRequestError } from '
 import { EditorUnavailableError } from '../editor/EditorGateway.js';
 import { LanguageServerUnavailableError } from '../lsp/LanguageServerClient.js';
 import { ScriptPathError } from '../scripts/ScriptFiles.js';
-import { type CodePlace, type ReferenceReport, type ReferenceRequest, ReferenceSearchError, type SceneUse } from '../scripts/ScriptReferenceFinder.js';
+import { type CodePlace, type OtherDeclaration, type ReferenceReport, type ReferenceRequest, ReferenceSearchError, type SceneUse } from '../scripts/ScriptReferenceFinder.js';
 import { sceneKindOf } from '../scripts/SymbolDeclaration.js';
 import { SymbolLookupError } from '../scripts/SymbolLocation.js';
 import { readingAnnotations } from './annotations.js';
@@ -18,6 +18,7 @@ export interface ReferenceFinder {
 
 const maximumCodePlaces = 100;
 const maximumMentions = 20;
+const maximumOtherUses = 10;
 
 const scriptFindReferencesInput = z.object({
   path: z.string().min(1).describe('The script that declares the symbol, as a res:// path, such as "res://enemy.gd".'),
@@ -30,7 +31,7 @@ export class ScriptFindReferencesTool implements Tool<typeof scriptFindReference
   readonly definition: ToolDefinition<typeof scriptFindReferencesInput> = {
     title: 'Find references',
     description:
-      "Find where a function, signal, variable, constant, enum or class_name is declared and used across the project, such as before changing the arguments of a function or removing it. The editor's language server traces the uses in scripts, also through typed variables and class names; then come the signal connections, method track keys, saved values and animated properties of scenes and resources that use the script, which the language server does not see, and the lines that name the symbol where it could not be traced, such as calls on untyped variables or strings in call() and has_method(). Lines count from 1. Needs the editor.",
+      "Find where a function, signal, variable, constant, enum or class_name is declared and used across the project, such as before changing the arguments of a function or removing it. Unlike a text search, it tells them apart from the uses of a symbol of the same name in another script, such as take_damage of Enemy from take_damage of Barrel. The editor's language server traces the uses in scripts, also through typed variables and class names; then come the signal connections, method track keys, saved values and animated properties of scenes and resources that use the script, which the language server does not see, and the lines that name the symbol where it could not be traced, such as calls on untyped variables or strings in call() and has_method(). Lines count from 1. Needs the editor.",
     inputSchema: scriptFindReferencesInput,
     annotations: readingAnnotations,
     alwaysLoad: false,
@@ -73,6 +74,12 @@ function describeReferences(report: ReferenceReport): string {
         : [`Used in scenes and resources, which the language server does not see (${countOf(places, 'place')}):`, ...uses]),
     );
   }
+  if (report.otherDeclarations.length > 0) {
+    lines.push(
+      `Left out: other scripts declare their own ${report.symbol}, and the language server traces these uses to them:`,
+      ...report.otherDeclarations.map((other) => `- ${placeOf(other.declaration)} — ${describeOtherUses(other)}`),
+    );
+  }
   if (report.mentions.length > 0) {
     lines.push(
       `Named ${report.symbol} where the language server could not trace it — calls on untyped variables, strings such as call("${report.symbol}"), comments, or another class with its own ${report.symbol}; check each:`,
@@ -98,6 +105,15 @@ function describeSceneUse(use: SceneUse, report: ReferenceReport): string {
     default:
       return use.kind;
   }
+}
+
+function describeOtherUses({ uses }: OtherDeclaration): string {
+  if (uses.length === 0) {
+    return 'no use';
+  }
+  const shown = uses.slice(0, maximumOtherUses).map((use) => `${use.resourcePath}:${String(use.line)}`);
+  const more = uses.length > maximumOtherUses ? ` and ${String(uses.length - maximumOtherUses)} more` : '';
+  return `used at ${shown.join(', ')}${more}`;
 }
 
 function placeOf(place: CodePlace): string {
