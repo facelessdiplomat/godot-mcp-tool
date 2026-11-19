@@ -10,11 +10,17 @@ export type ApplyReport = z.infer<typeof applyReportSchema>;
 
 const enumOptionSchema = z.object({ name: z.string(), value: z.number() });
 
+export const namedLayerSchema = z.object({ number: z.number().int(), name: z.string() });
+
+export type NamedLayer = z.infer<typeof namedLayerSchema>;
+
 const describedPropertySchema = z.object({
   name: z.string(),
   type: z.string(),
   value: z.unknown(),
   options: z.array(enumOptionSchema).optional(),
+  layer_kind: z.string().optional(),
+  layers: z.array(namedLayerSchema).optional(),
 });
 
 const unknownPropertySchema = z.object({ name: z.string(), error: z.string() });
@@ -87,15 +93,32 @@ export function formatPropertyLines(properties: PropertyDescriptions): string[] 
 
 function describeValue(property: DescribedProperty): string {
   const valueText = formatValue(property.value, property.type);
+  if (property.layers !== undefined) {
+    return `${valueText} (${describeMaskLayers(property.layers)})`;
+  }
   const optionName = property.options?.find((option) => option.value === property.value)?.name;
   return optionName === undefined ? valueText : `${valueText} (${optionName})`;
 }
 
 function describeType(property: DescribedProperty): string {
+  if (property.layer_kind !== undefined) {
+    return `${property.layer_kind} layers`;
+  }
   if (property.options === undefined) {
     return property.type;
   }
   return `${property.type}: ${property.options.map((option) => option.name).join(', ')}`;
+}
+
+function describeMaskLayers(layers: readonly NamedLayer[]): string {
+  if (layers.length === 0) {
+    return 'no layers';
+  }
+  return `${layers.length === 1 ? 'layer' : 'layers'} ${formatNamedLayers(layers)}`;
+}
+
+export function formatNamedLayers(layers: readonly NamedLayer[]): string {
+  return layers.map((layer) => (layer.name === '' ? String(layer.number) : `${String(layer.number)} ${JSON.stringify(layer.name)}`)).join(', ');
 }
 
 function capitalize(text: string): string {

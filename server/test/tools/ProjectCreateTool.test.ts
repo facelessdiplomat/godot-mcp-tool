@@ -43,7 +43,7 @@ describe('project_create', () => {
     expect(adopted).toEqual(['/work/capsule-walk']);
     expect(textOf(result)).toBe(
       [
-        'Created the Godot project "Capsule Walk" in /work/capsule-walk: project.godot (Forward+, Jolt Physics, window 1152×648), the main scene res://main.tscn with a camera and a light, .gitignore, .gitattributes and .editorconfig.',
+        'Created the Godot project "Capsule Walk" in /work/capsule-walk: project.godot (Forward+, Jolt Physics, window 1152×648, warnings for untyped GDScript), the main scene res://main.tscn with a camera and a light, .gitignore, .gitattributes and .editorconfig.',
         'Installed the Godot MCP Tool addon 0.1.2 in /work/capsule-walk/addons/godot_mcp_tool. Its plugin is enabled.',
         'The server now works on this project: start its editor with editor_launch.',
       ].join('\n'),

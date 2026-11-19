@@ -40,6 +40,10 @@ func take_damage(amount: int) -> void:
 - Typed collections: `var enemies: Array[Enemy] = []`, `var scores: Dictionary[String, int] = {}`.
 - Casts and checks: `var body := node as CharacterBody3D` gives `null` when the type differs; `if node is Enemy:`.
 - `5 / 2` is the integer 2, with a warning; write `5 / 2.0` or `float(a) / b` for a fraction.
+- Projects made by `project_create` or `npx godot-mcp-tool init` warn about every declaration without a type
+  (`UNTYPED_DECLARATION`), so `script_validate` and the hook point at it. In another project, turn the warning on with
+  `project_settings_set` `{"debug/gdscript/warnings/untyped_declaration": 1}`; the editor's language server reports it,
+  `godot --check-only` does not.
 
 ## Signals, callables and waiting
 

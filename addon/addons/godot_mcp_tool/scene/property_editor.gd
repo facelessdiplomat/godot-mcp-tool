@@ -1,7 +1,9 @@
 extends RefCounted
 
 const GodotMcpChangeSet := preload("change_set.gd")
+const GodotMcpDynamicProperties := preload("../codec/dynamic_properties.gd")
 const GodotMcpEnumOptions := preload("../codec/enum_options.gd")
+const GodotMcpLayerNames := preload("../codec/layer_names.gd")
 const GodotMcpSimilarNames := preload("../util/similar_names.gd")
 const GodotMcpUndoHistory := preload("undo_history.gd")
 const GodotMcpValueComparison := preload("../codec/value_comparison.gd")
@@ -155,10 +157,11 @@ func _decode_all(object: Object, values: Dictionary, owning_file: String, proper
 			decoded[property_name] = (path_write as Dictionary)["requested"]
 			writes[property_name] = path_write
 			continue
-		if not properties.has(property_name):
-			rejected.append({"name": property_name, "reason": _unknown_property_message(object, property_name, properties)})
+		var property: Variant = _property_to_set(object, property_name, properties, values)
+		if property is String:
+			rejected.append({"name": property_name, "reason": property})
 			continue
-		var outcome := _codec.decode(values[property_name], properties[property_name], object)
+		var outcome := _codec.decode(values[property_name], property, object)
 		if not outcome.is_success:
 			rejected.append({"name": property_name, "reason": outcome.error})
 			continue
@@ -201,10 +204,11 @@ func _decode_path(object: Object, path: String, value: Variant, owning_file: Str
 	var property_name: String = resolved["property"]
 	var part: String = resolved["part"]
 	var properties := settable_properties(holder)
-	if not properties.has(property_name):
-		return _unknown_property_message(holder, property_name, properties)
+	var property: Variant = _property_to_set(holder, property_name, properties, {})
+	if property is String:
+		return property
 	if part.is_empty():
-		var outcome := _codec.decode(value, properties[property_name], holder)
+		var outcome := _codec.decode(value, property, holder)
 		if not outcome.is_success:
 			return outcome.error
 		pending[_pending_key(holder, property_name)] = outcome.value
@@ -299,6 +303,10 @@ func _entry(property: Dictionary, value: Variant) -> Dictionary:
 	var entry := {"name": property["name"], "type": _type_name(property), "value": _codec.encode(value)}
 	if property["type"] == TYPE_INT and property["hint"] == PROPERTY_HINT_ENUM:
 		entry["options"] = GodotMcpEnumOptions.parse(str(property["hint_string"]))
+	var layer_kind := GodotMcpLayerNames.kind_of(property["hint"])
+	if property["type"] == TYPE_INT and not layer_kind.is_empty() and value is int:
+		entry["layer_kind"] = layer_kind
+		entry["layers"] = GodotMcpLayerNames.layers_in_mask(property["hint"], value)
 	return entry
 
 
@@ -321,10 +329,19 @@ static func _ordered_names(names: Array) -> Array:
 	var ordered: Array = []
 	if SCRIPT_PROPERTY in names:
 		ordered.append(SCRIPT_PROPERTY)
-	for property_name in names:
+	for property_name in GodotMcpDynamicProperties.counts_first(names):
 		if property_name != SCRIPT_PROPERTY:
 			ordered.append(property_name)
 	return ordered
+
+
+static func _property_to_set(object: Object, property_name: String, properties: Dictionary, values: Dictionary) -> Variant:
+	if properties.has(property_name):
+		return properties[property_name]
+	var dynamic: Variant = GodotMcpDynamicProperties.describe(object, property_name, values)
+	if dynamic is String or not (dynamic as Dictionary).is_empty():
+		return dynamic
+	return _unknown_property_message(object, property_name, properties)
 
 
 static func _exported_script_properties(script: Script) -> Dictionary:

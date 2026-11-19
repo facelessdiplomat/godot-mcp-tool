@@ -43,6 +43,14 @@ func test_describes_the_project() -> void:
 	assert_true(info.has("physics_engine_3d"))
 
 
+func test_lists_the_named_layers_of_each_kind_that_has_any() -> void:
+	var original: Variant = ProjectSettings.get_setting("layer_names/3d_physics/layer_2")
+	ProjectSettings.set_setting("layer_names/3d_physics/layer_2", "player")
+	var info: Dictionary = await GodotMcpProjectInfoCommand.new(_fake_indentation).execute({})
+	ProjectSettings.set_setting("layer_names/3d_physics/layer_2", original)
+	assert_eq(info["layer_names"], {"3d_physics": [{"number": 2, "name": "player"}]})
+
+
 func test_lists_the_project_classes_and_counts_the_classes_of_addons() -> void:
 	var info: Dictionary = await GodotMcpProjectInfoCommand.new(_fake_indentation).execute({})
 	var global_classes: Dictionary = info["global_classes"]

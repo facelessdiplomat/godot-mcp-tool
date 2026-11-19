@@ -37,7 +37,7 @@ export class ProjectCreateTool implements Tool<typeof projectCreateInput> {
   readonly definition: ToolDefinition<typeof projectCreateInput> = {
     title: 'Create project',
     description:
-      'Create a new Godot 4 project for a game from scratch: project.godot with the name, the renderer, Jolt Physics and the window size, a main scene with a camera and a light, .gitignore, and the godot MCP addon installed with its plugin enabled. A server that started without a project works on the new one right away; start its editor with editor_launch.',
+      'Create a new Godot 4 project for a game from scratch: project.godot with the name, the renderer, Jolt Physics, the window size and warnings for GDScript declarations without a static type, a main scene with a camera and a light, .gitignore, and the godot MCP addon installed with its plugin enabled. A server that started without a project works on the new one right away; start its editor with editor_launch.',
     inputSchema: projectCreateInput,
     annotations: changingAnnotations({ destructive: false, idempotent: false }),
     alwaysLoad: false,
@@ -67,7 +67,7 @@ export class ProjectCreateTool implements Tool<typeof projectCreateInput> {
     const [width, height] = created.windowSize;
     return textResult(
       [
-        `Created the Godot project "${created.name}" in ${created.root}: project.godot (${rendererNames[created.renderer]}, Jolt Physics, window ${String(width)}×${String(height)}), the main scene ${created.mainScene} with a camera and a light, .gitignore, .gitattributes and .editorconfig.`,
+        `Created the Godot project "${created.name}" in ${created.root}: project.godot (${rendererNames[created.renderer]}, Jolt Physics, window ${String(width)}×${String(height)}, warnings for untyped GDScript), the main scene ${created.mainScene} with a camera and a light, .gitignore, .gitattributes and .editorconfig.`,
         `${created.addon} Its plugin is enabled.`,
         adoption.adopted
           ? 'The server now works on this project: start its editor with editor_launch.'

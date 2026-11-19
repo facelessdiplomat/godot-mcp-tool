@@ -53,6 +53,7 @@ describe('createEditorTools', () => {
       'asset_import_settings_get',
       'asset_import_settings_set',
       'navigation_bake',
+      'navigation_get_path',
       'animation_get',
       'animation_set',
       'animation_delete',
@@ -82,14 +83,15 @@ describe('createEditorTools', () => {
   });
 
   it('reads the project and its scenes through the project reader, which works without the editor too', async () => {
-    const methods = ['project.info', 'project.settings_get', 'input_map.get', 'audio.buses_get', 'scene.get_tree', 'node.find', 'node.get_properties', 'node.get_bounds', 'gridmap.get_cells', 'tilemap.get_cells', 'signal.list'];
+    const methods = ['project.info', 'project.settings_get', 'input_map.get', 'audio.buses_get', 'scene.get_tree', 'node.find', 'node.get_properties', 'node.get_bounds', 'gridmap.get_cells', 'tilemap.get_cells', 'signal.list', 'navigation.get_path'];
     const editor = new FakeEditorGateway();
     const projectReader = methods.reduce((gateway, method) => gateway.respondTo(method, new BridgeRequestError('Read', -32010, undefined, undefined)), new FakeEditorGateway());
     const readingTools = createEditorTools(editor, projectReader, () => Buffer.alloc(0));
-    const readers = ['project_info', 'project_settings_get', 'input_map_get', 'audio_buses_get', 'scene_get_tree', 'node_find', 'node_get_properties', 'node_get_bounds', 'gridmap_get_cells', 'tilemap_get_cells', 'signal_list'];
+    const readers = ['project_info', 'project_settings_get', 'input_map_get', 'audio_buses_get', 'scene_get_tree', 'node_find', 'node_get_properties', 'node_get_bounds', 'gridmap_get_cells', 'tilemap_get_cells', 'signal_list', 'navigation_get_path'];
 
     for (const tool of readingTools.filter((candidate) => readers.includes(candidate.name))) {
-      await tool.execute({ scene: 'main', path: 'Player', names: ['position'], node: 'Player' });
+      const pathEnds = tool.name === 'navigation_get_path' ? { from: [0, 0, 0], to: [1, 0, 0] } : {};
+      await tool.execute({ scene: 'main', path: 'Player', names: ['position'], node: 'Player', ...pathEnds });
     }
 
     expect(editor.requests).toEqual([]);

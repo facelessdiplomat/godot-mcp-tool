@@ -1,5 +1,7 @@
 extends "converter.gd"
 
+const GodotMcpLayerNames := preload("../layer_names.gd")
+
 const LAYER_HINTS := [
 	PROPERTY_HINT_LAYERS_2D_RENDER,
 	PROPERTY_HINT_LAYERS_2D_PHYSICS,
@@ -22,10 +24,10 @@ func decode(value: Variant, property: Dictionary, _target: Object, _decoder: God
 	if _is_whole_number(value):
 		return _success(int(value))
 	if not value is Array:
-		return _failure("expected a whole number bit mask or a list of flag names or layer numbers")
+		return _failure("expected a whole number bit mask or a list of flag names, or of layer numbers and names")
 	if property["hint"] == PROPERTY_HINT_FLAGS:
 		return _decode_flag_names(value, property.get("hint_string", ""))
-	return _decode_layer_numbers(value)
+	return _decode_layers(value, GodotMcpLayerNames.kind_of(property["hint"]))
 
 
 func _decode_flag_names(flag_names: Array, hint_string: String) -> GodotMcpDecodeOutcome:
@@ -38,13 +40,35 @@ func _decode_flag_names(flag_names: Array, hint_string: String) -> GodotMcpDecod
 	return _success(mask)
 
 
-func _decode_layer_numbers(layers: Array) -> GodotMcpDecodeOutcome:
+func _decode_layers(layers: Array, kind: String) -> GodotMcpDecodeOutcome:
 	var mask := 0
 	for layer in layers:
-		if not _is_whole_number(layer) or int(layer) < 1 or int(layer) > HIGHEST_LAYER:
-			return _failure("layer numbers must be whole numbers from 1 to %d" % HIGHEST_LAYER)
-		mask |= 1 << (int(layer) - 1)
+		var number: Variant = _layer_number(layer, kind)
+		if number is String:
+			return _failure(number)
+		mask |= 1 << (int(number) - 1)
 	return _success(mask)
+
+
+static func _layer_number(layer: Variant, kind: String) -> Variant:
+	if layer is String or layer is StringName:
+		return _layer_number_named(str(layer), kind)
+	if not _is_whole_number(layer) or int(layer) < 1 or int(layer) > HIGHEST_LAYER:
+		return "layer numbers must be whole numbers from 1 to %d, and layer names must be text" % HIGHEST_LAYER
+	return int(layer)
+
+
+static func _layer_number_named(layer_name: String, kind: String) -> Variant:
+	var title := GodotMcpLayerNames.title_of(kind)
+	var numbers := GodotMcpLayerNames.numbers_named(kind, layer_name)
+	if numbers.size() == 1:
+		return numbers[0]
+	if numbers.size() > 1:
+		return "the %s layers %s are both named \"%s\"; give the layer number instead" % [title, " and ".join(PackedStringArray(numbers.map(func(number: int) -> String: return str(number)))), layer_name]
+	var named := GodotMcpLayerNames.named_layers(kind)
+	if named.is_empty():
+		return "no %s layer is named \"%s\", and none has a name yet; name one with project_settings_set, such as {\"%s%s/layer_2\": \"%s\"}, or give layer numbers" % [title, layer_name, GodotMcpLayerNames.SETTING_PREFIX, kind, layer_name]
+	return "no %s layer is named \"%s\"; the named %s layers are %s" % [title, layer_name, title, GodotMcpLayerNames.describe_layers(named)]
 
 
 static func _parse_flags(hint_string: String) -> Dictionary:

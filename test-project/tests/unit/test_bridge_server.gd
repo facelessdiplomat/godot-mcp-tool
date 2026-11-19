@@ -70,7 +70,7 @@ func test_answers_hello_and_requests_over_tcp() -> void:
 	var hello_text := _send_and_receive_line('{"jsonrpc":"2.0","id":1,"method":"hello","params":{"token":"secret","protocol":1}}\n')
 	assert_eq_deep(JSON.parse_string(hello_text), {"jsonrpc": "2.0", "id": 1.0, "result": {"protocol": 1.0}})
 	var ping_text := _send_and_receive_line('{"jsonrpc":"2.0","id":2,"method":"ping","params":{}}\n')
-	assert_eq_deep(JSON.parse_string(ping_text), {"jsonrpc": "2.0", "id": 2.0, "result": {"pong": true}})
+	assert_eq_deep(JSON.parse_string(ping_text), {"jsonrpc": "2.0", "id": 2.0, "result": {"pong": true, "changes_held": false}})
 
 
 func test_disconnects_a_client_that_does_not_speak_json() -> void:

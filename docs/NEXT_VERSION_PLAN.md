@@ -8,6 +8,39 @@
 [DEVELOPMENT_PLAN.md](DEVELOPMENT_PLAN.md) stays the place for decisions (Appendix A), verified engine facts
 (Appendix B) and the record of what each finished task found (§12). This file holds only what is still to do.
 
+## Progress
+
+As of 2026-11-19. "Done" means the code, its tests and its documents are in the working tree and every check that
+runs without an agent passes on the pinned 4.8 build; what each task still needs from you is named.
+
+| Task | State | Still open |
+|---|---|---|
+| T1 | done | one check by hand with `claude -p` and the staged plugin (needs your yes: a run with an agent) |
+| T2 | done | the agent run of `only-the-player-opens-the-door` |
+| T3 | done | — |
+| T4 | done: 82 of 913 calls of the third full run were reads of a node right after a read of another | the reruns of `follow-the-player` and `extract-an-enemy-scene` with an agent |
+| T5 | done | — |
+| T6 | done | — |
+| T7 | six scenarios with reference solutions; their writing found and fixed two gaps (dynamic properties, node paths) | the six agent runs (about $3) |
+| T8 | done | one run by hand on GitHub after the push; the schedule starts on the default branch |
+| T9 | done, with `reach-the-island` | its agent run |
+| T10 | done, with `silence-in-the-arena` | its agent run |
+| T11 | done, with `why-is-it-dark` | its agent run |
+| T12 | not started: a hypothesis that needs an agent run to decide | |
+| T13 | done, with `same-look-after-the-refactor`; screenshots keep the last 100 captures | its agent run |
+| T14–T16 | not started | |
+| T17 | the subagent `plugin/agents/playtester.md` with a test of its tools, and the page `ui.md` of the skill; the plugin validates | the measurement with and without the subagent (two agent runs of `playtest-without-a-window`) |
+| T18–T25 | not started | |
+
+All checks above ran on the pinned `master` build only; CI runs them on 4.7.2 after the push. One window test fails
+on this machine at commit `d7f3ef3` as well, so before this work: the second test of `windowedRescan.test.ts`, whose
+rescan reports the editor error "Cannot change to 'res://enemies/' folder" in two runs of three.
+
+Keep this work off `master` on GitHub until 0.3.0 is on npm: the plugin's `hooks.json` starts
+`godot-mcp-tool@0.2.0`, which has no `check-scene-edit`, answers it with exit code 2, and a `PreToolUse` hook with
+that code blocks the call, so every `Write` and `Edit` of a scene would fail for plugin users. The version bump of
+T25 moves the hooks to 0.3.0 together with the package; until then CI can run on a branch through a pull request.
+
 ## Contents
 
 1. [Where we start](#1-where-we-start)

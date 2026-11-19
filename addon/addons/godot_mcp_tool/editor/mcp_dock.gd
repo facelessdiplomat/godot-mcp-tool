@@ -7,6 +7,8 @@ const TAB_TITLE := "Godot MCP"
 const REFRESH_INTERVAL_SECONDS := 1.0
 const UNSAFE_TOOLS_TEXT := "Allow unsafe tools in this project"
 const UNSAFE_TOOLS_TOOLTIP := "Lets the agent run editor_run_script, game_eval, node_call_method and filesystem_delete in this project, once its MCP server offers them (GODOT_MCP_UNSAFE=1)."
+const HOLD_CHANGES_TEXT := "Hold the agent's changes"
+const HOLD_CHANGES_TOOLTIP := "While this is on, the agent can read the project and the running game, but its changes to scenes, resources, files and settings wait, and so do starting and playing the game. It lasts until you turn it off or close the editor. Tests and exports that run without the editor are not held."
 const COMMANDS_TITLE := "Recent agent commands"
 const CLEAR_TEXT := "Clear"
 const STATUS_COLUMN_WIDTH := 380
@@ -15,19 +17,24 @@ var _journal: GodotMcpCommandJournal
 var _read_status: Callable
 var _is_unsafe_allowed: Callable
 var _set_unsafe_allowed: Callable
+var _is_changes_held: Callable
+var _set_changes_held: Callable
 var _status_label := Label.new()
 var _unsafe_toggle := CheckBox.new()
+var _hold_toggle := CheckBox.new()
 var _clear_button := Button.new()
 var _commands := RichTextLabel.new()
 var _refresh_timer := Timer.new()
 
 
-func _init(journal: GodotMcpCommandJournal, read_status: Callable, is_unsafe_allowed: Callable, set_unsafe_allowed: Callable) -> void:
+func _init(journal: GodotMcpCommandJournal, read_status: Callable, is_unsafe_allowed: Callable, set_unsafe_allowed: Callable, is_changes_held: Callable, set_changes_held: Callable) -> void:
 	name = TAB_TITLE
 	_journal = journal
 	_read_status = read_status
 	_is_unsafe_allowed = is_unsafe_allowed
 	_set_unsafe_allowed = set_unsafe_allowed
+	_is_changes_held = is_changes_held
+	_set_changes_held = set_changes_held
 	_build()
 	_journal.changed.connect(_show_commands)
 	refresh()
@@ -43,6 +50,7 @@ func refresh() -> void:
 		status.get("game", ""),
 	]
 	_unsafe_toggle.set_pressed_no_signal(_is_unsafe_allowed.call())
+	_hold_toggle.set_pressed_no_signal(_is_changes_held.call())
 
 
 func status_text() -> String:
@@ -51,6 +59,10 @@ func status_text() -> String:
 
 func unsafe_tools_toggle() -> CheckBox:
 	return _unsafe_toggle
+
+
+func hold_changes_toggle() -> CheckBox:
+	return _hold_toggle
 
 
 func clear_button() -> Button:
@@ -74,6 +86,10 @@ func _build() -> void:
 	_unsafe_toggle.tooltip_text = UNSAFE_TOOLS_TOOLTIP
 	_unsafe_toggle.toggled.connect(_on_unsafe_toggled)
 	status_column.add_child(_unsafe_toggle)
+	_hold_toggle.text = HOLD_CHANGES_TEXT
+	_hold_toggle.tooltip_text = HOLD_CHANGES_TOOLTIP
+	_hold_toggle.toggled.connect(_on_hold_toggled)
+	status_column.add_child(_hold_toggle)
 	add_child(status_column)
 	var commands_column := VBoxContainer.new()
 	var header := HBoxContainer.new()
@@ -99,6 +115,10 @@ func _build() -> void:
 
 func _on_unsafe_toggled(allowed: bool) -> void:
 	_set_unsafe_allowed.call(allowed)
+
+
+func _on_hold_toggled(held: bool) -> void:
+	_set_changes_held.call(held)
 
 
 func _show_commands() -> void:

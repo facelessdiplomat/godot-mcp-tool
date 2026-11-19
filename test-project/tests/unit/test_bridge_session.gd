@@ -98,7 +98,7 @@ func test_answers_hello_with_the_editor_information() -> void:
 func test_routes_requests_after_hello() -> void:
 	await _session.handle_line(_hello_line("secret"))
 	var response: Dictionary = await _session.handle_line(_request_line(2, "ping"))
-	assert_eq_deep(response, {"jsonrpc": "2.0", "id": 2, "result": {"pong": true}})
+	assert_eq_deep(response, {"jsonrpc": "2.0", "id": 2, "result": {"pong": true, "changes_held": false}})
 
 
 func test_answers_an_asynchronous_command_when_it_finishes() -> void:
@@ -175,7 +175,7 @@ func test_holds_commands_until_the_first_scan_ends_but_answers_ping_at_once() ->
 	assert_false(recording.executed)
 	_first_scan_finished = true
 	await wait_until(func() -> bool: return not _background_response.is_empty(), 2.0)
-	assert_eq_deep(ping, {"jsonrpc": "2.0", "id": 2, "result": {"pong": true}})
+	assert_eq_deep(ping, {"jsonrpc": "2.0", "id": 2, "result": {"pong": true, "changes_held": false}})
 	assert_eq_deep(_background_response, {"jsonrpc": "2.0", "id": 3, "result": {"executed": true}})
 
 

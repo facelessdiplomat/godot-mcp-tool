@@ -2,9 +2,11 @@ import * as z from 'zod/v4';
 import type { EditorGateway } from '../editor/EditorGateway.js';
 import { changingAnnotations, readingAnnotations } from './annotations.js';
 import { BridgeTool } from './bridge/BridgeTool.js';
-import { applyReportSchema, formatApplyReport, formatNodePath, formatPropertyList, type PropertyList, propertyListSchema } from './formatting/propertyReports.js';
+import { applyReportSchema, formatApplyReport, formatNodePath, formatPropertyList, propertyListSchema } from './formatting/propertyReports.js';
+import { joinNodeBlocks, nodesOf } from './formatting/nodeBlocks.js';
 import { formatSceneTree, type SceneTreeResult, sceneTreeResultSchema } from './formatting/sceneTree.js';
-import { propertyValues } from './parameters.js';
+import { leftOutPropertiesAdvice } from './nodeTools.js';
+import { nodePaths, propertyValues, requireOneNodeSelection } from './parameters.js';
 import { errorResult, textResult } from './results.js';
 
 const waitAllowanceMs = 75_000;
@@ -113,31 +115,46 @@ function describeControl(control: ListedControl): string {
   return states.length === 0 ? parts.join(' ') : `${parts.join(' ')}, ${states.join(', ')}`;
 }
 
-const gameGetPropertiesInput = z.object({
-  path: gameNodePath,
-  names: z
-    .array(z.string())
-    .optional()
-    .describe(
-      'Properties to read, such as ["position", "velocity"], or paths such as "position:y" or "mesh:size". Methods without arguments whose names start with is_, get_, has_ or can_ can be read too, such as "is_on_floor()". Default: every property whose value differs from its default.',
+const gameGetPropertiesInput = z
+  .object({
+    path: gameNodePath.optional(),
+    paths: nodePaths(
+      'Read several nodes at once instead of path, such as ["Player", "Enemy"]. They are read in the same frame, so their values belong together, such as the distance between them.',
     ),
-  include_defaults: z.boolean().default(false).describe('Without names, also list properties at their default values. The list gets long.'),
-});
+    names: z
+      .array(z.string())
+      .optional()
+      .describe(
+        'Properties to read, such as ["position", "velocity"], or paths such as "position:y" or "mesh:size". Methods without arguments whose names start with is_, get_, has_ or can_ can be read too, such as "is_on_floor()". Default: every property whose value differs from its default.',
+      ),
+    include_defaults: z.boolean().default(false).describe('Without names, also list properties at their default values. The list gets long.'),
+  })
+  .superRefine(requireOneNodeSelection);
 
-export function createGameGetPropertiesTool(game: EditorGateway): BridgeTool<typeof gameGetPropertiesInput, PropertyList> {
+const gamePropertyListsSchema = z.union([nodesOf(propertyListSchema), propertyListSchema]);
+
+type GamePropertyLists = z.infer<typeof gamePropertyListsSchema>;
+
+export function createGameGetPropertiesTool(game: EditorGateway): BridgeTool<typeof gameGetPropertiesInput, GamePropertyLists> {
   return new BridgeTool(game, {
     name: 'game_get_properties',
     definition: {
       title: 'Running game properties',
       description:
-        'Read properties of a node in the running game, like the remote inspector: positions, velocities, health, and getters such as is_on_floor(). Use it to check what the game is doing after game_run or game_wait. Needs a game started with game_run, with or without the editor.',
+        'Read properties of a node in the running game, or of several nodes in the same frame, like the remote inspector: positions, velocities, health, and getters such as is_on_floor(). Use it to check what the game is doing after game_run or game_wait. Needs a game started with game_run, with or without the editor.',
       inputSchema: gameGetPropertiesInput,
       annotations: readingAnnotations,
       alwaysLoad: true,
     },
     method: 'game.get_properties',
-    responseSchema: propertyListSchema,
-    present: (list) => textResult(formatPropertyList({ ...list, scene: 'the running game' })),
+    responseSchema: gamePropertyListsSchema,
+    present: (lists) => {
+      if (!('nodes' in lists)) {
+        return textResult(formatPropertyList({ ...lists, scene: 'the running game' }));
+      }
+      const blocks = joinNodeBlocks(lists.nodes, { pathOf: (list) => list.path, describe: (list) => formatPropertyList({ ...list, scene: 'the running game' }), leftOutAdvice: leftOutPropertiesAdvice });
+      return textResult(`Read at the same moment of the game:\n${blocks}`);
+    },
   });
 }
 

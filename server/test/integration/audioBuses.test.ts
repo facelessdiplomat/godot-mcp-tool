@@ -1,6 +1,7 @@
 import type { ChildProcess } from 'node:child_process';
-import { readFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { toneWave } from '../support/toneWave.js';
 import { editorStartupTimeoutMs, godotBinary, McpSession, startHeadlessEditor, TemporaryProject } from './harness.js';
 
 const mainScene = ['[gd_scene format=3]', '', '[node name="Main" type="Node3D"]', '', '[node name="Music" type="AudioStreamPlayer" parent="."]', ''].join('\n');
@@ -59,6 +60,29 @@ describe.skipIf(godotBinary === '')('the audio buses of a project', () => {
     expect(playing.text).toContain('bus = "Music"  [StringName]');
   });
 
+  it('hears the music on its bus in the running game, and silence once the bus is muted', async () => {
+    writeFileSync(project?.path('tone.wav') ?? '', toneWave());
+    await tools().call('editor_rescan');
+    await tools().call('node_set_properties', { scene: 'res://main.tscn', path: 'Music', properties: { stream: 'res://tone.wav', autoplay: true } });
+    await tools().call('scene_save', { scene: 'res://main.tscn' });
+    await tools().call('game_run');
+    const heard = await tools().call('audio_buses_get', { in_game: true, window_physics_frames: 20 });
+    await tools().call('game_stop');
+    await tools().call('audio_buses_set', { buses: [{ name: 'Music', mute: true }] });
+    await tools().call('game_run');
+    const muted = await tools().call('audio_buses_get', { in_game: true, window_physics_frames: 20 });
+    await tools().call('game_stop');
+    await tools().call('audio_buses_set', { buses: [{ name: 'Music', mute: false }] });
+
+    expect(heard.text).toMatch(/^Sound of the running game \(res:\/\/main\.tscn\) over 20 physics frames/);
+    expect(heard.text).toMatch(/- Master: peak -\d+(\.\d)? dB/);
+    expect(heard.text).toMatch(/- Music: peak -\d+(\.\d)? dB, at -6 dB/);
+    expect(heard.text).toContain('Playing: Music (AudioStreamPlayer) on Music, res://tone.wav at 0 dB');
+    expect(muted.text).toContain('- Music: silent, at -6 dB, muted');
+    expect(muted.text).toContain('- Master: silent');
+    expect(muted.text).toContain('Playing: Music (AudioStreamPlayer) on Music');
+  });
+
   it('reads the saved buses without the editor', async () => {
     await tools().close();
     if (editorProcess !== undefined) {
@@ -71,5 +95,14 @@ describe.skipIf(godotBinary === '')('the audio buses of a project', () => {
     expect(layout.text).toBe(
       ['The audio buses of the project, saved in res://default_bus_layout.tres:', '- Master: 0 dB, plays to the speakers', '- Music: -6 dB, sends to Master', '- Effects: 0 dB, sends to Master'].join('\n'),
     );
+  });
+
+  it('hears the music of a game started without the editor', async () => {
+    await tools().call('game_run');
+    const heard = await tools().call('audio_buses_get', { in_game: true, window_physics_frames: 20 });
+    await tools().call('game_stop');
+
+    expect(heard.text).toMatch(/- Music: peak -\d+(\.\d)? dB, at -6 dB/);
+    expect(heard.text).toContain('Playing: Music (AudioStreamPlayer) on Music, res://tone.wav at 0 dB');
   });
 });

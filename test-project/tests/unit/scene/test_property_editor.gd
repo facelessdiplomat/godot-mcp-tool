@@ -53,6 +53,28 @@ func test_lists_the_options_of_enum_properties() -> void:
 	])
 
 
+func test_lists_the_layers_of_a_mask_with_the_names_of_the_project() -> void:
+	var original: Variant = ProjectSettings.get_setting("layer_names/3d_physics/layer_3")
+	ProjectSettings.set_setting("layer_names/3d_physics/layer_3", "enemies")
+	var body: CharacterBody3D = autofree(CharacterBody3D.new())
+	body.collision_mask = 5
+	var entry := _entry_named(_editor.describe(body, PackedStringArray(["collision_mask"]), false), "collision_mask")
+	ProjectSettings.set_setting("layer_names/3d_physics/layer_3", original)
+	assert_eq(entry.get("value"), 5)
+	assert_eq(entry.get("layer_kind"), "3d_physics")
+	assert_eq(entry.get("layers"), [{"number": 1, "name": ""}, {"number": 3, "name": "enemies"}])
+
+
+func test_sets_a_mask_by_layer_names() -> void:
+	var original: Variant = ProjectSettings.get_setting("layer_names/3d_physics/layer_2")
+	ProjectSettings.set_setting("layer_names/3d_physics/layer_2", "player")
+	var area: Area3D = autofree(Area3D.new())
+	var report := _editor.apply(area, {"collision_mask": ["player", 4]}, _history, "MCP: Set properties", area)
+	ProjectSettings.set_setting("layer_names/3d_physics/layer_2", original)
+	assert_eq(report["applied"], ["collision_mask"])
+	assert_eq(area.collision_mask, 10)
+
+
 func test_applies_several_properties_as_one_undoable_action() -> void:
 	var mesh_instance: MeshInstance3D = autofree(MeshInstance3D.new())
 	var report := _editor.apply(mesh_instance, {"position": [0, 1, 0], "mesh": {"new": "SphereMesh"}}, _history, "MCP: Set properties", mesh_instance)

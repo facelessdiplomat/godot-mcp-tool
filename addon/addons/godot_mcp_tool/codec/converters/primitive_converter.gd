@@ -1,6 +1,6 @@
 extends "converter.gd"
 
-const HANDLED_TYPES := [TYPE_BOOL, TYPE_INT, TYPE_FLOAT, TYPE_STRING, TYPE_STRING_NAME, TYPE_NODE_PATH]
+const HANDLED_TYPES := [TYPE_BOOL, TYPE_INT, TYPE_FLOAT, TYPE_STRING, TYPE_STRING_NAME]
 
 
 func handles(property: Dictionary) -> bool:
@@ -17,9 +17,5 @@ func decode(value: Variant, property: Dictionary, _target: Object, _decoder: God
 			return _success(float(value)) if _is_number(value) else _failure("expected a number")
 		TYPE_STRING:
 			return _success(value) if value is String else _failure("expected text")
-		TYPE_STRING_NAME:
-			return _success(StringName(value)) if value is String or value is StringName else _failure("expected text")
 		_:
-			if value is String or value is NodePath:
-				return _success(NodePath(value))
-			return _failure("expected a node path such as \"Player/Mesh\"")
+			return _success(StringName(value)) if value is String or value is StringName else _failure("expected text")

@@ -10,11 +10,11 @@ import {
   formatNodePath,
   formatPropertyList,
   isEmptyApplyReport,
-  type PropertyList,
   propertyListSchema,
 } from './formatting/propertyReports.js';
+import { joinNodeBlocks, nodesOf } from './formatting/nodeBlocks.js';
 import { formatNodeSummary, nodeTraitsSchema } from './formatting/sceneTree.js';
-import { expandInstances, nodePath, propertyValues, sceneToChange, sceneToRead } from './parameters.js';
+import { expandInstances, nodePath, nodePaths, propertyValues, requireOneNodeSelection, sceneToChange, sceneToRead } from './parameters.js';
 import { errorResult, textResult } from './results.js';
 
 export const addedNodeSchema = applyReportSchema.extend({ scene: z.string(), path: z.string(), type: z.string(), editable_children: editableChildrenSchema });
@@ -165,56 +165,85 @@ function describeCriteria(input: z.output<typeof nodeFindInput>): string {
   return criteria.filter((criterion) => criterion !== undefined).join(' and ');
 }
 
-const nodeGetPropertiesInput = z.object({
-  path: nodePath,
-  names: z
-    .array(z.string())
-    .optional()
-    .describe('Properties to read, such as ["position", "mesh"], or paths into a resource or a value, such as "mesh:size" or "position:y". Default: every property whose value differs from its default.'),
-  include_defaults: z.boolean().default(false).describe('Without names, also list properties at their default values. The list gets long.'),
-  scene: sceneToRead,
-});
+const nodeGetPropertiesInput = z
+  .object({
+    path: nodePath.optional(),
+    paths: nodePaths(
+      'Read several nodes at once instead of path, such as ["Player", "Enemies/Goblin"]: each comes back in its own block, and a node that is not found is reported among the others.',
+    ),
+    names: z
+      .array(z.string())
+      .optional()
+      .describe('Properties to read, such as ["position", "mesh"], or paths into a resource or a value, such as "mesh:size" or "position:y". Default: every property whose value differs from its default.'),
+    include_defaults: z.boolean().default(false).describe('Without names, also list properties at their default values. The list gets long.'),
+    scene: sceneToRead,
+  })
+  .superRefine(requireOneNodeSelection);
 
-export function createNodeGetPropertiesTool(editor: EditorGateway): BridgeTool<typeof nodeGetPropertiesInput, PropertyList> {
+const propertyListsSchema = z.union([nodesOf(propertyListSchema), propertyListSchema]);
+
+type PropertyLists = z.infer<typeof propertyListsSchema>;
+
+export function createNodeGetPropertiesTool(editor: EditorGateway): BridgeTool<typeof nodeGetPropertiesInput, PropertyLists> {
   return new BridgeTool(editor, {
     name: 'node_get_properties',
     definition: {
       title: 'Node properties',
       description:
-        'Read the properties of a node: those that differ from their defaults, or the ones named. Each value comes with its type, in Godot syntax; enums list their options. Use it to check a node before or after changing it.',
+        'Read the properties of a node, or of several nodes at once: those that differ from their defaults, or the ones named. Each value comes with its type, in Godot syntax; enums list their options, masks their layers. Use it to check nodes before or after changing them.',
       inputSchema: nodeGetPropertiesInput,
       annotations: readingAnnotations,
       alwaysLoad: true,
     },
     method: 'node.get_properties',
-    responseSchema: propertyListSchema,
-    present: (list) => textResult(formatPropertyList(list)),
+    responseSchema: propertyListsSchema,
+    present: (lists) =>
+      textResult(
+        'nodes' in lists
+          ? joinNodeBlocks(lists.nodes, { pathOf: (list) => list.path, describe: formatPropertyList, leftOutAdvice: leftOutPropertiesAdvice })
+          : formatPropertyList(lists),
+      ),
   });
 }
 
-const nodeGetBoundsInput = z.object({
-  path: z
-    .string()
-    .min(1)
-    .describe('Path of the node relative to the scene root, such as "Level/Crate"; "." measures the whole scene. With in_game, a path in the running game, such as "Player".'),
-  scene: sceneToRead,
-  in_game: z.boolean().default(false).describe('Measure the node in the running game instead, where it may have moved. Needs a game started from the editor.'),
-});
+export const leftOutPropertiesAdvice = 'Read them in another call, or name the properties to read with names.';
 
-export function createNodeGetBoundsTool(editor: EditorGateway): BridgeTool<typeof nodeGetBoundsInput, NodeBounds> {
+const nodeGetBoundsInput = z
+  .object({
+    path: z
+      .string()
+      .min(1)
+      .optional()
+      .describe('Path of the node relative to the scene root, such as "Level/Crate"; "." measures the whole scene. With in_game, a path in the running game, such as "Player".'),
+    paths: nodePaths('Measure several nodes at once instead of path, such as ["Crate", "Ramp", "Player"]; each comes back in its own block.'),
+    scene: sceneToRead,
+    in_game: z.boolean().default(false).describe('Measure the nodes in the running game instead, where they may have moved. Needs a game started from the editor.'),
+  })
+  .superRefine(requireOneNodeSelection);
+
+const nodeBoundsListSchema = z.union([nodesOf(nodeBoundsSchema), nodeBoundsSchema]);
+
+type NodeBoundsList = z.infer<typeof nodeBoundsListSchema>;
+
+export function createNodeGetBoundsTool(editor: EditorGateway): BridgeTool<typeof nodeGetBoundsInput, NodeBoundsList> {
   return new BridgeTool(editor, {
     name: 'node_get_bounds',
     definition: {
       title: 'Node bounds',
       description:
-        'Measure the box that a 3D node and its children take up in world coordinates: center, size and corners, from its meshes and CSG shapes, or from its collision shapes when it has none. For a Control or a 2D node, measure its rectangle in canvas pixels, from controls, sprites, polygons, lines and tile maps, or from 2D collision shapes; a control also says whether it fits the window of the project. Use it to check placement and scale, such as whether a crate rests on the floor, a door is wide enough for the player or a health bar stays on screen.',
+        'Measure the box that a 3D node and its children take up in world coordinates: center, size and corners, from its meshes and CSG shapes, or from its collision shapes when it has none. For a Control or a 2D node, measure its rectangle in canvas pixels, from controls, sprites, polygons, lines and tile maps, or from 2D collision shapes; a control also says whether it fits the window of the project. Measures one node, or several at once. Use it to check placement and scale, such as whether a crate rests on the floor, a door is wide enough for the player or a health bar stays on screen.',
       inputSchema: nodeGetBoundsInput,
       annotations: readingAnnotations,
       alwaysLoad: false,
     },
     method: 'node.get_bounds',
-    responseSchema: nodeBoundsSchema,
-    present: (bounds, input) => textResult(describeBounds(bounds, input.in_game)),
+    responseSchema: nodeBoundsListSchema,
+    present: (measured, input) =>
+      textResult(
+        'nodes' in measured
+          ? joinNodeBlocks(measured.nodes, { pathOf: (bounds) => bounds.path, describe: (bounds) => describeBounds(bounds, input.in_game), leftOutAdvice: 'Read them in another call.' })
+          : describeBounds(measured, input.in_game),
+      ),
   });
 }
 

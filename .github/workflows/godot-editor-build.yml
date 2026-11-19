@@ -1,0 +1,84 @@
+name: Build the Godot editor
+
+on:
+  workflow_call:
+    inputs:
+      commit:
+        description: The commit of godotengine/godot to build, or "master" for the head of its master branch.
+        type: string
+        required: true
+    outputs:
+      commit:
+        description: The commit that was built.
+        value: ${{ jobs.build.outputs.commit }}
+      cache-key:
+        description: The key of the cache that holds the editor as godot-master/godot.
+        value: ${{ jobs.build.outputs.cache-key }}
+
+permissions:
+  contents: read
+
+env:
+  GODOT_MASTER_DIRECTORY: godot-master
+
+jobs:
+  build:
+    name: Build Godot ${{ inputs.commit }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    outputs:
+      commit: ${{ steps.commit.outputs.commit }}
+      cache-key: ${{ steps.commit.outputs.cache-key }}
+    steps:
+      - name: Find the commit to build
+        id: commit
+        env:
+          REQUESTED_COMMIT: ${{ inputs.commit }}
+        run: |
+          if [ "$REQUESTED_COMMIT" = "master" ]; then
+            commit="$(git ls-remote https://github.com/godotengine/godot.git refs/heads/master | cut -f1)"
+          else
+            commit="$REQUESTED_COMMIT"
+          fi
+          if ! [[ "$commit" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "Not a commit of godotengine/godot: $commit" >&2
+            exit 1
+          fi
+          echo "commit=$commit" >> "$GITHUB_OUTPUT"
+          echo "cache-key=godot-editor-linux-$commit" >> "$GITHUB_OUTPUT"
+
+      - name: Look for a cached build of the commit
+        id: cached-build
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
+        with:
+          path: ${{ env.GODOT_MASTER_DIRECTORY }}
+          key: ${{ steps.commit.outputs.cache-key }}
+          lookup-only: true
+
+      - name: Check out Godot at the commit
+        if: steps.cached-build.outputs.cache-hit != 'true'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          repository: godotengine/godot
+          ref: ${{ steps.commit.outputs.commit }}
+          path: godot-source
+          persist-credentials: false
+
+      - name: Build the editor
+        if: steps.cached-build.outputs.cache-hit != 'true'
+        working-directory: godot-source
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes libwayland-bin
+          python3 -m venv "$RUNNER_TEMP/build-tools"
+          "$RUNNER_TEMP/build-tools/bin/pip" install scons==4.11.1 zstandard==0.25.0
+          "$RUNNER_TEMP/build-tools/bin/scons" platform=linuxbsd target=editor accesskit=no
+          mkdir -p "$GITHUB_WORKSPACE/$GODOT_MASTER_DIRECTORY"
+          cp bin/godot.linuxbsd.editor.x86_64 "$GITHUB_WORKSPACE/$GODOT_MASTER_DIRECTORY/godot"
+
+      - name: Cache the build
+        if: steps.cached-build.outputs.cache-hit != 'true'
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
+        with:
+          path: ${{ env.GODOT_MASTER_DIRECTORY }}
+          key: ${{ steps.commit.outputs.cache-key }}

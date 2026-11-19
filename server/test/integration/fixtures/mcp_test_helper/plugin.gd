@@ -38,6 +38,8 @@ func _handle(request: Dictionary) -> Dictionary:
 			return _read_mcp_dock()
 		"toggle_unsafe_tools_in_mcp_dock":
 			return _toggle_unsafe_tools_in_mcp_dock()
+		"toggle_hold_changes_in_mcp_dock":
+			return _toggle_hold_changes_in_mcp_dock()
 	return {"error": "unknown action %s" % request.get("action", "")}
 
 
@@ -92,7 +94,8 @@ func _read_mcp_dock() -> Dictionary:
 		return {"error": "no %s dock" % MCP_DOCK_NAME}
 	dock.call("refresh")
 	var toggle := dock.call("unsafe_tools_toggle") as CheckBox
-	return {"status": dock.call("status_text"), "unsafe_tools": toggle.button_pressed, "commands": dock.call("command_lines")}
+	var hold_toggle := dock.call("hold_changes_toggle") as CheckBox
+	return {"status": dock.call("status_text"), "unsafe_tools": toggle.button_pressed, "hold_changes": hold_toggle.button_pressed, "commands": dock.call("command_lines")}
 
 
 func _toggle_unsafe_tools_in_mcp_dock() -> Dictionary:
@@ -103,3 +106,12 @@ func _toggle_unsafe_tools_in_mcp_dock() -> Dictionary:
 	toggle.button_pressed = not toggle.button_pressed
 	var allowed: bool = EditorInterface.get_editor_settings().get_project_metadata(SETTINGS_SECTION, UNSAFE_TOOLS_KEY, false)
 	return {"unsafe_tools": toggle.button_pressed, "allowed_in_project": allowed}
+
+
+func _toggle_hold_changes_in_mcp_dock() -> Dictionary:
+	var dock := _find_mcp_dock()
+	if dock == null:
+		return {"error": "no %s dock" % MCP_DOCK_NAME}
+	var toggle := dock.call("hold_changes_toggle") as CheckBox
+	toggle.button_pressed = not toggle.button_pressed
+	return {"hold_changes": toggle.button_pressed}

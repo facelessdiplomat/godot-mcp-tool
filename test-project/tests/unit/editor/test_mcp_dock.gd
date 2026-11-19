@@ -6,6 +6,7 @@ const GodotMcpMcpDock := preload("res://addons/godot_mcp_tool/editor/mcp_dock.gd
 var _journal: GodotMcpCommandJournal
 var _status: Dictionary
 var _unsafe_tools_allowed := false
+var _changes_held := false
 var _dock: GodotMcpMcpDock
 
 
@@ -13,11 +14,14 @@ func before_each() -> void:
 	_journal = GodotMcpCommandJournal.new(func() -> String: return "12:03:41")
 	_status = {"bridge": "listening on 127.0.0.1:50731", "clients": 1, "game": "running"}
 	_unsafe_tools_allowed = false
+	_changes_held = false
 	_dock = GodotMcpMcpDock.new(
 		_journal,
 		func() -> Dictionary: return _status,
 		func() -> bool: return _unsafe_tools_allowed,
-		func(allowed: bool) -> void: _unsafe_tools_allowed = allowed)
+		func(allowed: bool) -> void: _unsafe_tools_allowed = allowed,
+		func() -> bool: return _changes_held,
+		func(held: bool) -> void: _changes_held = held)
 	add_child_autofree(_dock)
 
 
@@ -47,6 +51,24 @@ func test_follows_a_change_of_the_unsafe_tools_made_elsewhere() -> void:
 	_unsafe_tools_allowed = true
 	_dock.refresh()
 	assert_true(_dock.unsafe_tools_toggle().button_pressed)
+
+
+func test_holds_the_changes_of_the_agent_and_lets_them_go_again() -> void:
+	assert_false(_dock.hold_changes_toggle().button_pressed)
+	_dock.hold_changes_toggle().button_pressed = true
+	assert_true(_changes_held)
+	_dock.hold_changes_toggle().button_pressed = false
+	assert_false(_changes_held)
+
+
+func test_follows_a_hold_set_in_the_tools_menu() -> void:
+	_changes_held = true
+	_dock.refresh()
+	assert_true(_dock.hold_changes_toggle().button_pressed)
+
+
+func test_says_what_holding_changes_means() -> void:
+	assert_string_contains(_dock.hold_changes_toggle().tooltip_text, "changes to scenes, resources, files and settings")
 
 
 func test_lists_the_recent_commands_with_their_errors() -> void:

@@ -42,6 +42,7 @@ const gameRequests: Readonly<Record<string, string>> = {
   'game.pause': 'pause',
   'game.step': 'step',
   'game.performance': 'performance',
+  'game.audio_levels': 'audio_levels',
   'game.eval': 'eval',
 };
 const evaluationMethod = 'game.eval';

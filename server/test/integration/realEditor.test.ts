@@ -60,7 +60,7 @@ describe.skipIf(godotBinary === '')('the MCP server with a real headless Godot e
 
     try {
       await bridge.connect();
-      await expect(bridge.request('ping')).resolves.toEqual({ pong: true });
+      await expect(bridge.request('ping')).resolves.toEqual({ pong: true, changes_held: false });
     } finally {
       bridge.close();
     }

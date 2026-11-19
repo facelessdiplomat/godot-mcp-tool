@@ -18,6 +18,7 @@ export interface BridgeToolSpec<InputSchema extends z.ZodObject, Response> {
 export class BridgeTool<InputSchema extends z.ZodObject, Response> implements Tool<InputSchema> {
   readonly name: string;
   readonly definition: ToolDefinition<InputSchema>;
+  readonly method: string;
 
   constructor(
     private readonly editor: EditorGateway,
@@ -25,6 +26,7 @@ export class BridgeTool<InputSchema extends z.ZodObject, Response> implements To
   ) {
     this.name = spec.name;
     this.definition = spec.definition;
+    this.method = spec.method;
   }
 
   async execute(input: z.input<InputSchema>): Promise<CallToolResult> {

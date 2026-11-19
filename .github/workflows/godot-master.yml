@@ -1,0 +1,105 @@
+name: Godot master nightly
+
+on:
+  schedule:
+    - cron: '17 2 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: godot-master-nightly
+  cancel-in-progress: false
+
+env:
+  NODE_VERSION: 22
+  GODOT_MASTER_DIRECTORY: godot-master
+
+jobs:
+  build:
+    name: Build the head of Godot master
+    if: github.event_name == 'workflow_dispatch' || github.repository == 'facelessdiplomat/godot-mcp-tool'
+    uses: ./.github/workflows/godot-editor-build.yml
+    with:
+      commit: master
+
+  tests:
+    name: Tests against the head of Godot master
+    needs: build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    outputs:
+      addon-tests: ${{ steps.addon-tests.outcome }}
+      integration-tests: ${{ steps.integration-tests.outcome }}
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: server/package-lock.json
+
+      - name: Install dependencies
+        working-directory: server
+        run: npm ci
+
+      - name: Restore the build of Godot master
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
+        with:
+          path: ${{ env.GODOT_MASTER_DIRECTORY }}
+          key: ${{ needs.build.outputs.cache-key }}
+          fail-on-cache-miss: true
+
+      - name: Use the build of Godot master
+        run: echo "GODOT_BIN=$GITHUB_WORKSPACE/$GODOT_MASTER_DIRECTORY/godot" >> "$GITHUB_ENV"
+
+      - name: Show the Godot version
+        run: '"$GODOT_BIN" --headless --version'
+
+      - name: Install GUT and gdUnit4 into the test project
+        run: |
+          scripts/install-gut.sh
+          scripts/install-gdunit4.sh
+
+      - name: Run the addon tests
+        id: addon-tests
+        run: scripts/test-addon.sh
+
+      - name: Run the integration tests
+        id: integration-tests
+        if: ${{ !cancelled() }}
+        working-directory: server
+        run: npm run test:integration
+
+  summary:
+    name: Summary of the night
+    needs: [build, tests]
+    if: ${{ always() && needs.build.result != 'skipped' }}
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Write the engine commit and the results
+        env:
+          COMMIT: ${{ needs.build.outputs.commit }}
+          BUILD: ${{ needs.build.result }}
+          ADDON_TESTS: ${{ needs.tests.outputs.addon-tests || 'not run' }}
+          INTEGRATION_TESTS: ${{ needs.tests.outputs.integration-tests || 'not run' }}
+        run: |
+          {
+            echo "## Godot master at ${COMMIT:0:9}"
+            echo
+            echo "Engine commit: [\`$COMMIT\`](https://github.com/godotengine/godot/commit/$COMMIT)"
+            echo
+            echo "| Step | Result |"
+            echo "|---|---|"
+            echo "| Build of the editor | $BUILD |"
+            echo "| Addon tests | $ADDON_TESTS |"
+            echo "| Integration tests | $INTEGRATION_TESTS |"
+            echo
+            echo "A green night makes this commit a candidate for the pin in ci.yml; CONTRIBUTING.md says how to move it."
+          } >> "$GITHUB_STEP_SUMMARY"

@@ -2,6 +2,7 @@ extends "../command.gd"
 
 const GodotMcpAutoloadList := preload("../../project/autoload_list.gd")
 const GodotMcpGlobalClassSummary := preload("../../project/global_class_summary.gd")
+const GodotMcpLayerNames := preload("../../codec/layer_names.gd")
 const GodotMcpResourcePaths := preload("../../util/resource_paths.gd")
 
 const MAXIMUM_PROJECT_CLASSES := 50
@@ -32,6 +33,7 @@ func execute(_params: Dictionary) -> Variant:
 		"global_classes": GodotMcpGlobalClassSummary.summarize(ProjectSettings.get_global_class_list(), MAXIMUM_PROJECT_CLASSES),
 		"indentation": _read_indentation.call(),
 		"folders": _top_level_folders(),
+		"layer_names": GodotMcpLayerNames.named_layers_by_kind(),
 	}
 
 

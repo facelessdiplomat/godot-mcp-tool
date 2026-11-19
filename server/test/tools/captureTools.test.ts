@@ -113,6 +113,49 @@ describe('capture tools', () => {
     expect(game.requests).toHaveLength(0);
   });
 
+  it('editor_screenshot forwards the render mode of a view', async () => {
+    const editor = new FakeEditorGateway().respondTo('editor.screenshot', { ...gameCapture, scene: 'res://levels/arena.tscn', views: ['iso, unshaded', 'iso'] });
+
+    const result = await createEditorScreenshotTool(editor, readPng).execute({ views: [{ preset: 'iso', render: 'unshaded' }, 'iso'] });
+
+    expect(editor.requests[0]?.params).toMatchObject({ views: [{ preset: 'iso', render: 'unshaded' }, 'iso'] });
+    expect(textOf(result)).toContain('iso, unshaded, iso');
+  });
+
+  it('game_screenshot rejects an unknown render mode before asking the game', async () => {
+    const game = new FakeEditorGateway();
+
+    const result = await createGameScreenshotTool(game, readPng).execute({ views: [{ preset: 'iso', render: 'xray' }] } as never);
+
+    expect(result.isError).toBe(true);
+    expect(game.requests).toHaveLength(0);
+  });
+
+  it('game_screenshot compares the picture with an earlier one and says where it changed', async () => {
+    const game = new FakeEditorGateway().respondTo('game.screenshot', {
+      ...gameCapture,
+      comparison: { earlier: '/projects/arena/.godot/godot_mcp_tool/captures/game-1.png', sizes_match: true, earlier_size: [1280, 720], mean_difference: 1.234, changed_share: 0.0321, changed_rect: [400, 200, 96, 80], tolerance: 0.1 },
+    });
+
+    const text = textOf(await createGameScreenshotTool(game, readPng).execute({ compare_to: '/projects/arena/.godot/godot_mcp_tool/captures/game-1.png' }));
+
+    expect(game.requests[0]?.params).toMatchObject({ compare_to: '/projects/arena/.godot/godot_mcp_tool/captures/game-1.png', tolerance: 0.1 });
+    expect(text).toContain(
+      'Compared with /projects/arena/.godot/godot_mcp_tool/captures/game-1.png: 3.2% of the pixels changed by more than 0.1, all within [400, 200, 96, 80] (x, y, width, height), outlined in magenta; the mean difference is 1.23 of 255.',
+    );
+  });
+
+  it('game_screenshot says when the picture matches the earlier one, and when the sizes differ', async () => {
+    const game = new FakeEditorGateway().respondTo('game.screenshot', {
+      ...gameCapture,
+      comparison: { earlier: 'res://shots/start.png', sizes_match: false, earlier_size: [640, 360], mean_difference: 0.2, changed_share: 0, changed_rect: null, tolerance: 0.1 },
+    });
+
+    const text = textOf(await createGameScreenshotTool(game, readPng).execute({ compare_to: 'res://shots/start.png' }));
+
+    expect(text).toContain('Compared with res://shots/start.png, scaled from 640×360: no pixel changed by more than 0.1, so the pictures match; the mean difference is 0.2 of 255.');
+  });
+
   it('game_screenshot waits longer than the game does for a frame', async () => {
     const game = new FakeEditorGateway().respondTo('game.screenshot', gameCapture);
 

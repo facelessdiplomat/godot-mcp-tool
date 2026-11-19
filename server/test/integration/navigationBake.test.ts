@@ -82,6 +82,29 @@ describe.skipIf(godotBinary === '')('baking navigation for an enemy that follows
     expect(baked.text).toMatch(/- Navigation: \d+ polygons from Vector3\(-9\.5, [\d.]+, -9\.5\) to Vector3\(9\.5, [\d.]+, 9\.5\), for an agent of radius 0\.5 and height 1\.5/);
   });
 
+  it('finds the path around the wall in the scene, before the game runs', async () => {
+    const path = await tools().call('navigation_get_path', { from: [0, 0, -6], to: [0, 0, 6] });
+
+    expect(path.isError).toBe(false);
+    expect(path.text).toMatch(/^A path from Vector3\(0, 0, -6\) to Vector3\(0, 0, 6\) in res:\/\/arena\.tscn reaches the target: \d+(\.\d)? m over \d+ points, on navigation layer 1\./);
+  });
+
+  it('says where a path stops when it leads to an island that no region joins', async () => {
+    await tools().call('scene_batch_edit', {
+      operations: [
+        { op: 'node_add', type: 'NavigationRegion3D', name: 'Island', properties: { navigation_mesh: { new: 'NavigationMesh' } } },
+        { op: 'node_add', type: 'CSGBox3D', name: 'Floor', parent: 'Island', properties: { size: [6, 1, 6], position: [20, -0.5, 0], use_collision: true } },
+      ],
+    });
+    await tools().call('navigation_bake', { path: 'Island' });
+
+    const path = await tools().call('navigation_get_path', { from: [0, 0, 6], to: [20, 0, 0] });
+
+    expect(path.text).toContain('does not reach the target: it stops');
+    expect(path.text).toMatch(/at Vector3\(9\.5, [\d.]+, [\d.-]+\)/);
+    expect(path.text).toContain('does not connect to the one around the target');
+  });
+
   it('lets the enemy walk around the wall to the player in the running game', async () => {
     await tools().call('scene_save');
     const run = await tools().call('game_run', { scene: 'res://arena.tscn' });
@@ -90,5 +113,11 @@ describe.skipIf(godotBinary === '')('baking navigation for an enemy that follows
 
     expect(run.text).toMatch(/^The game is running res:\/\/arena\.tscn/);
     expect(reached.text).toMatch(/became true on Enemy/);
+  });
+
+  it('asks the navigation of the running game for the same path', async () => {
+    const path = await tools().call('navigation_get_path', { from: [0, 0, -6], to: [0, 0, 6], in_game: true });
+
+    expect(path.text).toMatch(/^A path from Vector3\(0, 0, -6\) to Vector3\(0, 0, 6\) in the running game \(res:\/\/arena\.tscn\) reaches the target/);
   });
 });

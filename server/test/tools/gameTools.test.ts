@@ -298,6 +298,30 @@ describe('game tools', () => {
     expect(missed).toBe('Enemy did not emit died within 10000 ms.');
   });
 
+  it('game_get_properties reads several nodes at the same moment of the game', async () => {
+    const editor = new FakeEditorGateway().respondTo('game.get_properties', {
+      scene: 'res://levels/arena.tscn',
+      nodes: [
+        { scene: 'res://levels/arena.tscn', path: 'Player', type: 'CharacterBody3D', properties: [{ name: 'position', type: 'Vector3', value: 'Vector3(0, 1, 0)' }] },
+        { scene: 'res://levels/arena.tscn', path: 'Enemy', type: 'CharacterBody3D', properties: [{ name: 'position', type: 'Vector3', value: 'Vector3(4, 1, 0)' }] },
+      ],
+    });
+
+    const text = textOf(await createGameGetPropertiesTool(editor).execute({ paths: ['Player', 'Enemy'], names: ['position'] }));
+
+    expect(editor.requests[0]?.params).toEqual({ paths: ['Player', 'Enemy'], names: ['position'], include_defaults: false });
+    expect(text).toBe(
+      [
+        'Read at the same moment of the game:',
+        'Player (CharacterBody3D) in the running game',
+        'position = Vector3(0, 1, 0)  [Vector3]',
+        '',
+        'Enemy (CharacterBody3D) in the running game',
+        'position = Vector3(4, 1, 0)  [Vector3]',
+      ].join('\n'),
+    );
+  });
+
   it('game_get_properties lists values, getters included', async () => {
     const editor = new FakeEditorGateway().respondTo('game.get_properties', {
       scene: 'res://levels/arena.tscn',

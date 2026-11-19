@@ -59,7 +59,7 @@ describe('running a command of the command line', () => {
   it('creates a project with the addon in a new folder', async () => {
     expect(await run(['init', 'capsule-walk'], workspace)).toBe(0);
 
-    expect(output[0]).toMatch(/^Created the Godot project "Capsule Walk" in .*capsule-walk: project\.godot \(Forward\+, Jolt Physics, window 1152×648\)/);
+    expect(output[0]).toMatch(/^Created the Godot project "Capsule Walk" in .*capsule-walk: project\.godot \(Forward\+, Jolt Physics, window 1152×648, warnings for untyped GDScript\)/);
     expect(output[1]).toBe(`Installed the Godot MCP Tool addon ${SERVER_VERSION} in ${join(workspace, 'capsule-walk', 'addons', 'godot_mcp_tool')}. Its plugin is enabled.`);
     expect(output[2]).toContain('godot --editor --path');
   });
@@ -84,6 +84,17 @@ describe('running a command of the command line', () => {
     expect(output[0]).toBe(`Checking the setup of Godot MCP Tool ${SERVER_VERSION}:`);
     expect(output).toContain(`ok       Addon ${SERVER_VERSION} in ${join(projectRoot, 'addons', 'godot_mcp_tool')}`);
     expect(output).toContain(`ok       Plugin enabled in ${join(projectRoot, 'project.godot')}`);
+  });
+
+  it('installs the addon into the one project in a folder below the working directory and names it', async () => {
+    expect(await run(['install-addon'], workspace)).toBe(0);
+    expect(output[0]).toBe(`Installed the Godot MCP Tool addon ${SERVER_VERSION} in ${join(projectRoot, 'addons', 'godot_mcp_tool')}.`);
+  });
+
+  it('checks the project that it found in a folder below the working directory', async () => {
+    await run(['doctor'], workspace);
+
+    expect(output).toContain(`ok       Project ${projectRoot} (from subfolder)`);
   });
 
   it('says when it finds no project', async () => {
@@ -111,6 +122,37 @@ describe('running a command of the command line', () => {
     hookInput = 'not json';
 
     expect(await run(['check-edited-script'])).toBe(0);
+    expect([...output, ...errors]).toEqual([]);
+  });
+
+  it('lets the hook deny an edit of a scene while the editor of its project runs', async () => {
+    const scenePath = join(projectRoot, 'arena.tscn');
+    writeFileSync(scenePath, '[gd_scene format=3]\n');
+    mkdirSync(join(projectRoot, '.godot', 'godot_mcp_tool'), { recursive: true });
+    writeFileSync(
+      join(projectRoot, '.godot', 'godot_mcp_tool', 'bridge.json'),
+      JSON.stringify({ protocol: 1, port: 50731, token: 'secret', pid: process.pid, godot_version: '4.8', addon_version: SERVER_VERSION, project_path: projectRoot, executable_path: '/godot', lsp_port: 6005, started_at: '2026-11-19T10:00:00Z' }),
+    );
+    hookInput = JSON.stringify({ hook_event_name: 'PreToolUse', tool_name: 'Edit', tool_input: { file_path: scenePath, old_string: 'a', new_string: 'b' } });
+
+    expect(await run(['check-scene-edit'])).toBe(0);
+    expect(errors).toEqual([]);
+    expect(JSON.parse(output[0] ?? '{}')).toMatchObject({ hookSpecificOutput: { hookEventName: 'PreToolUse', permissionDecision: 'deny' } });
+  });
+
+  it('lets the hook pass the edit of a scene in silence when no editor runs', async () => {
+    const scenePath = join(projectRoot, 'arena.tscn');
+    writeFileSync(scenePath, '[gd_scene format=3]\n');
+    hookInput = JSON.stringify({ hook_event_name: 'PreToolUse', tool_name: 'Edit', tool_input: { file_path: scenePath, old_string: 'a', new_string: 'b' } });
+
+    expect(await run(['check-scene-edit'])).toBe(0);
+    expect([...output, ...errors]).toEqual([]);
+  });
+
+  it('lets the scene hook pass input that is not JSON in silence', async () => {
+    hookInput = 'not json';
+
+    expect(await run(['check-scene-edit'])).toBe(0);
     expect([...output, ...errors]).toEqual([]);
   });
 

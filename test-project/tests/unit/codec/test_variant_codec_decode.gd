@@ -188,6 +188,36 @@ func test_resolves_a_node_reference_relative_to_the_target() -> void:
 	assert_eq(_decoded("Enemy", _property(TYPE_OBJECT, PROPERTY_HINT_NODE_TYPE, "Node3D"), owner_node), enemy)
 
 
+func _scene_with_post_and_gate() -> Node3D:
+	var arena: Node3D = autofree(Node3D.new())
+	for node_name in ["Post", "Gate", "Hinge"]:
+		var node := Node3D.new()
+		node.name = node_name
+		arena.add_child(node)
+		node.owner = arena
+	return arena
+
+
+func test_turns_a_node_path_from_the_scene_root_into_one_from_the_node() -> void:
+	var hinge := _scene_with_post_and_gate().get_node("Hinge")
+	assert_eq(_decoded("Post", _property(TYPE_NODE_PATH), hinge), NodePath("../Post"))
+
+
+func test_keeps_a_node_path_that_already_leads_from_the_node() -> void:
+	var hinge := _scene_with_post_and_gate().get_node("Hinge")
+	assert_eq(_decoded("../Gate", _property(TYPE_NODE_PATH), hinge), NodePath("../Gate"))
+
+
+func test_keeps_the_property_part_of_a_node_path() -> void:
+	var hinge := _scene_with_post_and_gate().get_node("Hinge")
+	assert_eq(_decoded("Gate:position", _property(TYPE_NODE_PATH), hinge), NodePath("../Gate:position"))
+
+
+func test_keeps_a_node_path_to_a_node_that_does_not_exist_yet() -> void:
+	var hinge := _scene_with_post_and_gate().get_node("Hinge")
+	assert_eq(_decoded("Door", _property(TYPE_NODE_PATH), hinge), NodePath("Door"))
+
+
 func _scene_with_hud_and_player() -> Node3D:
 	var arena: Node3D = autofree(Node3D.new())
 	arena.name = "Arena"

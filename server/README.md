@@ -37,10 +37,11 @@ godot-mcp-tool install-addon [folder]  Copy the addon into the Godot project and
 godot-mcp-tool update-addon [folder]   Replace the addon of the project with the version of this package
 godot-mcp-tool doctor [folder]         Check Node.js, Godot, the addon, the plugin and the connection to the editor
 godot-mcp-tool check-edited-script     Check the .gd file of a Claude Code hook input; the plugin's hook runs it
+godot-mcp-tool check-scene-edit        Deny a text edit of a scene while the editor is open; the plugin's hook runs it
 ```
 
 The folder is the Godot project: by default `GODOT_PROJECT_PATH`, or the current folder or the nearest folder above
-it that has a `project.godot`.
+it that has a `project.godot`, or else the one project in the folders up to three levels below it.
 
 ## Documentation
 

@@ -60,6 +60,7 @@ describe.skipIf(godotBinary === '')('looking into the running game', () => {
 
   beforeAll(async () => {
     project = new TemporaryProject('MCP game inspection', { mainScene: 'res://main.tscn' });
+    project.write('project.godot', `${project.read('project.godot')}\n[layer_names]\n\n3d_physics/layer_1="world"\n3d_physics/layer_2="player"\n`);
     project.write('main.gd', mainScript);
     project.write('player.gd', playerScript);
     project.write('main.tscn', mainScene);
@@ -110,6 +111,23 @@ describe.skipIf(godotBinary === '')('looking into the running game', () => {
     expect(moved.text).toContain('Updated Player in the running game.');
     expect(waited.text).toMatch(/^Waited 5 physics frames/);
     expect(properties.text).toMatch(/position = Vector3\(2, /);
+  });
+
+  it('reads and sets a mask by the names that the project gives its layers', async () => {
+    const changed = await tools().call('game_set_properties', { path: 'Player', properties: { collision_mask: ['world', 'player'] } });
+    const properties = await tools().call('game_get_properties', { path: 'Player', names: ['collision_layer', 'collision_mask'] });
+
+    expect(changed.text).toContain('Updated Player in the running game.');
+    expect(properties.text).toContain('collision_layer = 1 (layer 1 "world")  [3d_physics layers]');
+    expect(properties.text).toContain('collision_mask = 3 (layers 1 "world", 2 "player")  [3d_physics layers]');
+  });
+
+  it('reads several nodes of the running game in the same frame', async () => {
+    const read = await tools().call('game_get_properties', { paths: ['Player', 'Floor', 'Ghost'], names: ['position'] });
+
+    expect(read.text).toMatch(/^Read at the same moment of the game:\nPlayer \(CharacterBody3D\) in the running game\nposition = Vector3/);
+    expect(read.text).toContain('\n\nFloor (StaticBody3D) in the running game\nposition = Vector3(0, -0.5, 0)');
+    expect(read.text).toContain('\n\nNode "Ghost" not found in the running game');
   });
 
   it('suggests node paths it did not find', async () => {

@@ -7,6 +7,7 @@ import { allScenarios } from './scenarios/allScenarios.js';
 
 const claudeBinary = process.env['CLAUDE_BIN'] ?? '';
 const referenceOnly = process.env['EVAL_REFERENCE'] === '1';
+const unsolvedOnly = process.env['EVAL_UNSOLVED'] === '1';
 const selectedNames = (process.env['EVAL_SCENARIOS'] ?? '').split(',').filter((name) => name !== '');
 const scenarios = allScenarios.filter((scenario) => selectedNames.length === 0 || selectedNames.includes(scenario.name));
 const agentTimeoutMs = 40 * 60_000;
@@ -30,7 +31,21 @@ describe.skipIf(godotBinary === '' || !referenceOnly)('the reference solutions o
   }
 });
 
-describe.skipIf(godotBinary === '' || claudeBinary === '' || referenceOnly)('evaluation scenarios', () => {
+describe.skipIf(godotBinary === '' || !unsolvedOnly)('the evaluation scenarios left unsolved', () => {
+  for (const scenario of scenarios) {
+    it(
+      `${scenario.name} fails a check when nothing is done`,
+      async () => {
+        const checks = await runReferenceSolution(scenario, () => Promise.resolve());
+
+        expect(checks.filter((check) => !check.passed)).not.toEqual([]);
+      },
+      referenceTimeoutMs,
+    );
+  }
+});
+
+describe.skipIf(godotBinary === '' || claudeBinary === '' || referenceOnly || unsolvedOnly)('evaluation scenarios', () => {
   for (const scenario of scenarios) {
     it(
       scenario.name,

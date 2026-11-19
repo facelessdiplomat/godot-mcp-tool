@@ -17,7 +17,6 @@ env:
   NODE_VERSION: 22
   GODOT_STABLE_VERSION: 4.7.2
   GODOT_STABLE_SHA512: 9aa00f7a605200940bce3027a567b782f49bd8e940dd06ae9e987bd65aee1b1467edd56ed84fcdcbdd44354bf613bdbb4e5d2913e925850368e150c59ed54c65
-  GODOT_MASTER_COMMIT: 679066724352c12673001d692d41dc2dab9314c0
   GODOT_MASTER_DIRECTORY: godot-master
 
 jobs:
@@ -126,44 +125,9 @@ jobs:
 
   godot-master:
     name: Build Godot master
-    runs-on: ubuntu-24.04
-    timeout-minutes: 120
-    steps:
-      - name: Look for a cached build of the pinned commit
-        id: cached-build
-        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
-        with:
-          path: ${{ env.GODOT_MASTER_DIRECTORY }}
-          key: godot-editor-linux-${{ env.GODOT_MASTER_COMMIT }}
-          lookup-only: true
-
-      - name: Check out Godot at the pinned commit
-        if: steps.cached-build.outputs.cache-hit != 'true'
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-        with:
-          repository: godotengine/godot
-          ref: ${{ env.GODOT_MASTER_COMMIT }}
-          path: godot-source
-          persist-credentials: false
-
-      - name: Build the editor
-        if: steps.cached-build.outputs.cache-hit != 'true'
-        working-directory: godot-source
-        run: |
-          sudo apt-get update
-          sudo apt-get install --yes libwayland-bin
-          python3 -m venv "$RUNNER_TEMP/build-tools"
-          "$RUNNER_TEMP/build-tools/bin/pip" install scons==4.11.1 zstandard==0.25.0
-          "$RUNNER_TEMP/build-tools/bin/scons" platform=linuxbsd target=editor accesskit=no
-          mkdir -p "$GITHUB_WORKSPACE/$GODOT_MASTER_DIRECTORY"
-          cp bin/godot.linuxbsd.editor.x86_64 "$GITHUB_WORKSPACE/$GODOT_MASTER_DIRECTORY/godot"
-
-      - name: Cache the build
-        if: steps.cached-build.outputs.cache-hit != 'true'
-        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
-        with:
-          path: ${{ env.GODOT_MASTER_DIRECTORY }}
-          key: godot-editor-linux-${{ env.GODOT_MASTER_COMMIT }}
+    uses: ./.github/workflows/godot-editor-build.yml
+    with:
+      commit: 679066724352c12673001d692d41dc2dab9314c0
 
   godot-tests:
     name: Godot ${{ matrix.godot }} tests
@@ -207,7 +171,7 @@ jobs:
         uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
         with:
           path: ${{ env.GODOT_MASTER_DIRECTORY }}
-          key: godot-editor-linux-${{ env.GODOT_MASTER_COMMIT }}
+          key: ${{ needs.godot-master.outputs.cache-key }}
           fail-on-cache-miss: true
 
       - name: Use the Godot master build

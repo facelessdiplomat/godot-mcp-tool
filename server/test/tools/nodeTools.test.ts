@@ -93,6 +93,61 @@ describe('node tools', () => {
     expect(textOf(result)).toBe('Player (CharacterBody3D) in res://levels/arena.tscn\nposition = Vector3(1, 2, 3)  [Vector3]');
   });
 
+  it('node_get_properties reads several nodes in one call, each in its own block', async () => {
+    const editor = new FakeEditorGateway().respondTo('node.get_properties', {
+      scene: 'res://levels/arena.tscn',
+      nodes: [
+        { scene: 'res://levels/arena.tscn', path: 'Player', type: 'CharacterBody3D', properties: [{ name: 'position', type: 'Vector3', value: 'Vector3(1, 2, 3)' }] },
+        { path: 'Playr', error: 'Node "Playr" not found', hint: 'Similar: Player' },
+        { scene: 'res://levels/arena.tscn', path: 'Camera', type: 'Camera3D', properties: [{ name: 'position', type: 'Vector3', value: 'Vector3(0, 2, 5)' }] },
+      ],
+    });
+
+    const result = await createNodeGetPropertiesTool(editor).execute({ paths: ['Player', 'Playr', 'Camera'], names: ['position'] });
+
+    expect(editor.requests[0]?.params).toEqual({ paths: ['Player', 'Playr', 'Camera'], names: ['position'], include_defaults: false });
+    expect(result.isError).toBeFalsy();
+    expect(textOf(result)).toBe(
+      [
+        'Player (CharacterBody3D) in res://levels/arena.tscn',
+        'position = Vector3(1, 2, 3)  [Vector3]',
+        '',
+        'Node "Playr" not found',
+        'Hint: Similar: Player',
+        '',
+        'Camera (Camera3D) in res://levels/arena.tscn',
+        'position = Vector3(0, 2, 5)  [Vector3]',
+      ].join('\n'),
+    );
+  });
+
+  it('node_get_properties takes either path or paths', async () => {
+    const editor = new FakeEditorGateway();
+
+    const both = await createNodeGetPropertiesTool(editor).execute({ path: 'Player', paths: ['Camera'] });
+    const neither = await createNodeGetPropertiesTool(editor).execute({});
+    const tooMany = await createNodeGetPropertiesTool(editor).execute({ paths: Array.from({ length: 21 }, (_, index) => `Crate${String(index)}`) });
+
+    expect(both.isError).toBe(true);
+    expect(textOf(both)).toContain('Give path for one node or paths for several, not both.');
+    expect(textOf(neither)).toContain('Give path for one node or paths for several.');
+    expect(tooMany.isError).toBe(true);
+    expect(editor.requests).toEqual([]);
+  });
+
+  it('node_get_properties cuts a long reading of several nodes and names the nodes it left out', async () => {
+    const manyProperties = Array.from({ length: 120 }, (_, index) => ({ name: `property_${String(index)}`, type: 'String', value: 'x'.repeat(60) }));
+    const editor = new FakeEditorGateway().respondTo('node.get_properties', {
+      scene: 'res://levels/arena.tscn',
+      nodes: ['A', 'B', 'C', 'D', 'E'].map((path) => ({ scene: 'res://levels/arena.tscn', path, type: 'Node3D', properties: manyProperties })),
+    });
+
+    const text = textOf(await createNodeGetPropertiesTool(editor).execute({ paths: ['A', 'B', 'C', 'D', 'E'], include_defaults: true }));
+
+    expect(text.length).toBeLessThan(26_000);
+    expect(text).toMatch(/\nNot shown, to keep the answer short: [B-E](, [C-E])*\. Read them in another call, or name the properties to read with names\.$/);
+  });
+
   it('node_set_properties reports a partial success as a success', async () => {
     const editor = new FakeEditorGateway().respondTo('node.set_properties', {
       scene: 'res://levels/arena.tscn',
@@ -204,6 +259,40 @@ describe('node tools', () => {
         'center Vector3(4, 1, 0), size Vector3(2, 2, 2)',
         'from Vector3(3, 0, -1) to Vector3(5, 2, 1)',
         'Measured from 1 visual node.',
+      ].join('\n'),
+    );
+  });
+
+  it('node_get_bounds measures several nodes in one call', async () => {
+    const editor = new FakeEditorGateway().respondTo('node.get_bounds', {
+      scene: 'res://levels/arena.tscn',
+      nodes: [
+        {
+          scene: 'res://levels/arena.tscn',
+          path: 'Crate',
+          type: 'Node3D',
+          position: 'Vector3(3, 0, -1)',
+          size: 'Vector3(2, 2, 2)',
+          center: 'Vector3(4, 1, 0)',
+          end: 'Vector3(5, 2, 1)',
+          visual_count: 1,
+          collision_count: 1,
+        },
+        { path: 'Logic', error: 'Logic is a Node, neither a 3D nor a 2D node, so it has no bounds' },
+      ],
+    });
+
+    const result = await createNodeGetBoundsTool(editor).execute({ paths: ['Crate', 'Logic'] });
+
+    expect(editor.requests[0]?.params).toEqual({ paths: ['Crate', 'Logic'], in_game: false });
+    expect(textOf(result)).toBe(
+      [
+        'Crate (Node3D) in res://levels/arena.tscn, in world coordinates:',
+        'center Vector3(4, 1, 0), size Vector3(2, 2, 2)',
+        'from Vector3(3, 0, -1) to Vector3(5, 2, 1)',
+        'Measured from 1 visual node.',
+        '',
+        'Logic is a Node, neither a 3D nor a 2D node, so it has no bounds',
       ].join('\n'),
     );
   });

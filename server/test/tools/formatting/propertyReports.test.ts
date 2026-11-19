@@ -74,6 +74,37 @@ describe('formatPropertyList', () => {
     );
   });
 
+  it('lists the layers of a mask with the names that the project gives them', () => {
+    const text = formatPropertyList({
+      scene: 'res://levels/arena.tscn',
+      path: 'Door/Area',
+      type: 'Area3D',
+      properties: [
+        {
+          name: 'collision_mask',
+          type: 'int',
+          value: 5,
+          layer_kind: '3d_physics',
+          layers: [
+            { number: 1, name: 'world' },
+            { number: 3, name: '' },
+          ],
+        },
+        { name: 'collision_layer', type: 'int', value: 0, layer_kind: '3d_physics', layers: [] },
+        { name: 'layers', type: 'int', value: 2, layer_kind: '3d_render', layers: [{ number: 2, name: 'minimap' }] },
+      ],
+    });
+
+    expect(text).toBe(
+      [
+        'Door/Area (Area3D) in res://levels/arena.tscn',
+        'collision_mask = 5 (layers 1 "world", 3)  [3d_physics layers]',
+        'collision_layer = 0 (no layers)  [3d_physics layers]',
+        'layers = 2 (layer 2 "minimap")  [3d_render layers]',
+      ].join('\n'),
+    );
+  });
+
   it('names enum values by their explicit numbers', () => {
     const text = formatPropertyList({
       scene: 'res://a.tscn',

@@ -14,6 +14,7 @@ const GodotMcpPoseRequest := preload("../../capture/pose_request.gd")
 const GodotMcpPreviewLighting := preload("../../capture/preview_lighting.gd")
 const GodotMcpScreenshotFile := preload("../../capture/screenshot_file.gd")
 const GodotMcpViewRenderer := preload("../../capture/view_renderer.gd")
+const GodotMcpRenderModes := preload("../../capture/render_modes.gd")
 const GodotMcpViewRequests := preload("../../capture/view_requests.gd")
 
 const CAPTURE_PREFIX := "editor"
@@ -49,6 +50,9 @@ func execute(params: Dictionary) -> Variant:
 	var views: Variant = GodotMcpViewRequests.parse(options["views"], _bounds_in.bind(scene_root))
 	if views is GodotMcpCommandError:
 		return views
+	var unrenderable := GodotMcpRenderModes.refusal_for(views, GodotMcpRenderModes.current_renderer(), false)
+	if not unrenderable.is_empty():
+		return GodotMcpCommandError.new(GodotMcpJsonRpc.INVALID_PARAMS, unrenderable, "Render modes: %s; normals needs Forward+, and wireframe works in editor_screenshot only." % GodotMcpRenderModes.names())
 	var poses: Variant = null
 	if params.get("animation") != null:
 		poses = GodotMcpPoseRequest.parse(params["animation"], scene_root)

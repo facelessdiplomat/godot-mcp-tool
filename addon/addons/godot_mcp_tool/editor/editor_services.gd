@@ -5,6 +5,7 @@ const GodotMcpAuthenticator := preload("../bridge/authenticator.gd")
 const GodotMcpBottomPanel := preload("bottom_panel.gd")
 const GodotMcpBridgeServer := preload("../bridge/bridge_server.gd")
 const GodotMcpBridgeSession := preload("../bridge/bridge_session.gd")
+const GodotMcpChangesHoldSwitch := preload("changes_hold_switch.gd")
 const GodotMcpCommandCatalog := preload("../commands/command_catalog.gd")
 const GodotMcpCommandJournal := preload("command_journal.gd")
 const GodotMcpCommandRouter := preload("../commands/command_router.gd")
@@ -29,6 +30,7 @@ const GodotMcpRuntimeContext := preload("../runtime/runtime_context.gd")
 const GodotMcpRuntimeDebugger := preload("../runtime/runtime_debugger.gd")
 const GodotMcpRuntimeLogger := preload("../runtime/runtime_logger.gd")
 const GodotMcpTokenGenerator := preload("../bridge/token_generator.gd")
+const GodotMcpToolsMenu := preload("tools_menu.gd")
 const GodotMcpUnsafeToolsSwitch := preload("unsafe_tools_switch.gd")
 const GodotMcpVariantCodec := preload("../codec/variant_codec.gd")
 const GodotMcpWindowSizeOverride := preload("../runtime/window_size_override.gd")
@@ -52,6 +54,8 @@ var _discovery_file: GodotMcpDiscoveryFile
 var _first_scan_gate: GodotMcpFirstScanGate
 var _token := ""
 var _unsafe_tools := GodotMcpUnsafeToolsSwitch.new()
+var _changes_hold := GodotMcpChangesHoldSwitch.new()
+var _tools_menu := GodotMcpToolsMenu.new()
 var _command_journal := GodotMcpCommandJournal.new()
 var _bridge_state := ""
 var _dock_panel: GodotMcpBottomPanel
@@ -74,12 +78,14 @@ func start() -> void:
 	OS.add_logger(_editor_logger)
 	_ensure_runtime_autoload()
 	var context := GodotMcpEditingContext.new(GodotMcpEditorSceneAccess.new(), GodotMcpEditorUndoHistory.new(_plugin.get_undo_redo()), GodotMcpVariantCodec.new(), GodotMcpEditorScriptEditorAccess.new())
-	_unsafe_tools.install(_plugin)
-	_router = GodotMcpCommandCatalog.build_router(context, _runtime, _read_indentation, ProjectSettings.save, GodotMcpEditorAutoloadRegistry.new(_plugin), _unsafe_tools.is_allowed)
+	_tools_menu.add_switch(GodotMcpUnsafeToolsSwitch.ITEM_TEXT, _unsafe_tools.is_allowed, _unsafe_tools.set_allowed)
+	_tools_menu.add_switch(GodotMcpChangesHoldSwitch.ITEM_TEXT, _changes_hold.is_held, _changes_hold.set_held)
+	_tools_menu.install(_plugin)
+	_router = GodotMcpCommandCatalog.build_router(context, _runtime, _read_indentation, ProjectSettings.save, GodotMcpEditorAutoloadRegistry.new(_plugin), _unsafe_tools.is_allowed, _changes_hold.is_held)
 	_token = GodotMcpTokenGenerator.generate()
 	_first_scan_gate = GodotMcpFirstScanGate.new(GodotMcpEditorFileSystemAccess.new())
 	_bridge_state = _start_bridge()
-	var dock := GodotMcpMcpDock.new(_command_journal, _read_dock_status, _unsafe_tools.is_allowed, _unsafe_tools.set_allowed)
+	var dock := GodotMcpMcpDock.new(_command_journal, _read_dock_status, _unsafe_tools.is_allowed, _unsafe_tools.set_allowed, _changes_hold.is_held, _changes_hold.set_held)
 	_dock_panel = GodotMcpBottomPanel.new(_plugin, dock)
 	_dock_panel.add(GodotMcpMcpDock.TAB_TITLE)
 
@@ -99,7 +105,7 @@ func stop() -> void:
 	if _dock_panel != null:
 		_dock_panel.remove()
 		_dock_panel = null
-	_unsafe_tools.uninstall(_plugin)
+	_tools_menu.uninstall(_plugin)
 	if _bridge_server != null:
 		_bridge_server.stop()
 		_bridge_server = null

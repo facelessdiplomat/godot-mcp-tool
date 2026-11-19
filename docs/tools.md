@@ -7,7 +7,9 @@ The line under each tool says what kind of tool it is:
 
 - *Read-only*: it reads the project, the editor or the running game and changes nothing. Read-only mode
   (`GODOT_MCP_READ_ONLY=1`) keeps only these tools.
-- *Makes changes*: it changes the project, the editor or the running game.
+- *Makes changes*: it changes the project, the editor or the running game. While the user holds changes in the
+  editor (Project → Tools → Godot MCP Tool → Hold Changes), the editor refuses these tools, but `game_stop` and
+  what runs without it, such as `test_run` and `export_project`.
 - *Loaded at the start*: Claude has it from the first message; Claude Code loads the other tools when a task needs
   them.
 - *Off by default*: one of the unsafe tools. They need `GODOT_MCP_UNSAFE=1` and, in the editor,
@@ -21,7 +23,7 @@ The line under each tool says what kind of tool it is:
 - [Project](#project): `project_create`, `project_info`, `project_settings_get`, `project_settings_set`, `input_map_get`, `input_map_set`, `audio_buses_get`, `audio_buses_set`, `autoload_add`, `autoload_remove`, `plugin_set_enabled`
 - [Scenes and nodes](#scenes-and-nodes): `scene_create`, `scene_open`, `scene_save`, `scene_get_tree`, `scene_batch_edit`, `node_add`, `node_delete`, `node_duplicate`, `node_reparent`, `node_save_as_scene`, `node_make_local`, `node_find`, `node_get_properties`, `node_get_bounds`, `scene_raycast`, `node_snap_to_floor`, `node_add_collision`, `node_set_properties`, `gridmap_get_cells`, `gridmap_set_cells`, `tilemap_get_cells`, `tilemap_set_cells`, `signal_list`, `signal_connect`, `signal_disconnect`, `node_set_groups`, `scene_close`, `node_call_method`
 - [Resources and files](#resources-and-files): `user_data_get`, `resource_create`, `resource_get`, `resource_set_properties`, `tileset_add_atlas`, `resource_find_usages`, `filesystem_move`, `asset_import_settings_get`, `asset_import_settings_set`, `filesystem_delete`, `user_data_delete`
-- [Animation and navigation](#animation-and-navigation): `navigation_bake`, `animation_get`, `animation_set`, `animation_delete`, `animation_tree_get`, `animation_tree_set`
+- [Animation and navigation](#animation-and-navigation): `navigation_bake`, `navigation_get_path`, `animation_get`, `animation_set`, `animation_delete`, `animation_tree_get`, `animation_tree_set`
 - [Scripts, tests and exports](#scripts-tests-and-exports): `script_rename_symbol`, `script_validate`, `test_install_framework`, `test_run`, `export_preset_add`, `export_project`
 - [The running game](#the-running-game): `game_run`, `game_stop`, `game_get_output`, `game_get_tree`, `game_get_properties`, `game_set_properties`, `game_wait`, `game_input`, `game_screenshot`, `game_pause`, `game_step`, `game_performance`, `game_eval`
 - [Debugging](#debugging): `debug_breakpoints`, `debug_state`, `debug_continue`
@@ -61,19 +63,21 @@ No parameters.
 
 *Read-only*
 
-- `views`: list of 1 to 6 items. Render the 3D scene from these angles instead of the editor camera, up to 6 in one labelled image: a preset "front" (from +Z), "back", "left" (from -X), "right", "top" or "iso", framed on the whole scene; {"preset": "front", "target": "Player"} to frame one node; or {"position": [0, 8, 12], "look_at": [0, 0, 0]} for a camera at a point. Each view also takes "fov" and "label". Each item is one of:
+- `views`: list of 1 to 6 items. Render the 3D scene from these angles instead of the editor camera, up to 6 in one labelled image: a preset "front" (from +Z), "back", "left" (from -X), "right", "top" or "iso", framed on the whole scene; {"preset": "front", "target": "Player"} to frame one node; or {"position": [0, 8, 12], "look_at": [0, 0, 0]} for a camera at a point. Each view also takes "fov", "label" and "render", such as {"preset": "iso", "render": "unshaded"}. Each item is one of:
   - "front", "back", "left", "right", "top" or "iso".
   - an object with:
     - `preset` (required): "front", "back", "left", "right", "top" or "iso".
     - `target`: string. A node to frame instead of the whole scene, such as "Player".
     - `fov`: number from 1 to 179. Vertical field of view in degrees. Default: 50.
     - `label`: string. Caption of the view in the image.
+    - `render`: "unshaded", "lighting", "overdraw", "wireframe" or "normals". Draw this view as a debug view of the 3D viewport instead of with materials and light: "unshaded" shows colors without light, to tell a dark room from a black material; "lighting" shows only the light; "overdraw" shows where transparent surfaces pile up; "wireframe" shows the triangles (editor_screenshot only); "normals" shows the surface normals (Forward+ only).
   - an object with:
     - `position` (required): list of 3 numbers. Camera position [x, y, z] in world coordinates.
     - `look_at`: list of 3 numbers. The point the camera looks at. Default: the center of target, or of the whole scene.
     - `target`: string. A node to frame instead of the whole scene, such as "Player".
     - `fov`: number from 1 to 179. Vertical field of view in degrees. Default: 50.
     - `label`: string. Caption of the view in the image.
+    - `render`: "unshaded", "lighting", "overdraw", "wireframe" or "normals". Draw this view as a debug view of the 3D viewport instead of with materials and light: "unshaded" shows colors without light, to tell a dark room from a black material; "lighting" shows only the light; "overdraw" shows where transparent surfaces pile up; "wireframe" shows the triangles (editor_screenshot only); "normals" shows the surface normals (Forward+ only).
 - `animation`: object. Render the poses of an animation at given times without running the game, one labelled image per time in one picture, from the editor camera or from one given view. Method calls and sounds of the animation stay silent, and the animated values are put back afterwards. It has:
   - `player` (required): string. Path of the AnimationPlayer relative to the scene root, such as "Hero/AnimationPlayer".
   - `name` (required): string. The animation to pose, such as "walk".
@@ -81,6 +85,8 @@ No parameters.
 - `sizes`: list of arrays, 1 to 6. For a UI or 2D scene, the window sizes to render it at, such as [[1920, 1080], [1440, 1080]] for 16:9 and 4:3 in one labelled image; the layout follows the stretch mode and aspect of the project. Default: the window size of the project.
 - `max_size`: integer from 256 to 2560, default `1280`. The longest side of the image in pixels. Default: 1280.
 - `format`: "png" or "jpeg", default `"png"`. png (default), or jpeg for a smaller file.
+- `compare_to`: string. Compare the new picture with an earlier one, by the path that an earlier screenshot gave (the last 100 are kept) or as an image of the project, such as "res://screenshots/level.png": the result says how much changed and where, and outlines the changes in the picture. Take both with the same views and size. Time, particles and temporal anti-aliasing make two runs differ; run the game with fixed_fps and take both at the same physics frame to compare runs.
+- `tolerance`: number from 0 to 1, default `0.1`. With compare_to, how much a color channel may change, from 0 to 1, before its pixel counts as changed. Default: 0.1.
 
 ### `editor_select`
 
@@ -132,7 +138,7 @@ No parameters.
 
 ### `project_create`
 
-**Create project.** Create a new Godot 4 project for a game from scratch: project.godot with the name, the renderer, Jolt Physics and the window size, a main scene with a camera and a light, .gitignore, and the godot MCP addon installed with its plugin enabled. A server that started without a project works on the new one right away; start its editor with editor_launch.
+**Create project.** Create a new Godot 4 project for a game from scratch: project.godot with the name, the renderer, Jolt Physics, the window size and warnings for GDScript declarations without a static type, a main scene with a camera and a light, .gitignore, and the godot MCP addon installed with its plugin enabled. A server that started without a project works on the new one right away; start its editor with editor_launch.
 
 *Makes changes*
 
@@ -185,11 +191,12 @@ No parameters.
 
 ### `audio_buses_get`
 
-**Read audio buses.** Read the audio bus layout of the project, as the Audio panel of the editor shows it: each bus in order with its volume in dB, the bus it sends to, mute, solo, bypass and its effects, and the file the layout is saved in. Players such as AudioStreamPlayer pick a bus by name with their "bus" property. Works without the editor.
+**Read audio buses.** Read the audio bus layout of the project, as the Audio panel of the editor shows it: each bus in order with its volume in dB, the bus it sends to, mute, solo, bypass and its effects, and the file the layout is saved in. Players such as AudioStreamPlayer pick a bus by name with their "bus" property. Works without the editor. With in_game, listen to the running game: the level of each bus and the players that play, to tell a muted bus, a silent volume or a player that never starts from a sound that plays.
 
 *Read-only*
 
-No parameters.
+- `in_game`: boolean, default `false`. Listen to the running game instead: the loudest peak of each bus over a few physics frames, whether that is silence, and the players that are playing, with their bus and stream. Works with or without the editor.
+- `window_physics_frames`: integer from 1 to 600, default `30`. With in_game, how long to listen, in physics frames (60 per second by default). Default: 30.
 
 ### `audio_buses_set`
 
@@ -351,7 +358,7 @@ No parameters.
 - `name`: string. Name of the new node. Default: the type name; a taken name gets a number.
 - `parent`: string, default `"."`. Path of the parent node relative to the scene root. Default: "." (the root).
 - `index`: integer, at least 0. Position among the children of the parent. Default: after the last child.
-- `properties`: object that maps names to values. Property names mapped to values, such as {"position": [0, 1, 0], "mesh": {"new": "BoxMesh", "size": [2, 1, 2]}}. Formats: numbers, booleans and text as JSON; vectors as [x, y, z] or "Vector3(0, 1, 0)"; rotation is in radians, rotation_degrees takes degrees; colors as "#ff8800", "orange" or [r, g, b, a] with channels from 0 to 1; enums by option name ("Double-Sided") or number; flags as a list of names; physics and render layers as layer numbers ([1, 3]); resources as a "res://…" path, or {"new": "Class", …properties} to create one; a script as "res://….gd"; node references as paths relative to the node ("../Player") or to the scene root ("Player"); Transform3D, Basis, AABB and Rect2 in Godot syntax ("Transform3D(…)"). Scripting properties such as global_position work too. A path changes one part only: "mesh:size" a property of the node's own mesh, "position:y" one coordinate. Every value is read back after it is set.
+- `properties`: object that maps names to values. Property names mapped to values, such as {"position": [0, 1, 0], "mesh": {"new": "BoxMesh", "size": [2, 1, 2]}}. Formats: numbers, booleans and text as JSON; vectors as [x, y, z] or "Vector3(0, 1, 0)"; rotation is in radians, rotation_degrees takes degrees; colors as "#ff8800", "orange" or [r, g, b, a] with channels from 0 to 1; enums by option name ("Double-Sided") or number; flags as a list of names; physics, render and navigation layers as a list of layer numbers or of the names the project gives them (["world", "enemies", 5]); resources as a "res://…" path, or {"new": "Class", …properties} to create one; the items of a Theme as "Button/styles/normal" or "Label/font_sizes/font_size", the points of a curve as "point_count" and "point_0/position", the items of a MeshLibrary as "item/0/name" and "item/0/mesh"; a script as "res://….gd"; node references and node paths, such as node_a of a joint, as paths relative to the node ("../Player") or to the scene root ("Player"); Transform3D, Basis, AABB and Rect2 in Godot syntax ("Transform3D(…)"). Scripting properties such as global_position work too. A path changes one part only: "mesh:size" a property of the node's own mesh, "position:y" one coordinate. Every value is read back after it is set.
 - `scene`: string. The scene to change, as a res:// path or "main" for the main scene of the project; it is opened in the editor if it is not open yet. Default: the scene currently open in the editor.
 
 ### `node_delete`
@@ -372,7 +379,7 @@ No parameters.
 - `path` (required): string. Path of the node relative to the scene root, such as "Player/Camera"; "." is the root itself.
 - `name`: string. Name of the copy. Default: the name of the original with a number, such as "Crate2".
 - `parent`: string. Put the copy under this node instead of right after the original.
-- `properties`: object that maps names to values. Property names mapped to values, such as {"position": [0, 1, 0], "mesh": {"new": "BoxMesh", "size": [2, 1, 2]}}. Formats: numbers, booleans and text as JSON; vectors as [x, y, z] or "Vector3(0, 1, 0)"; rotation is in radians, rotation_degrees takes degrees; colors as "#ff8800", "orange" or [r, g, b, a] with channels from 0 to 1; enums by option name ("Double-Sided") or number; flags as a list of names; physics and render layers as layer numbers ([1, 3]); resources as a "res://…" path, or {"new": "Class", …properties} to create one; a script as "res://….gd"; node references as paths relative to the node ("../Player") or to the scene root ("Player"); Transform3D, Basis, AABB and Rect2 in Godot syntax ("Transform3D(…)"). Scripting properties such as global_position work too. A path changes one part only: "mesh:size" a property of the node's own mesh, "position:y" one coordinate. Every value is read back after it is set.
+- `properties`: object that maps names to values. Property names mapped to values, such as {"position": [0, 1, 0], "mesh": {"new": "BoxMesh", "size": [2, 1, 2]}}. Formats: numbers, booleans and text as JSON; vectors as [x, y, z] or "Vector3(0, 1, 0)"; rotation is in radians, rotation_degrees takes degrees; colors as "#ff8800", "orange" or [r, g, b, a] with channels from 0 to 1; enums by option name ("Double-Sided") or number; flags as a list of names; physics, render and navigation layers as a list of layer numbers or of the names the project gives them (["world", "enemies", 5]); resources as a "res://…" path, or {"new": "Class", …properties} to create one; the items of a Theme as "Button/styles/normal" or "Label/font_sizes/font_size", the points of a curve as "point_count" and "point_0/position", the items of a MeshLibrary as "item/0/name" and "item/0/mesh"; a script as "res://….gd"; node references and node paths, such as node_a of a joint, as paths relative to the node ("../Player") or to the scene root ("Player"); Transform3D, Basis, AABB and Rect2 in Godot syntax ("Transform3D(…)"). Scripting properties such as global_position work too. A path changes one part only: "mesh:size" a property of the node's own mesh, "position:y" one coordinate. Every value is read back after it is set.
 - `scene`: string. The scene to change, as a res:// path or "main" for the main scene of the project; it is opened in the editor if it is not open yet. Default: the scene currently open in the editor.
 
 ### `node_reparent`
@@ -423,24 +430,26 @@ No parameters.
 
 ### `node_get_properties`
 
-**Node properties.** Read the properties of a node: those that differ from their defaults, or the ones named. Each value comes with its type, in Godot syntax; enums list their options. Use it to check a node before or after changing it.
+**Node properties.** Read the properties of a node, or of several nodes at once: those that differ from their defaults, or the ones named. Each value comes with its type, in Godot syntax; enums list their options, masks their layers. Use it to check nodes before or after changing them.
 
 *Read-only · loaded at the start*
 
-- `path` (required): string. Path of the node relative to the scene root, such as "Player/Camera"; "." is the root itself.
+- `path`: string. Path of the node relative to the scene root, such as "Player/Camera"; "." is the root itself.
+- `paths`: list of strings, 1 to 20. Read several nodes at once instead of path, such as ["Player", "Enemies/Goblin"]: each comes back in its own block, and a node that is not found is reported among the others.
 - `names`: list of strings. Properties to read, such as ["position", "mesh"], or paths into a resource or a value, such as "mesh:size" or "position:y". Default: every property whose value differs from its default.
 - `include_defaults`: boolean, default `false`. Without names, also list properties at their default values. The list gets long.
 - `scene`: string. The scene to read, as a res:// path or "main" for the main scene of the project; a scene that is not open is read from disk. Default: the scene currently open in the editor.
 
 ### `node_get_bounds`
 
-**Node bounds.** Measure the box that a 3D node and its children take up in world coordinates: center, size and corners, from its meshes and CSG shapes, or from its collision shapes when it has none. For a Control or a 2D node, measure its rectangle in canvas pixels, from controls, sprites, polygons, lines and tile maps, or from 2D collision shapes; a control also says whether it fits the window of the project. Use it to check placement and scale, such as whether a crate rests on the floor, a door is wide enough for the player or a health bar stays on screen.
+**Node bounds.** Measure the box that a 3D node and its children take up in world coordinates: center, size and corners, from its meshes and CSG shapes, or from its collision shapes when it has none. For a Control or a 2D node, measure its rectangle in canvas pixels, from controls, sprites, polygons, lines and tile maps, or from 2D collision shapes; a control also says whether it fits the window of the project. Measures one node, or several at once. Use it to check placement and scale, such as whether a crate rests on the floor, a door is wide enough for the player or a health bar stays on screen.
 
 *Read-only*
 
-- `path` (required): string. Path of the node relative to the scene root, such as "Level/Crate"; "." measures the whole scene. With in_game, a path in the running game, such as "Player".
+- `path`: string. Path of the node relative to the scene root, such as "Level/Crate"; "." measures the whole scene. With in_game, a path in the running game, such as "Player".
+- `paths`: list of strings, 1 to 20. Measure several nodes at once instead of path, such as ["Crate", "Ramp", "Player"]; each comes back in its own block.
 - `scene`: string. The scene to read, as a res:// path or "main" for the main scene of the project; a scene that is not open is read from disk. Default: the scene currently open in the editor.
-- `in_game`: boolean, default `false`. Measure the node in the running game instead, where it may have moved. Needs a game started from the editor.
+- `in_game`: boolean, default `false`. Measure the nodes in the running game instead, where they may have moved. Needs a game started from the editor.
 
 ### `scene_raycast`
 
@@ -483,7 +492,7 @@ No parameters.
 *Makes changes*
 
 - `path` (required): string. Path of the node relative to the scene root, such as "Player/Camera"; "." is the root itself.
-- `properties` (required): object that maps names to values. Property names mapped to values, such as {"position": [0, 1, 0], "mesh": {"new": "BoxMesh", "size": [2, 1, 2]}}. Formats: numbers, booleans and text as JSON; vectors as [x, y, z] or "Vector3(0, 1, 0)"; rotation is in radians, rotation_degrees takes degrees; colors as "#ff8800", "orange" or [r, g, b, a] with channels from 0 to 1; enums by option name ("Double-Sided") or number; flags as a list of names; physics and render layers as layer numbers ([1, 3]); resources as a "res://…" path, or {"new": "Class", …properties} to create one; a script as "res://….gd"; node references as paths relative to the node ("../Player") or to the scene root ("Player"); Transform3D, Basis, AABB and Rect2 in Godot syntax ("Transform3D(…)"). Scripting properties such as global_position work too. A path changes one part only: "mesh:size" a property of the node's own mesh, "position:y" one coordinate. Every value is read back after it is set.
+- `properties` (required): object that maps names to values. Property names mapped to values, such as {"position": [0, 1, 0], "mesh": {"new": "BoxMesh", "size": [2, 1, 2]}}. Formats: numbers, booleans and text as JSON; vectors as [x, y, z] or "Vector3(0, 1, 0)"; rotation is in radians, rotation_degrees takes degrees; colors as "#ff8800", "orange" or [r, g, b, a] with channels from 0 to 1; enums by option name ("Double-Sided") or number; flags as a list of names; physics, render and navigation layers as a list of layer numbers or of the names the project gives them (["world", "enemies", 5]); resources as a "res://…" path, or {"new": "Class", …properties} to create one; the items of a Theme as "Button/styles/normal" or "Label/font_sizes/font_size", the points of a curve as "point_count" and "point_0/position", the items of a MeshLibrary as "item/0/name" and "item/0/mesh"; a script as "res://….gd"; node references and node paths, such as node_a of a joint, as paths relative to the node ("../Player") or to the scene root ("Player"); Transform3D, Basis, AABB and Rect2 in Godot syntax ("Transform3D(…)"). Scripting properties such as global_position work too. A path changes one part only: "mesh:size" a property of the node's own mesh, "position:y" one coordinate. Every value is read back after it is set.
 - `scene`: string. The scene to change, as a res:// path or "main" for the main scene of the project; it is opened in the editor if it is not open yet. Default: the scene currently open in the editor.
 
 ### `gridmap_get_cells`
@@ -634,7 +643,7 @@ No parameters.
 
 - `path` (required): string. Where to save the new resource, as a res:// path ending in .tres, such as "res://materials/ice.tres". Missing folders are created; an existing file is never replaced.
 - `type` (required): string. The resource class: an engine class such as "StandardMaterial3D", "PhysicsMaterial", "Environment" or "Curve", or a class_name of the project that extends Resource.
-- `properties`: object that maps names to values. Property names mapped to values, such as {"position": [0, 1, 0], "mesh": {"new": "BoxMesh", "size": [2, 1, 2]}}. Formats: numbers, booleans and text as JSON; vectors as [x, y, z] or "Vector3(0, 1, 0)"; rotation is in radians, rotation_degrees takes degrees; colors as "#ff8800", "orange" or [r, g, b, a] with channels from 0 to 1; enums by option name ("Double-Sided") or number; flags as a list of names; physics and render layers as layer numbers ([1, 3]); resources as a "res://…" path, or {"new": "Class", …properties} to create one; a script as "res://….gd"; node references as paths relative to the node ("../Player") or to the scene root ("Player"); Transform3D, Basis, AABB and Rect2 in Godot syntax ("Transform3D(…)"). Scripting properties such as global_position work too. A path changes one part only: "mesh:size" a property of the node's own mesh, "position:y" one coordinate. Every value is read back after it is set.
+- `properties`: object that maps names to values. Property names mapped to values, such as {"position": [0, 1, 0], "mesh": {"new": "BoxMesh", "size": [2, 1, 2]}}. Formats: numbers, booleans and text as JSON; vectors as [x, y, z] or "Vector3(0, 1, 0)"; rotation is in radians, rotation_degrees takes degrees; colors as "#ff8800", "orange" or [r, g, b, a] with channels from 0 to 1; enums by option name ("Double-Sided") or number; flags as a list of names; physics, render and navigation layers as a list of layer numbers or of the names the project gives them (["world", "enemies", 5]); resources as a "res://…" path, or {"new": "Class", …properties} to create one; the items of a Theme as "Button/styles/normal" or "Label/font_sizes/font_size", the points of a curve as "point_count" and "point_0/position", the items of a MeshLibrary as "item/0/name" and "item/0/mesh"; a script as "res://….gd"; node references and node paths, such as node_a of a joint, as paths relative to the node ("../Player") or to the scene root ("Player"); Transform3D, Basis, AABB and Rect2 in Godot syntax ("Transform3D(…)"). Scripting properties such as global_position work too. A path changes one part only: "mesh:size" a property of the node's own mesh, "position:y" one coordinate. Every value is read back after it is set.
 
 ### `resource_get`
 
@@ -653,7 +662,7 @@ No parameters.
 *Makes changes*
 
 - `path` (required): string. The resource file, as a res:// path such as "res://materials/ice.tres".
-- `properties` (required): object that maps names to values. Property names mapped to values, such as {"position": [0, 1, 0], "mesh": {"new": "BoxMesh", "size": [2, 1, 2]}}. Formats: numbers, booleans and text as JSON; vectors as [x, y, z] or "Vector3(0, 1, 0)"; rotation is in radians, rotation_degrees takes degrees; colors as "#ff8800", "orange" or [r, g, b, a] with channels from 0 to 1; enums by option name ("Double-Sided") or number; flags as a list of names; physics and render layers as layer numbers ([1, 3]); resources as a "res://…" path, or {"new": "Class", …properties} to create one; a script as "res://….gd"; node references as paths relative to the node ("../Player") or to the scene root ("Player"); Transform3D, Basis, AABB and Rect2 in Godot syntax ("Transform3D(…)"). Scripting properties such as global_position work too. A path changes one part only: "mesh:size" a property of the node's own mesh, "position:y" one coordinate. Every value is read back after it is set.
+- `properties` (required): object that maps names to values. Property names mapped to values, such as {"position": [0, 1, 0], "mesh": {"new": "BoxMesh", "size": [2, 1, 2]}}. Formats: numbers, booleans and text as JSON; vectors as [x, y, z] or "Vector3(0, 1, 0)"; rotation is in radians, rotation_degrees takes degrees; colors as "#ff8800", "orange" or [r, g, b, a] with channels from 0 to 1; enums by option name ("Double-Sided") or number; flags as a list of names; physics, render and navigation layers as a list of layer numbers or of the names the project gives them (["world", "enemies", 5]); resources as a "res://…" path, or {"new": "Class", …properties} to create one; the items of a Theme as "Button/styles/normal" or "Label/font_sizes/font_size", the points of a curve as "point_count" and "point_0/position", the items of a MeshLibrary as "item/0/name" and "item/0/mesh"; a script as "res://….gd"; node references and node paths, such as node_a of a joint, as paths relative to the node ("../Player") or to the scene root ("Player"); Transform3D, Basis, AABB and Rect2 in Godot syntax ("Transform3D(…)"). Scripting properties such as global_position work too. A path changes one part only: "mesh:size" a property of the node's own mesh, "position:y" one coordinate. Every value is read back after it is set.
 
 ### `tileset_add_atlas`
 
@@ -730,6 +739,18 @@ No parameters.
 
 - `path`: string. Path of the NavigationRegion3D relative to the scene root, such as "Navigation". Default: every NavigationRegion3D of the scene.
 - `scene`: string. The scene to bake in, as a res:// path; it is opened in the editor if it is not open yet. Default: the scene currently open in the editor.
+
+### `navigation_get_path`
+
+**Navigation path.** Ask the navigation for the path from one point to another, as a NavigationAgent3D would get it: whether it reaches the target, its length and its points, and, when it stops short, where and how far from the target. It tells a level whose regions connect from one with a gap without running a chase. Reads the baked navigation meshes of the scene, which navigation_bake makes, or with in_game those of the running game.
+
+*Read-only*
+
+- `from` (required): list of 3 values. Where the path starts, [x, y, z] in world coordinates, such as the position of an enemy.
+- `to` (required): list of 3 values. Where the path should end, such as the position of the player.
+- `navigation_layers`: list of values. The navigation layers to walk on, by number or by the name the project gives them, as navigation_layers of a NavigationAgent3D. Default: [1], the layer of a new agent.
+- `in_game`: boolean, default `false`. Ask the navigation of the running game instead, as its agents see it now. Needs a game started from the editor.
+- `scene`: string. The scene to ask, as a res:// path or "main"; a scene that is not open is read from disk. Default: the scene currently open in the editor.
 
 ### `animation_get`
 
@@ -932,11 +953,12 @@ No parameters.
 
 ### `game_get_properties`
 
-**Running game properties.** Read properties of a node in the running game, like the remote inspector: positions, velocities, health, and getters such as is_on_floor(). Use it to check what the game is doing after game_run or game_wait. Needs a game started with game_run, with or without the editor.
+**Running game properties.** Read properties of a node in the running game, or of several nodes in the same frame, like the remote inspector: positions, velocities, health, and getters such as is_on_floor(). Use it to check what the game is doing after game_run or game_wait. Needs a game started with game_run, with or without the editor.
 
 *Read-only · loaded at the start*
 
-- `path` (required): string. Path of the node in the running game: relative to the current scene, such as "Player"; "." for the scene root; or absolute, such as "/root/GameState" for an autoload.
+- `path`: string. Path of the node in the running game: relative to the current scene, such as "Player"; "." for the scene root; or absolute, such as "/root/GameState" for an autoload.
+- `paths`: list of strings, 1 to 20. Read several nodes at once instead of path, such as ["Player", "Enemy"]. They are read in the same frame, so their values belong together, such as the distance between them.
 - `names`: list of strings. Properties to read, such as ["position", "velocity"], or paths such as "position:y" or "mesh:size". Methods without arguments whose names start with is_, get_, has_ or can_ can be read too, such as "is_on_floor()". Default: every property whose value differs from its default.
 - `include_defaults`: boolean, default `false`. Without names, also list properties at their default values. The list gets long.
 
@@ -947,7 +969,7 @@ No parameters.
 *Makes changes*
 
 - `path` (required): string. Path of the node in the running game: relative to the current scene, such as "Player"; "." for the scene root; or absolute, such as "/root/GameState" for an autoload.
-- `properties` (required): object that maps names to values. Property names mapped to values, such as {"position": [0, 1, 0], "mesh": {"new": "BoxMesh", "size": [2, 1, 2]}}. Formats: numbers, booleans and text as JSON; vectors as [x, y, z] or "Vector3(0, 1, 0)"; rotation is in radians, rotation_degrees takes degrees; colors as "#ff8800", "orange" or [r, g, b, a] with channels from 0 to 1; enums by option name ("Double-Sided") or number; flags as a list of names; physics and render layers as layer numbers ([1, 3]); resources as a "res://…" path, or {"new": "Class", …properties} to create one; a script as "res://….gd"; node references as paths relative to the node ("../Player") or to the scene root ("Player"); Transform3D, Basis, AABB and Rect2 in Godot syntax ("Transform3D(…)"). Scripting properties such as global_position work too. A path changes one part only: "mesh:size" a property of the node's own mesh, "position:y" one coordinate. Every value is read back after it is set.
+- `properties` (required): object that maps names to values. Property names mapped to values, such as {"position": [0, 1, 0], "mesh": {"new": "BoxMesh", "size": [2, 1, 2]}}. Formats: numbers, booleans and text as JSON; vectors as [x, y, z] or "Vector3(0, 1, 0)"; rotation is in radians, rotation_degrees takes degrees; colors as "#ff8800", "orange" or [r, g, b, a] with channels from 0 to 1; enums by option name ("Double-Sided") or number; flags as a list of names; physics, render and navigation layers as a list of layer numbers or of the names the project gives them (["world", "enemies", 5]); resources as a "res://…" path, or {"new": "Class", …properties} to create one; the items of a Theme as "Button/styles/normal" or "Label/font_sizes/font_size", the points of a curve as "point_count" and "point_0/position", the items of a MeshLibrary as "item/0/name" and "item/0/mesh"; a script as "res://….gd"; node references and node paths, such as node_a of a joint, as paths relative to the node ("../Player") or to the scene root ("Player"); Transform3D, Basis, AABB and Rect2 in Godot syntax ("Transform3D(…)"). Scripting properties such as global_position work too. A path changes one part only: "mesh:size" a property of the node's own mesh, "position:y" one coordinate. Every value is read back after it is set.
 
 ### `game_wait`
 
@@ -1039,23 +1061,27 @@ No parameters.
 
 *Read-only*
 
-- `views`: list of 1 to 6 items. Render the 3D scene from these angles instead of the game window, up to 6 in one labelled image: a preset "front" (from +Z), "back", "left" (from -X), "right", "top" or "iso", framed on the whole scene; {"preset": "front", "target": "Player"} to frame one node; or {"position": [0, 8, 12], "look_at": [0, 0, 0]} for a camera at a point. Each view also takes "fov" and "label". Each item is one of:
+- `views`: list of 1 to 6 items. Render the 3D scene from these angles instead of the game window, up to 6 in one labelled image: a preset "front" (from +Z), "back", "left" (from -X), "right", "top" or "iso", framed on the whole scene; {"preset": "front", "target": "Player"} to frame one node; or {"position": [0, 8, 12], "look_at": [0, 0, 0]} for a camera at a point. Each view also takes "fov", "label" and "render", such as {"preset": "iso", "render": "unshaded"}. Each item is one of:
   - "front", "back", "left", "right", "top" or "iso".
   - an object with:
     - `preset` (required): "front", "back", "left", "right", "top" or "iso".
     - `target`: string. A node to frame instead of the whole scene, such as "Player".
     - `fov`: number from 1 to 179. Vertical field of view in degrees. Default: 50.
     - `label`: string. Caption of the view in the image.
+    - `render`: "unshaded", "lighting", "overdraw", "wireframe" or "normals". Draw this view as a debug view of the 3D viewport instead of with materials and light: "unshaded" shows colors without light, to tell a dark room from a black material; "lighting" shows only the light; "overdraw" shows where transparent surfaces pile up; "wireframe" shows the triangles (editor_screenshot only); "normals" shows the surface normals (Forward+ only).
   - an object with:
     - `position` (required): list of 3 numbers. Camera position [x, y, z] in world coordinates.
     - `look_at`: list of 3 numbers. The point the camera looks at. Default: the center of target, or of the whole scene.
     - `target`: string. A node to frame instead of the whole scene, such as "Player".
     - `fov`: number from 1 to 179. Vertical field of view in degrees. Default: 50.
     - `label`: string. Caption of the view in the image.
+    - `render`: "unshaded", "lighting", "overdraw", "wireframe" or "normals". Draw this view as a debug view of the 3D viewport instead of with materials and light: "unshaded" shows colors without light, to tell a dark room from a black material; "lighting" shows only the light; "overdraw" shows where transparent surfaces pile up; "wireframe" shows the triangles (editor_screenshot only); "normals" shows the surface normals (Forward+ only).
 - `frames`: integer from 2 to 6. Instead of one moment, take this many screenshots of the game window, every_physics_frames apart, as one labelled image, to see motion such as a jump, an animation or a camera move. While game_pause holds the game, it plays exactly those frames and pauses again.
 - `every_physics_frames`: integer from 1 to 600. Physics frames between the screenshots of frames. Default: 5.
 - `max_size`: integer from 256 to 2560, default `1280`. The longest side of the image in pixels. Default: 1280.
 - `format`: "png" or "jpeg", default `"png"`. png (default), or jpeg for a smaller file.
+- `compare_to`: string. Compare the new picture with an earlier one, by the path that an earlier screenshot gave (the last 100 are kept) or as an image of the project, such as "res://screenshots/level.png": the result says how much changed and where, and outlines the changes in the picture. Take both with the same views and size. Time, particles and temporal anti-aliasing make two runs differ; run the game with fixed_fps and take both at the same physics frame to compare runs.
+- `tolerance`: number from 0 to 1, default `0.1`. With compare_to, how much a color channel may change, from 0 to 1, before its pixel counts as changed. Default: 0.1.
 
 ### `game_pause`
 

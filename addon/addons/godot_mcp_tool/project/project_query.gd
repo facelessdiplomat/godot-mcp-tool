@@ -10,6 +10,7 @@ const GodotMcpGameRequestResponder := preload("../runtime/game_request_responder
 const GodotMcpGridMapGetCellsCommand := preload("../commands/grid/gridmap_get_cells_command.gd")
 const GodotMcpInputMapGetCommand := preload("../commands/input/input_map_get_command.gd")
 const GodotMcpJsonRpc := preload("../bridge/json_rpc.gd")
+const GodotMcpNavigationGetPathCommand := preload("../commands/navigation/navigation_get_path_command.gd")
 const GodotMcpNodeFindCommand := preload("../commands/node/node_find_command.gd")
 const GodotMcpNodeGetBoundsCommand := preload("../commands/node/node_get_bounds_command.gd")
 const GodotMcpNodeGetPropertiesCommand := preload("../commands/node/node_get_properties_command.gd")
@@ -27,21 +28,22 @@ const GodotMcpUserDataGetCommand := preload("../commands/project/user_data_get_c
 const GodotMcpVariantCodec := preload("../codec/variant_codec.gd")
 
 const ANSWER_MARKER := "GODOT_MCP_TOOL_ANSWER "
-const SCENE_READING_METHODS := ["scene.get_tree", "node.find", "node.get_properties", "node.get_bounds", "gridmap.get_cells", "tilemap.get_cells", "signal.list"]
+const SCENE_READING_METHODS := ["scene.get_tree", "node.find", "node.get_properties", "node.get_bounds", "navigation.get_path", "gridmap.get_cells", "tilemap.get_cells", "signal.list"]
 
 
 class GodotMcpRunningGameOutOfReach:
 	extends "../commands/game/game_request_command.gd"
 
-	func _init() -> void:
-		super(null, "bounds", 0)
+	var _message: String
+	var _hint: String
+
+	func _init(message: String, hint: String) -> void:
+		super(null, "", 0)
+		_message = message
+		_hint = hint
 
 	func execute(_params: Dictionary) -> Variant:
-		return GodotMcpCommandError.new(
-			GodotMcpJsonRpc.GAME_NOT_RUNNING,
-			"Without the editor, node_get_bounds measures scenes, not the running game",
-			"Read the running game with game_get_properties, such as global_position.",
-		)
+		return GodotMcpCommandError.new(GodotMcpJsonRpc.GAME_NOT_RUNNING, _message, _hint)
 
 
 func _initialize() -> void:
@@ -71,7 +73,8 @@ static func _router() -> GodotMcpCommandRouter:
 	router.register("scene.get_tree", GodotMcpSceneGetTreeCommand.new(context))
 	router.register("node.find", GodotMcpNodeFindCommand.new(context))
 	router.register("node.get_properties", GodotMcpNodeGetPropertiesCommand.new(context))
-	router.register("node.get_bounds", GodotMcpNodeGetBoundsCommand.new(context, GodotMcpRunningGameOutOfReach.new()))
+	router.register("node.get_bounds", GodotMcpNodeGetBoundsCommand.new(context, GodotMcpRunningGameOutOfReach.new("Without the editor, node_get_bounds measures scenes, not the running game", "Read the running game with game_get_properties, such as global_position.")))
+	router.register("navigation.get_path", GodotMcpNavigationGetPathCommand.new(context, GodotMcpRunningGameOutOfReach.new("Without the editor, navigation_get_path reads scenes, not the running game", "Pass scene instead of in_game, or start the editor with editor_launch.")))
 	router.register("gridmap.get_cells", GodotMcpGridMapGetCellsCommand.new(context))
 	router.register("tilemap.get_cells", GodotMcpTileMapGetCellsCommand.new(context))
 	router.register("signal.list", GodotMcpSignalListCommand.new(context))

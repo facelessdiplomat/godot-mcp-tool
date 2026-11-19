@@ -1,6 +1,5 @@
-import { dirname } from 'node:path';
 import * as z from 'zod/v4';
-import { ProjectLocator } from '../project/ProjectLocator.js';
+import { findProjectContaining } from '../project/ProjectLocator.js';
 import { ScriptPathError } from '../scripts/ScriptFiles.js';
 import { type ValidationResult, ValidationUnavailableError } from '../scripts/ScriptValidator.js';
 import { formatValidation } from '../tools/formatting/scriptReports.js';
@@ -22,13 +21,13 @@ export class EditedScriptCheck {
       return silent;
     }
     const scriptPath = edit.data.tool_input.file_path;
-    const project = new ProjectLocator({}, dirname(scriptPath)).locate();
-    if (!project.found) {
+    const projectRoot = findProjectContaining(scriptPath);
+    if (projectRoot === undefined) {
       return silent;
     }
     let validation: ValidationResult;
     try {
-      validation = await this.validate(project.root, scriptPath);
+      validation = await this.validate(projectRoot, scriptPath);
     } catch (error) {
       if (error instanceof ValidationUnavailableError || error instanceof ScriptPathError) {
         return silent;

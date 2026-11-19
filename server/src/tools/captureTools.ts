@@ -25,17 +25,38 @@ export const captureSchema = z.object({
   moments: z.array(z.string()).optional(),
   sizes: z.array(z.string()).optional(),
   note: z.string().optional(),
+  comparison: z
+    .object({
+      earlier: z.string(),
+      sizes_match: z.boolean(),
+      earlier_size: z.array(z.number()),
+      mean_difference: z.number(),
+      changed_share: z.number(),
+      changed_rect: z.array(z.number()).nullable(),
+      tolerance: z.number(),
+    })
+    .optional(),
 });
 
 export type Capture = z.infer<typeof captureSchema>;
+
+type Comparison = NonNullable<Capture['comparison']>;
 
 const point = z.array(z.number()).length(3);
 
 const viewTarget = z.string().min(1).optional().describe('A node to frame instead of the whole scene, such as "Player".');
 
+const renderModes = ['unshaded', 'lighting', 'overdraw', 'wireframe', 'normals'] as const;
+
 const viewSettings = {
   fov: z.number().min(1).max(179).optional().describe('Vertical field of view in degrees. Default: 50.'),
   label: z.string().min(1).optional().describe('Caption of the view in the image.'),
+  render: z
+    .enum(renderModes)
+    .optional()
+    .describe(
+      'Draw this view as a debug view of the 3D viewport instead of with materials and light: "unshaded" shows colors without light, to tell a dark room from a black material; "lighting" shows only the light; "overdraw" shows where transparent surfaces pile up; "wireframe" shows the triangles (editor_screenshot only); "normals" shows the surface normals (Forward+ only).',
+    ),
 };
 
 const view = z.union([
@@ -56,13 +77,26 @@ function viewsParameter(instead: string) {
     .max(maximumViews)
     .optional()
     .describe(
-      `Render the 3D scene from these angles instead of ${instead}, up to ${String(maximumViews)} in one labelled image: a preset "front" (from +Z), "back", "left" (from -X), "right", "top" or "iso", framed on the whole scene; {"preset": "front", "target": "Player"} to frame one node; or {"position": [0, 8, 12], "look_at": [0, 0, 0]} for a camera at a point. Each view also takes "fov" and "label".`,
+      `Render the 3D scene from these angles instead of ${instead}, up to ${String(maximumViews)} in one labelled image: a preset "front" (from +Z), "back", "left" (from -X), "right", "top" or "iso", framed on the whole scene; {"preset": "front", "target": "Player"} to frame one node; or {"position": [0, 8, 12], "look_at": [0, 0, 0]} for a camera at a point. Each view also takes "fov", "label" and "render", such as {"preset": "iso", "render": "unshaded"}.`,
     );
 }
 
 const imageSettings = {
   max_size: z.number().int().min(256).max(2560).default(1280).describe('The longest side of the image in pixels. Default: 1280.'),
   format: z.enum(['png', 'jpeg']).default('png').describe('png (default), or jpeg for a smaller file.'),
+  compare_to: z
+    .string()
+    .min(1)
+    .optional()
+    .describe(
+      'Compare the new picture with an earlier one, by the path that an earlier screenshot gave (the last 100 are kept) or as an image of the project, such as "res://screenshots/level.png": the result says how much changed and where, and outlines the changes in the picture. Take both with the same views and size. Time, particles and temporal anti-aliasing make two runs differ; run the game with fixed_fps and take both at the same physics frame to compare runs.',
+    ),
+  tolerance: z
+    .number()
+    .min(0)
+    .max(1)
+    .default(0.1)
+    .describe('With compare_to, how much a color channel may change, from 0 to 1, before its pixel counts as changed. Default: 0.1.'),
 };
 
 const gameScreenshotInput = z.object({
@@ -93,6 +127,7 @@ export function createGameScreenshotTool(game: EditorGateway, readCapture: Captu
     },
     method: 'game.screenshot',
     responseSchema: captureSchema,
+    params: withoutUnusedTolerance,
     timeoutMs: ({ frames, every_physics_frames }) =>
       screenshotAllowanceMs + (frames === undefined ? 0 : frames * screenshotAllowanceMs + Math.ceil((frames * (every_physics_frames ?? 5) * 1000) / 60)),
     present: (capture, input) => presentCapture(capture, describeGameCapture(capture, input.views === undefined), readCapture),
@@ -140,6 +175,7 @@ export function createEditorScreenshotTool(editor: EditorGateway, readCapture: C
     },
     method: 'editor.screenshot',
     responseSchema: captureSchema,
+    params: withoutUnusedTolerance,
     timeoutMs: screenshotAllowanceMs,
     present: (capture, input) => presentCapture(capture, describeEditorCapture(capture, input.views === undefined), readCapture),
   });
@@ -152,7 +188,7 @@ export function presentCapture(capture: Capture, summary: string, readCapture: C
   } catch (error) {
     return errorResult(`${summary}\nThe screenshot was saved to ${capture.path}, but it could not be read: ${describeError(error)}`);
   }
-  const lines = [summary, ...(capture.note === undefined ? [] : [capture.note]), `Saved to ${capture.path}`];
+  const lines = [summary, ...(capture.note === undefined ? [] : [capture.note]), ...(capture.comparison === undefined ? [] : [describeComparison(capture.comparison)]), `Saved to ${capture.path}`];
   return {
     content: [
       { type: 'image', data: image.toString('base64'), mimeType: imageTypes[extname(capture.path).toLowerCase()] ?? 'image/png' },
@@ -190,6 +226,21 @@ function describeEditorCapture(capture: Capture, fromEditorCamera: boolean): str
 function describeViews(capture: Capture, subject: string): string {
   const order = capture.views.length === 1 ? '' : ', left to right and top to bottom';
   return `${capture.views.length === 1 ? 'View' : 'Views'} of ${subject}, ${describeSize(capture)}${order}: ${capture.views.join(', ')}.`;
+}
+
+function withoutUnusedTolerance(input: Readonly<Record<string, unknown>>): Record<string, unknown> {
+  return input['compare_to'] === undefined ? Object.fromEntries(Object.entries(input).filter(([name]) => name !== 'tolerance')) : { ...input };
+}
+
+function describeComparison(comparison: Comparison): string {
+  const [earlierWidth = 0, earlierHeight = 0] = comparison.earlier_size;
+  const scaled = comparison.sizes_match ? '' : `, scaled from ${String(earlierWidth)}×${String(earlierHeight)}`;
+  const mean = `the mean difference is ${String(Number(comparison.mean_difference.toFixed(2)))} of 255`;
+  if (comparison.changed_rect === null) {
+    return `Compared with ${comparison.earlier}${scaled}: no pixel changed by more than ${String(comparison.tolerance)}, so the pictures match; ${mean}.`;
+  }
+  const share = `${String(Number((comparison.changed_share * 100).toFixed(1)))}%`;
+  return `Compared with ${comparison.earlier}${scaled}: ${share} of the pixels changed by more than ${String(comparison.tolerance)}, all within [${comparison.changed_rect.join(', ')}] (x, y, width, height), outlined in magenta; ${mean}.`;
 }
 
 function describeSize(capture: Capture): string {

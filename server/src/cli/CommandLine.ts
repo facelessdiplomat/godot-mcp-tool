@@ -1,15 +1,17 @@
 export type ProjectCommand = 'init' | 'install-addon' | 'update-addon' | 'doctor';
 
+export type HookCommand = 'check-edited-script' | 'check-scene-edit';
+
 export type CommandLineRequest =
   | { readonly kind: 'serve' }
   | { readonly kind: ProjectCommand; readonly projectPath: string | undefined }
-  | { readonly kind: 'check-edited-script' }
+  | { readonly kind: HookCommand }
   | { readonly kind: 'help' }
   | { readonly kind: 'version' }
   | { readonly kind: 'invalid'; readonly reason: string };
 
 const projectCommands: readonly ProjectCommand[] = ['init', 'install-addon', 'update-addon', 'doctor'];
-const hookCommand = 'check-edited-script';
+const hookCommands: readonly HookCommand[] = ['check-edited-script', 'check-scene-edit'];
 const helpArguments = new Set(['--help', '-h', 'help']);
 const versionArguments = new Set(['--version', '-v']);
 
@@ -25,9 +27,13 @@ export const usage = [
   '  doctor [folder]         Check Node.js, Godot, the addon, the plugin and the connection to the editor',
   '  check-edited-script    Check the .gd or .gdshader file named in the Claude Code hook input on standard input;',
   '                         the hook of the Claude Code plugin runs it after Claude writes or edits a file',
+  '  check-scene-edit       Deny the edit of the .tscn or .tres file named in the Claude Code hook input on standard',
+  '                         input while the Godot editor has the project open; the hook of the Claude Code plugin',
+  '                         runs it before Claude writes or edits a file',
   '',
   'The project folder is the folder with project.godot. By default it is GODOT_PROJECT_PATH, or the',
-  'current folder or the nearest folder above it that has a project.godot.',
+  'current folder or the nearest folder above it that has a project.godot, or else the one project in',
+  'the folders up to three levels below it.',
   '',
   'Options:',
   '  --help, -h     Show this help',
@@ -45,7 +51,8 @@ export function parseCommandLine(commandLineArguments: readonly string[]): Comma
   if (versionArguments.has(first)) {
     return { kind: 'version' };
   }
-  if (first === hookCommand) {
+  const hookCommand = hookCommands.find((candidate) => candidate === first);
+  if (hookCommand !== undefined) {
     return rest.length === 0 ? { kind: hookCommand } : { kind: 'invalid', reason: `${hookCommand} reads the hook input from standard input and takes no arguments.` };
   }
   const command = projectCommands.find((candidate) => candidate === first);

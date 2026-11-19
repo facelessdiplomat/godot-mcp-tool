@@ -52,6 +52,15 @@ describe.skipIf(godotBinary === '')('bounds and screenshots without a window', (
     expect(scene.text).toContain('Measured from 2 visual nodes.');
   });
 
+  it('measures several nodes in one call and reports a missing one among them', async () => {
+    const measured = await tools().call('node_get_bounds', { paths: ['Crate', 'Floor', 'Crat'], scene: 'res://main.tscn' });
+
+    expect(measured.isError).toBe(false);
+    expect(measured.text).toContain('Crate (MeshInstance3D) in res://main.tscn, in world coordinates:\ncenter Vector3(4, 1, 0), size Vector3(2, 2, 2)');
+    expect(measured.text).toContain('\n\nFloor (CSGBox3D) in res://main.tscn, in world coordinates:\ncenter Vector3(0, -0.5, 0), size Vector3(20, 1, 20)');
+    expect(measured.text).toMatch(/\n\nNode "Crat" not found\nHint: .*Crate/);
+  });
+
   it('explains that the editor cannot render without a window', async () => {
     await tools().call('scene_open', { path: 'res://main.tscn' });
 
@@ -70,6 +79,13 @@ describe.skipIf(godotBinary === '')('bounds and screenshots without a window', (
     expect(bounds.text).toContain('Player (CharacterBody3D) in the running game (res://main.tscn), in world coordinates:');
     expect(bounds.text).toContain('size Vector3(1, 2, 1)');
     expect(bounds.text).toContain('No visual nodes, so measured from 1 collision shape.');
+  });
+
+  it('measures several nodes of the running game in one call', async () => {
+    const measured = await tools().call('node_get_bounds', { paths: ['Player', 'Floor'], in_game: true });
+
+    expect(measured.text).toContain('Player (CharacterBody3D) in the running game (res://main.tscn), in world coordinates:');
+    expect(measured.text).toContain('Floor (CSGBox3D) in the running game (res://main.tscn), in world coordinates:');
   });
 
   it('checks the views of a game screenshot before it needs a window', async () => {

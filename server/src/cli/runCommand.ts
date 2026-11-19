@@ -1,9 +1,11 @@
 import { AddonInstaller } from '../addon/AddonInstaller.js';
 import { readAddonVersion } from '../addon/InstalledAddon.js';
+import { isProcessAlive } from '../bridge/DiscoveryFileReader.js';
 import { type ApplicationEnvironment, createGodotContext, type GodotContext } from '../createGodotContext.js';
 import { GodotCli } from '../godot/GodotCli.js';
 import { EditedScriptCheck } from '../hooks/EditedScriptCheck.js';
-import { respondToEditedScript } from '../hooks/hookResponse.js';
+import { type HookResponse, respondToEditedScript, respondToSceneEdit } from '../hooks/hookResponse.js';
+import { SceneEditGuard } from '../hooks/SceneEditGuard.js';
 import { NodeProcessRunner } from '../process/ProcessRunner.js';
 import { EditorOrHeadlessGateway } from '../editor/EditorOrHeadlessGateway.js';
 import { HeadlessProjectQuery } from '../project/HeadlessProjectQuery.js';
@@ -52,6 +54,8 @@ export async function runCommand(request: CommandRequest, environment: CommandLi
       return usageErrorExitCode;
     case 'check-edited-script':
       return checkEditedScript(environment, output);
+    case 'check-scene-edit':
+      return checkSceneEdit(environment, output);
     case 'init':
       return createProject(request.projectPath, environment, output);
     default:
@@ -95,7 +99,7 @@ async function createProject(folder: string | undefined, environment: CommandLin
     }).create({ path: folder });
     const [width, height] = created.windowSize;
     output.write(
-      `Created the Godot project "${created.name}" in ${created.root}: project.godot (Forward+, Jolt Physics, window ${String(width)}×${String(height)}), the main scene ${created.mainScene}, .gitignore, .gitattributes and .editorconfig.`,
+      `Created the Godot project "${created.name}" in ${created.root}: project.godot (Forward+, Jolt Physics, window ${String(width)}×${String(height)}, warnings for untyped GDScript), the main scene ${created.mainScene}, .gitignore, .gitattributes and .editorconfig.`,
     );
     output.write(`${created.addon} Its plugin is enabled.`);
     output.write(`Next: open it in the Godot editor (godot --editor --path ${created.root}), or start Claude Code in ${created.root} and ask for the game.`);
@@ -109,14 +113,31 @@ async function createProject(folder: string | undefined, environment: CommandLin
 }
 
 async function checkEditedScript(environment: CommandLineEnvironment, output: CommandOutput): Promise<number> {
-  let hookInput: unknown;
-  try {
-    hookInput = JSON.parse(await environment.readInput());
-  } catch {
+  const hookInput = await readHookInput(environment);
+  if (hookInput === undefined) {
     return 0;
   }
   const outcome = await new EditedScriptCheck((projectRoot, scriptPath) => validateScript(environment, projectRoot, scriptPath)).check(hookInput);
-  const response = respondToEditedScript(outcome);
+  return answerHook(respondToEditedScript(outcome), output);
+}
+
+async function checkSceneEdit(environment: CommandLineEnvironment, output: CommandOutput): Promise<number> {
+  const hookInput = await readHookInput(environment);
+  if (hookInput === undefined) {
+    return 0;
+  }
+  return answerHook(respondToSceneEdit(new SceneEditGuard(isProcessAlive).check(hookInput)), output);
+}
+
+async function readHookInput(environment: CommandLineEnvironment): Promise<unknown> {
+  try {
+    return JSON.parse(await environment.readInput()) as unknown;
+  } catch {
+    return undefined;
+  }
+}
+
+function answerHook(response: HookResponse, output: CommandOutput): number {
   response.standardOutput.forEach((line) => {
     output.write(line);
   });

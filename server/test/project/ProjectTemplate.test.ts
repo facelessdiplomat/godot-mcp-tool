@@ -16,6 +16,14 @@ describe('the template of a new project', () => {
     expect(text).toContain('renderer/rendering_method="mobile"');
   });
 
+  it('warns about declarations without a static type, so that script checks point at untyped code', () => {
+    const text = projectFileText({ name: 'Game', renderer: 'forward_plus', windowSize: [1152, 648], versionBranch: '4.8' });
+
+    expect(text).toContain('[debug]\n\ngdscript/warnings/untyped_declaration=1\n');
+    expect(text.indexOf('[debug]')).toBeGreaterThan(text.indexOf('[application]'));
+    expect(text.indexOf('[debug]')).toBeLessThan(text.indexOf('[display]'));
+  });
+
   it('leaves the version out when it is not known and the renderer setting out for Forward+', () => {
     const text = projectFileText({ name: 'Game', renderer: 'forward_plus', windowSize: [1152, 648], versionBranch: undefined });
 

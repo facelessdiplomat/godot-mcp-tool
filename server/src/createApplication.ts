@@ -2,6 +2,7 @@ import { join } from 'node:path';
 import { readFileSync } from 'node:fs';
 import type { McpServer } from '@modelcontextprotocol/server';
 import { DocsSource } from './docs/DocsSource.js';
+import { areChangesHeld } from './editor/ChangesHold.js';
 import { EditorLauncher, systemClock } from './editor/EditorLauncher.js';
 import { EditorOrHeadlessGateway } from './editor/EditorOrHeadlessGateway.js';
 import { DebugAdapterClient } from './debug/DebugAdapterClient.js';
@@ -136,6 +137,7 @@ function createApplicationParts(environment: ApplicationEnvironment, createdProj
       binaryLocator,
       readVersion: (executablePath) => new GodotCli(processRunner, executablePath).version(),
       toolNotes,
+      readChangesHeld: () => areChangesHeld(editor),
     }),
     new EditorLaunchTool(editorLauncher, { headlessByDefault: windowless }),
     new ProjectCreateTool(
@@ -146,7 +148,7 @@ function createApplicationParts(environment: ApplicationEnvironment, createdProj
       }),
       adopt,
     ),
-    ...createEditorTools(editor, projectReader, readFileSync),
+    ...createEditorTools(editor, projectReader, readFileSync, gameGateway),
     new ScriptRenameTool(
       new ScriptRenamer({
         projectRoot: project.found ? project.root : undefined,

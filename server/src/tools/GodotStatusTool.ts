@@ -18,7 +18,11 @@ export interface GodotStatusDependencies {
   readonly binaryLocator: BinaryLocator;
   readonly readVersion: (executablePath: string) => Promise<GodotVersion>;
   readonly toolNotes?: readonly string[] | undefined;
+  readonly readChangesHeld?: (() => Promise<boolean>) | undefined;
 }
+
+const changesHeldNote =
+  'Changes are held: the user turned on Hold Changes in the editor, so the tools that change scenes, resources, files and settings or start and play the game are refused until the user turns it off. Reading works.';
 
 export class GodotStatusTool implements Tool<typeof inputSchema> {
   readonly name = 'godot_status';
@@ -36,8 +40,22 @@ export class GodotStatusTool implements Tool<typeof inputSchema> {
 
   async execute(_input: z.input<typeof inputSchema>): Promise<CallToolResult> {
     const editorStatus = await this.dependencies.editor.status();
-    const statusLines = [this.describeProject(), describeEditor(editorStatus), await this.describeBinary(editorStatus), ...(this.dependencies.toolNotes ?? [])];
+    const statusLines = [
+      this.describeProject(),
+      describeEditor(editorStatus),
+      ...(await this.describeHeldChanges(editorStatus)),
+      await this.describeBinary(editorStatus),
+      ...(this.dependencies.toolNotes ?? []),
+    ];
     return textResult(statusLines.join('\n'));
+  }
+
+  private async describeHeldChanges(editorStatus: EditorStatus): Promise<string[]> {
+    const { readChangesHeld } = this.dependencies;
+    if (!editorStatus.connected || readChangesHeld === undefined) {
+      return [];
+    }
+    return (await readChangesHeld().catch(() => false)) ? [changesHeldNote] : [];
   }
 
   private describeProject(): string {

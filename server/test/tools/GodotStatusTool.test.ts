@@ -53,6 +53,32 @@ describe('GodotStatusTool', () => {
     expect(text).toContain('Godot binary: /opt/godot/godot (from running editor), version 4.8.beta.custom_build.679066724');
   });
 
+  it('says when the user holds the changes of the agent in the editor', async () => {
+    const tool = new GodotStatusTool({
+      project: foundProject,
+      editor: editorReporting({ connected: true, hello }),
+      binaryLocator: binaryFromRunningEditor,
+      readVersion: readKnownVersion,
+      readChangesHeld: () => Promise.resolve(true),
+    });
+
+    expect(await statusText(tool)).toContain(
+      'Changes are held: the user turned on Hold Changes in the editor, so the tools that change scenes, resources, files and settings or start and play the game are refused until the user turns it off. Reading works.',
+    );
+  });
+
+  it('says nothing about holding changes when they are not held', async () => {
+    const tool = new GodotStatusTool({
+      project: foundProject,
+      editor: editorReporting({ connected: true, hello }),
+      binaryLocator: binaryFromRunningEditor,
+      readVersion: readKnownVersion,
+      readChangesHeld: () => Promise.resolve(false),
+    });
+
+    expect(await statusText(tool)).not.toContain('held');
+  });
+
   it('says when the editor runs without a window, so that screenshots cannot work', async () => {
     const tool = new GodotStatusTool({
       project: foundProject,

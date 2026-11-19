@@ -26,6 +26,46 @@ const menuScene = [
   '',
 ].join('\n');
 
+const darkScene = [
+  '[gd_scene load_steps=4 format=3]',
+  '',
+  '[sub_resource type="StandardMaterial3D" id="Material_green"]',
+  'albedo_color = Color(0, 1, 0, 1)',
+  '',
+  '[sub_resource type="BoxMesh" id="BoxMesh_box"]',
+  'material = SubResource("Material_green")',
+  'size = Vector3(2, 2, 2)',
+  '',
+  '[sub_resource type="Environment" id="Environment_dark"]',
+  'background_mode = 1',
+  'background_color = Color(0, 0, 0, 1)',
+  'ambient_light_source = 2',
+  'ambient_light_color = Color(0, 0, 0, 1)',
+  'ambient_light_energy = 0.0',
+  'reflected_light_source = 1',
+  '',
+  '[node name="Dark" type="Node3D"]',
+  '',
+  '[node name="Box" type="MeshInstance3D" parent="."]',
+  'mesh = SubResource("BoxMesh_box")',
+  '',
+  '[node name="Environment" type="WorldEnvironment" parent="."]',
+  'environment = SubResource("Environment_dark")',
+  '',
+  '[node name="Lamp" type="OmniLight3D" parent="."]',
+  'transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -20, 0)',
+  'light_energy = 0.0',
+  '',
+].join('\n');
+
+function isGreen([red, green, blue]: Rgb): boolean {
+  return green > 200 && red < 60 && blue < 60;
+}
+
+function isDark([red, green, blue]: Rgb): boolean {
+  return red < 40 && green < 40 && blue < 40;
+}
+
 function decodedImage(outcome: ImageOutcome): PngImage {
   if (outcome.image === undefined) {
     throw new Error(`The result has no image: ${outcome.text}`);
@@ -57,6 +97,7 @@ describe.skipIf(godotBinary === '' || !windowTestsEnabled)('screenshots with a w
     project = new TemporaryProject('MCP screenshots', { mainScene: 'res://main.tscn' });
     writeCaptureScene(project);
     project.write('menu.tscn', menuScene);
+    project.write('dark.tscn', darkScene);
     editorProcess = await startWindowedEditor(project.root);
     session = await McpSession.connect(project.root);
     await session.call('scene_open', { path: 'res://main.tscn' });
@@ -77,6 +118,31 @@ describe.skipIf(godotBinary === '' || !windowTestsEnabled)('screenshots with a w
     expect(outcome.text).not.toContain('preview');
     expect([image.width, image.height]).toEqual([1280, 720]);
     expect(isRed(centerOf(image))).toBe(true);
+  });
+
+  it('shows the colors of an unlit scene in an unshaded view, which a lit view shows dark', async () => {
+    await tools().call('scene_open', { path: 'res://dark.tscn' });
+    const lit = decodedImage(await tools().callForImage('editor_screenshot', { views: [{ preset: 'front', target: 'Box' }] }));
+    const unshaded = await tools().callForImage('editor_screenshot', { views: [{ preset: 'front', target: 'Box', render: 'unshaded' }] });
+    await tools().call('scene_open', { path: 'res://main.tscn' });
+
+    expect(unshaded.text).toContain('front of Box, unshaded');
+    expect(isDark(centerOf(lit))).toBe(true);
+    expect(isGreen(centerOf(decodedImage(unshaded)))).toBe(true);
+  });
+
+  it('compares a view with an earlier one: the same scene matches, a moved crate is outlined', async () => {
+    const view = { views: [{ position: [0, 6, 14], look_at: [0, 0, 0] }] };
+    const first = await tools().callForImage('editor_screenshot', view);
+    const earlier = /Saved to (?<path>.+)$/m.exec(first.text)?.groups?.['path'] ?? '';
+    const same = await tools().callForImage('editor_screenshot', { ...view, compare_to: earlier });
+    await tools().call('node_set_properties', { path: 'Crate', properties: { position: [-4, 1, 0] } });
+    const moved = await tools().callForImage('editor_screenshot', { ...view, compare_to: earlier });
+    await tools().call('editor_undo');
+
+    expect(earlier).toMatch(/\.png$/);
+    expect(same.text).toContain(`Compared with ${earlier}: no pixel changed by more than 0.1, so the pictures match`);
+    expect(moved.text).toMatch(/Compared with .+: [\d.]+% of the pixels changed by more than 0\.1, all within \[\d+, \d+, \d+, \d+\]/);
   });
 
   it('lays several editor views out in one image', async () => {
@@ -158,6 +224,15 @@ describe.skipIf(godotBinary === '' || !windowTestsEnabled)('screenshots with a w
     expect(view.text).toContain('View of the running game (res://main.tscn), 1280×720: top of Crate.');
     expect(isRed(centerOf(decodedImage(view)))).toBe(true);
     expect(isRed(centerOf(decodedImage(window)))).toBe(true);
+  });
+
+  it('renders an unshaded view of the running game, and refuses its wireframe', async () => {
+    const unshaded = await tools().callForImage('game_screenshot', { views: [{ preset: 'front', target: 'Crate', render: 'unshaded' }] });
+    const wireframe = await tools().call('game_screenshot', { views: [{ preset: 'front', render: 'wireframe' }] });
+
+    expect(isRed(centerOf(decodedImage(unshaded)))).toBe(true);
+    expect(wireframe.isError).toBe(true);
+    expect(wireframe.text).toContain('editor_screenshot');
   });
 
   it('takes a screenshot right after playing input', async () => {

@@ -6,6 +6,7 @@ const GodotMcpGameRequestCommand := preload("../game/game_request_command.gd")
 const GodotMcpHeadlessWindow := preload("../../runtime/headless_window.gd")
 const GodotMcpNodeFactory := preload("../../scene/node_factory.gd")
 const GodotMcpNodeLocator := preload("../../scene/node_locator.gd")
+const GodotMcpNodeSelection := preload("../node_selection.gd")
 const GodotMcpParams := preload("../params.gd")
 const GodotMcpSceneSnapshot := preload("../../scene/scene_snapshot.gd")
 
@@ -19,21 +20,28 @@ func _init(context: GodotMcpEditingContext, game_bounds: GodotMcpGameRequestComm
 
 
 func execute(params: Dictionary) -> Variant:
-	var node_path: Variant = GodotMcpParams.required_text(params, "path", "\"Player\", or \".\" for the whole scene")
+	var selection: Variant = GodotMcpNodeSelection.read(params, "\"Player\", or \".\" for the whole scene")
 	var scene_path: Variant = GodotMcpParams.text(params, "scene")
 	var in_game: Variant = GodotMcpParams.flag(params, "in_game", false)
-	for value in [node_path, scene_path, in_game]:
+	for value in [selection, scene_path, in_game]:
 		if value is GodotMcpCommandError:
 			return value
 	if in_game:
 		if not (scene_path as String).is_empty():
 			return GodotMcpCommandError.new(GodotMcpJsonRpc.INVALID_PARAMS, "\"scene\" and \"in_game\" cannot be used together", "With in_game the node is measured in the current scene of the running game.")
-		return await _game_bounds.execute({"path": node_path})
+		return await _game_bounds.execute({"path": selection} if selection is String else {"paths": selection})
 	var resolved: Variant = _context.scenes.resolve_for_reading(scene_path)
 	if resolved is GodotMcpCommandError:
 		return resolved
 	var snapshot := resolved as GodotMcpSceneSnapshot
-	var result: Variant = await _measure(snapshot, node_path)
+	var result: Variant
+	if selection is String:
+		result = await _measure(snapshot, selection)
+	else:
+		var nodes: Array = []
+		for node_path: String in selection:
+			nodes.append(GodotMcpNodeSelection.entry_of(node_path, await _measure(snapshot, node_path)))
+		result = {"scene": snapshot.scene_path, "nodes": nodes}
 	snapshot.release()
 	return result
 

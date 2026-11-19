@@ -249,7 +249,10 @@ against one of them.
 
 - Launched by Claude Code as a stdio process. stdout carries MCP only; the server's own logs go to stderr.
 - Finds the project: `GODOT_PROJECT_PATH` → `project.godot` in `CLAUDE_PROJECT_DIR` (Claude Code passes this
-  variable to servers) → a search upwards from the working directory. Finds the Godot binary: `GODOT_BIN` → the
+  variable to servers) → a search upwards from the working directory → the one project in the folders up to three
+  levels below `CLAUDE_PROJECT_DIR` or the working directory, skipping dot folders, `node_modules`, folders with a
+  `.gdignore` and the inside of a project (source `subfolder`); several projects there are named, not guessed. The
+  plugin's hooks look for the project of a file upwards only. Finds the Godot binary: `GODOT_BIN` → the
   connected editor → the editor that last opened the project (recorded in its discovery file) → `godot`/`godot4` on
   `PATH` → standard install locations on macOS, Linux and Windows.
 - Side-effect-free startup: it connects to the editor lazily, on the first tool call, and never launches Godot at
@@ -377,7 +380,9 @@ editor settings are not there.
   version means an error and a disconnect. The reply carries versions and the list of supported methods.
 - **Errors:** the standard `-32601` (method not found) and `-32602` (invalid params), plus our own codes in
   `-32000…-32099`: `EDITOR_BUSY`, `NOT_FOUND`, `NO_SCENE`, `GAME_NOT_RUNNING`, `CONFLICT`, `TIMEOUT`,
-  `UNSAFE_DISABLED`. `error.data.hint` carries advice for the agent.
+  `UNSAFE_DISABLED`, `OPERATION_FAILED` (`-32010`) and `CHANGES_HELD` (`-32011`, since 0.3.0: the user holds the
+  agent's changes in the editor). `error.data.hint` carries advice for the agent. An older server shows a code it does
+  not know as a plain refusal with its message and hint.
 - **Notifications from the addon:** `game.started`, `game.stopped`, `game.breaked`, `log` (batched),
   `filesystem.changed`, `scene.changed`.
 - **Timeouts:** a `ping` every 10 s; the default request timeout is 30 s; long operations send progress
@@ -619,6 +624,9 @@ right angles and in structured spatial checks.
 | `node_get_bounds` | Global AABB (center, size) of a 3D node and its subtree — for placement and scale checks | 2 | R | E/G |
 | `asset_import_settings_get` / `asset_import_settings_set` | Import options of any imported file from its `.import` file (`nodes/root_scale`, `nodes/root_type`, `materials/extract`, texture and sound options), and for 3D models the settings of their nodes, such as collision generation; `set` reimports at once and reports the size, nodes and collision shapes of the imported scene before and after | 4 | R/W | E |
 | `navigation_bake` | Bake the `NavigationMesh` of a `NavigationRegion3D`, or of every one in the scene, as one Undo step; report the polygons and the covered area of each, the reason when a region gets none (no geometry under it, or an agent too large), and a `cell_size` or `cell_height` finer than the navigation map | 4 | W | E |
+| `navigation_get_path` (0.3.0) | The path that a `NavigationAgent3D` would get from one point to another, on given navigation layers: whether it reaches the target, its length and points, where it stops short and how far the ends lie from the mesh. Asks a copy of the scene in a `SubViewport` with its own map, without the editor too, or with `in_game` the running game | — | R | E/G |
+| `render` of a view (0.3.0) | Draw a view of `editor_screenshot` or `game_screenshot` unshaded, lighting only, as overdraw, as a wireframe (editor only) or as normals (Forward+ only) | — | R | E/G |
+| `compare_to` of the screenshots (0.3.0) | Compare a new picture with an earlier capture or an image of the project: the share of pixels changed beyond a `tolerance`, the rectangle that holds them, outlined in the picture, and the mean difference | — | R | E/G |
 | `gridmap_set_cells` / `gridmap_get_cells` | `GridMap` (3D tiles) — only if evaluations show it's needed | 4 | R/W | E |
 | `animation_get` / `animation_set` / `animation_delete` | Animations of an `AnimationPlayer`: list them or read one track by track with its keys; create or replace one from property tracks (`Door:position`, `Door:position:y`, `.:visible`) with interpolation, update mode and loop by name, keying the current values of newly animated properties in `RESET` as the editor does; delete one, clearing an `autoplay` that names it. Each change is one Undo step | 4 | R/W | E |
 | `animation_tree_get` / `animation_tree_set` | An `AnimationTree` as a state machine: read its states, transitions and conditions; set it up whole from states that each play an animation and transitions with a condition, an expression, a cross-fade, a switch mode and a priority, as one Undo step | 4 | R/W | E |
@@ -702,12 +710,26 @@ Connected to Godot <version>, project "<name>" (3D). Indentation: <tabs | N spac
   `func run(scene: Node) -> Variant` in an in-memory `@tool` script and reports compile and runtime errors with the
   lines of the code; `node_call_method` records the property changes of the node as one Undo step; `game_eval`
   evaluates an `Expression` on a node of the running game.
+- Hold Changes (since 0.3.0) is the user's switch in the editor: Project → Tools → Godot MCP Tool → Hold Changes, or
+  "Hold the agent's changes" in the Godot MCP panel. It lives in the editor's memory, so it is off whenever the editor
+  starts. While it is on, `held_command.gd` refuses every bridge command of `METHODS_THAT_CHANGE` in
+  `command_catalog.gd` with `CHANGES_HELD`: the commands of the tools that are not read-only, but `game_stop`, and
+  the commands that `editor_rescan`, `script_rename_symbol` and `plugin_set_enabled` send. `server/test/addon/
+  heldMethods.test.ts` compares the list with the annotations of the tools. `ping` answers `changes_held`, which
+  `godot_status` reports, and the panel's journal shows the refused commands. What runs without the bridge is not
+  held: `test_run`, `export_project`, and debugging through the debug adapter.
 - No tool profiles for other clients (§3).
 - Installed as the Claude Code plugin `godot`, the server's tools are named `mcp__plugin_godot_godot__<tool>`, so
   permission rules and hook matchers use these names; its skill is `/godot:godot`.
 - The `if` condition of a hook names one tool: `Edit(*.gd)` does not match `Write`, and `Write(*.gd)|Edit(*.gd)`
   matches nothing (seen in the first evaluation run and checked with `claude -p`), so the plugin has one script check
   for `Write` and one for `Edit`.
+- A `PreToolUse` hook of the plugin runs `check-scene-edit` before `Write` and `Edit` of a `.tscn` or `.tres` file,
+  one entry per tool and pattern. While the editor of the file's project is open (its discovery record is not
+  `closed` and its `pid` is alive) and the file exists, it denies the call with `permissionDecision: "deny"` and a
+  reason that names the tools that change scenes and resources through the editor (ADR-7). It says nothing for a new
+  file, which the editor has no copy of, for a closed editor and outside a project. Edits through the shell pass it;
+  there the server instructions stay the only rule.
 - Claude Code runs the tool calls of one message at the same time only when all of them only read; otherwise it runs
   them one after another, in the order sent. The debug logs of the first evaluation run show it: a `game_wait` sent
   with a `game_input` ended before the input began, so it never saw the jump. And a later call comes seconds after a
@@ -1126,6 +1148,11 @@ Dropped and failed connections are the top complaint about almost every existing
   `actions/cache` v6.1.0), the Godot archive by its SHA-512, GUT and gdUnit4 by the commits of their release tags,
   which the install scripts check, and SCons and `zstandard`, which the build of Godot needs on Python before 3.14,
   by version. The tests of 4.7.2 run even when the build of `master` fails.
+- Since 0.3.0 the build of `master` is a reusable workflow (`godot-editor-build.yml`) that CI calls with the pinned
+  commit and a nightly workflow (`godot-master.yml`, also started by hand) calls with the head of `master`; the
+  nightly run tests the addon and the integration against it and writes the engine commit and the results into its
+  summary. It is no check of pull requests, so a red night blocks nothing. CONTRIBUTING.md has the steps for moving
+  the pin.
 - MCP specification 2026-07-28 is incompatible with earlier revisions, but SDK v2 negotiates the version and serves
   both new and old clients.
 
@@ -1147,7 +1174,11 @@ Dropped and failed connections are the top complaint about almost every existing
   `script_validate` reports them itself.
 - `--check-only --script` is the fallback when the language server is not available: its exit code is always 0, so its
   output is parsed (`SCRIPT ERROR: …` followed by `at: … (res://…:line)`), duplicates on one line are dropped, and errors
-  about autoload names are filtered out (spike 7; not seen again on 4.8). It finds errors but not warnings.
+  about autoload names are filtered out (spike 7; not seen again on 4.8). It finds errors but not warnings, also not
+  `UNTYPED_DECLARATION` in a project that turns it on; the result of `script_validate` says so.
+- New projects of `project_create` and `init` set `debug/gdscript/warnings/untyped_declaration` to 1 (warn), which
+  is 0 (ignore) by default, so the language server reports untyped declarations to `script_validate` and the hook;
+  `doctor` advises it for other projects. Observed on 4.8: the warning arrives as code `UNTYPED_DECLARATION`.
 
 ### 9.16 3D specifics
 
@@ -1273,8 +1304,8 @@ godot-mcp-tool/
 │   │   ├── resources/            MCP resources
 │   │   ├── prompts/              MCP prompts
 │   │   ├── addon/                the addon in a game project: inspection, installation, plugin activation
-│   │   ├── cli/                  the commands install-addon, update-addon, doctor and check-edited-script
-│   │   ├── hooks/                the check of a script after Claude edits it, for the plugin's hook
+│   │   ├── cli/                  the commands install-addon, update-addon, doctor and the checks of the hooks
+│   │   ├── hooks/                the plugin's hooks: a script after Claude edits it, a scene before
 │   │   └── util/                 errors, truncation, pagination, images
 │   ├── addon/                    the addon copied in by the build and shipped in the npm package (not in Git)
 │   ├── README.md                 the page of the package on npm
@@ -1291,13 +1322,16 @@ godot-mcp-tool/
 │       ├── runtime/              autoload GodotMcpRuntime and its commands
 │       └── logging/              Logger subclass
 ├── .github/workflows/ci.yml      CI: lint, unit tests, addon and integration tests on Godot 4.7.2 and master
+├── .github/workflows/godot-master.yml   nightly: the tests against the head of Godot master
+├── .github/workflows/godot-editor-build.yml   the build of a Godot master commit, cached by commit
 ├── .claude-plugin/
 │   └── marketplace.json          the repository as the marketplace godot-mcp-tool
 ├── plugin/                       the Claude Code plugin godot
 │   ├── .claude-plugin/plugin.json
 │   ├── .mcp.json                 starts the server with npx
-│   ├── hooks/hooks.json          checks every .gd file that Claude writes or edits
-│   └── skills/godot/             the companion skill: SKILL.md, gdscript.md, 3d.md, testing.md
+│   ├── hooks/hooks.json          checks every .gd file that Claude writes, guards scenes and resources
+│   ├── agents/playtester.md      a subagent that playtests with the game tools and reports back
+│   └── skills/godot/             the companion skill: SKILL.md, gdscript.md, 3d.md, testing.md, ui.md
 ├── test-project/                 3D Godot project for integration tests (addon symlinked)
 └── scripts/                      dev scripts: install GUT and gdUnit4, run the addon tests, release
 ```
@@ -2150,7 +2184,7 @@ Server environment variables:
 | Variable | Purpose | Default |
 |---|---|---|
 | `GODOT_BIN` | path to the Godot binary | auto-detection |
-| `GODOT_PROJECT_PATH` | path to the project | `CLAUDE_PROJECT_DIR`, then a search for `project.godot` upwards from the working directory |
+| `GODOT_PROJECT_PATH` | path to the project | `CLAUDE_PROJECT_DIR`, then a search for `project.godot` upwards from the working directory, then the one project up to three levels below |
 | `GODOT_MCP_DISABLE` | tools to turn off (comma-separated) | — |
 | `GODOT_MCP_READ_ONLY` | read-only mode | `0` |
 | `GODOT_MCP_UNSAFE` | allow `editor_run_script`, `game_eval` and the like | `0` |
@@ -2193,7 +2227,7 @@ in the Claude Code CLI — `claude --debug=mcp` (the server's stderr ends up in 
 
 | Risk | Likelihood | Impact | Mitigation |
 |---|---|---|---|
-| Engine regressions in the `master` build we target | high | medium | a pinned engine commit, deliberate updates, CI on 4.7 stable to tell our bugs from engine bugs |
+| Engine regressions in the `master` build we target | high | medium | a pinned engine commit, deliberate updates, CI on 4.7 stable to tell our bugs from engine bugs, and a nightly run against the head of `master` that shows a break before the pin moves |
 | An agent edit overwritten by a stale script copy from editor memory | medium | high | sync before saving and running, `CONFLICT`, auto-reload recommendation (§9.3) |
 | 3D results are hard to verify visually | high | medium | structured checks (bounds, properties) first, renders from several angles, 3D evaluation tasks |
 | Latency or a blocked editor main thread | medium | medium | per-frame time budget, `await` between steps, timeouts, advice on the sleep setting |
@@ -2201,7 +2235,7 @@ in the Claude Code CLI — `claude --debug=mcp` (the server's stderr ends up in 
 | A game paused on error "hangs" the scenario | high | medium | `--ignore-error-breaks` for agent runs, the `paused_on_error` state, `game_stop` |
 | Large responses eat the context | high | high | default limits, cursors, text summaries, downscaled screenshots, contact sheets |
 | Too many tools confuse the agent | medium | medium | tool search and `alwaysLoad` for the core, evaluations, merging rare operations |
-| The agent and the user edit the same scene | medium | medium | everything through the editor and Undo/Redo, explicit saving, no text edits of `.tscn` |
+| The agent and the user edit the same scene | medium | medium | everything through the editor and Undo/Redo, explicit saving, no text edits of `.tscn` (a hook of the plugin refuses them), and Hold Changes, the user's switch in the editor |
 | Server and addon versions drift apart | medium | low | protocol version in the handshake, `update-addon` |
 | The MCP specification changes | medium | low | version negotiation is handled by SDK v2; we keep the SDK up to date |
 | An attack on the local port | low | high | 127.0.0.1, a token, TCP instead of HTTP/WS, dangerous tools off |
@@ -2271,6 +2305,9 @@ in the Claude Code CLI — `claude --debug=mcp` (the server's stderr ends up in 
 - `.tscn`/`.tres` are text, but with `ext_resource`/`sub_resource` references, UIDs and `owner` rules. Hand edits
   break easily and conflict with the copy open in the editor. The editor API gives Undo/Redo, a correct `owner` and
   UIDs.
+- The server instructions say so, and in the first run of `music-on-its-own-bus` an agent still edited `arena.tscn`
+  as text. Since 0.3.0 the plugin's `PreToolUse` hook denies `Write` and `Edit` of an existing `.tscn` or `.tres`
+  while the editor of the project is open (§8.12).
 
 ### ADR-8. The addon is the server, the MCP server is the client
 
@@ -2461,6 +2498,15 @@ Checked against the sources in `~/Software/godot` (`master`, 4.8-beta, commit `6
 | The editor does not run static variable initializers of scripts that are not `@tool`, so such `static var` stay `null` there | observed in the addon (`symbol_rename_in_text.gd`) |
 | `EditorInterface.set_plugin_enabled()` runs `_enable_plugin()` / `_disable_plugin()` and changes `editor_plugins/enabled` at once, but `project.godot` gets them only from the queued save of `ProjectSettingsEditor` 1.5 s later. A plugin that removes its autoload in `_disable_plugin()` leaves it in `project.godot`, since `remove_autoload_singleton()` keeps the setting (see above). The autoload that a plugin adds is written as `*uid://…` on 4.7.2 and as `*res://…` on the 4.8 beta | `editor/editor_node.cpp` (`_update_addon_config`), observed on 4.7.2 and 4.8 |
 | The debug adapter puts its responses at the front of a client's queue and its events at the back, so the answer to a `stackTrace` sent right after a game stopped can arrive before the `stopped` event that names the reason | `editor/debugger/debug_adapter/debug_adapter_protocol.cpp` (`process_message`, `notify_stopped_*`) |
+| `Theme::_set` takes `Type/kind/name` with the kinds `icons`, `styles`, `fonts`, `font_sizes`, `colors`, `constants`, `sounds` (4.8) and `base_type`, and `_get_property_list` lists only the items that exist. `MeshLibrary` lists `item/<id>/…` only for existing items (with `PROPERTY_USAGE_NO_EDITOR`), and on 4.8 its `PropertyListHelper` creates an item that a set names (`enable_out_of_bounds_assign`). Curves list `point_<n>/…` up to `point_count`, and a set beyond it fails; `Curve3D.closed` closes the loop | `scene/resources/theme.cpp`, `scene/resources/3d/mesh_library.cpp`, `scene/resources/curve.cpp` |
+| `GPUParticles3D.restart()` sets `emission_time` to `lifetime * (1 - explosiveness)`, so with `explosiveness` 1 a one-shot node turns `emitting` off on its next process frame; `finished` comes after `lifetime * (2 - explosiveness)`. The editor turns `emitting` off when the burst of a one-shot node ends, so such a node is saved with it off | `scene/3d/gpu_particles_3d.cpp`, observed on 4.8 |
+| A hinge turns around the Z axis of the joint's transform (`mHingeAxis1` is its Z column in Jolt), so a vertical hinge needs the joint turned by -90 degrees around X | `modules/jolt_physics/joints/jolt_hinge_joint_3d.cpp`, observed on 4.8 |
+| A `CharacterBody3D` that runs into a `RigidBody3D` stops as at a wall and does not push it; the script has to apply an impulse to the collider of each slide collision | observed on 4.8 with Godot Physics |
+| `NavigationMesh.set_vertices()` and `set_polygons()`, which baking uses, do not emit `changed`, so a `NavigationRegion3D` keeps the copy that the navigation server got before the bake: in the editor, `map_get_path` on the map of the edited scene finds nothing until `region_set_navigation_mesh` sends the baked mesh again (or the region enters a tree again), and then only after the map has synced, which takes one or two physics frames. `navigation_get_path` asks a copy of the scene inside a `SubViewport` with its own `World3D`, and so its own map, after two syncs. A path that cannot reach its target ends at the nearest point it can reach; regions join only where the edges of their meshes lie within `edge_connection_margin` of each other | `scene/resources/navigation_mesh.cpp`, `scene/3d/navigation/navigation_region_3d.cpp`, observed on 4.8 |
+| The dummy audio driver of `--headless` mixes in a thread of its own (but in movie mode), so the peaks of the buses read in a game without a window too. A peak is measured after the volume and the mute of its bus: a muted bus, and `Master` behind it, read -200 dB. `AudioStreamPlayer.bus` returns `Master` while the bus it names does not exist | `servers/audio/audio_driver_dummy.cpp`, `servers/audio/audio_server.cpp` (`_mix_step`), observed on 4.8 |
+| `Viewport.debug_draw` draws one viewport in a debug mode. Forward+ supports unshaded, lighting, overdraw, wireframe and the normal buffer; Mobile and Compatibility have no normal buffer to show. Wireframes need `RenderingServer.set_debug_generate_wireframes(true)` before the meshes load, which the editor does and a game does not, so `game_screenshot` refuses `wireframe`. In a game without a window `get_current_rendering_method()` names no renderer, so the tools read the renderer of the project instead | `servers/rendering/renderer_rd/forward_clustered/render_forward_clustered.cpp`, `forward_mobile/render_forward_mobile.cpp`, `drivers/gles3/rasterizer_scene_gles3.cpp`, observed on 4.8 |
+| `Image.compute_image_metrics(compared_image, use_luma)` returns `max`, `mean`, `mean_squared`, `root_mean_squared` and `peak_snr` of the differences on the 0–255 scale; both images need the same size and format. `editor_screenshot` of the same view of an unchanged scene gives the same pixels twice | `core/io/image.cpp`, observed on 4.8 |
+| The names of layers are the settings `layer_names/<kind>/layer_<n>`, empty by default, with the kinds `2d_render`, `3d_render` (20 layers each), `2d_physics`, `2d_navigation`, `3d_physics`, `3d_navigation` and `avoidance` (32 each). They are registered with the scene types, so the running game and a `-s` script read them too; the inspector shows a layer without a name as "Layer n". The kind of a mask property follows its hint, `PROPERTY_HINT_LAYERS_3D_PHYSICS` and the others | `scene/register_scene_types.cpp`, `editor/inspector/editor_properties.cpp` (`EditorPropertyLayers::setup`) |
 
 ---
 

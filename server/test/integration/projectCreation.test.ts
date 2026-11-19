@@ -1,4 +1,4 @@
-import { mkdtempSync, readFileSync, realpathSync, rmSync } from 'node:fs';
+import { mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -46,4 +46,23 @@ describe.skipIf(godotBinary === '')('making a game from scratch in an empty fold
     },
     editorStartupTimeoutMs + 60_000,
   );
+
+  it('warns about a declaration without a static type in the new project, through the editor', async () => {
+    writeFileSync(join(folder, 'player.gd'), ['extends Node', '', 'var speed = 5', ''].join('\n'));
+    await tools().call('editor_rescan');
+
+    const checked = await tools().call('script_validate', { paths: ['res://player.gd'] });
+
+    expect(checked.text).toContain("checked with the editor's language server");
+    expect(checked.text).toMatch(/3:\d+ warning \(UNTYPED_DECLARATION\)/);
+  });
+
+  it('says that godot --check-only cannot show that warning once the editor is closed', async () => {
+    await stopDiscoveredEditor(folder);
+
+    const checked = await tools().call('script_validate', { paths: ['res://player.gd'] });
+
+    expect(checked.isError).toBe(false);
+    expect(checked.text).toContain('godot --check-only, which finds errors but not warnings');
+  });
 });

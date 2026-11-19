@@ -44,6 +44,18 @@ describe('BridgeTool', () => {
     expect(textOf(result)).toBe('Node "Plyer" not found\nHint: Similar: Player.');
   });
 
+  it('passes on the refusal of an editor where the user holds changes, with its hint', async () => {
+    const editor = new FakeEditorGateway().respondTo(
+      'echo.path',
+      new BridgeRequestError('Changes are held in the editor, so this was not done', -32011, 'The user turned on Project → Tools → Godot MCP Tool → Hold Changes.', undefined),
+    );
+
+    const result = await createTool(editor).execute({ path: 'Player' });
+
+    expect(result.isError).toBe(true);
+    expect(textOf(result)).toBe('Changes are held in the editor, so this was not done\nHint: The user turned on Project → Tools → Godot MCP Tool → Hold Changes.');
+  });
+
   it('explains that the editor is not connected', async () => {
     const editor = new FakeEditorGateway().respondTo('echo.path', new EditorUnavailableError('The Godot editor is not running for this project.'));
 

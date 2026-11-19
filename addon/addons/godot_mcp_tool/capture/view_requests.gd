@@ -4,6 +4,7 @@ const GodotMcpCameraViews := preload("camera_views.gd")
 const GodotMcpCommandError := preload("../commands/command_error.gd")
 const GodotMcpJsonRpc := preload("../bridge/json_rpc.gd")
 const GodotMcpNumberText := preload("../util/number_text.gd")
+const GodotMcpRenderModes := preload("render_modes.gd")
 
 const DEFAULT_FOV := 50.0
 const MINIMUM_FOV := 1.0
@@ -47,6 +48,17 @@ static func labels_of(views: Array) -> Array:
 	return views.map(func(view: Dictionary) -> String: return view["label"])
 
 
+static func _with_render_mode(description: Dictionary, view: Dictionary) -> Variant:
+	var mode: Variant = description.get("render", "")
+	if not mode is String or (not (mode as String).is_empty() and not GodotMcpRenderModes.MODES.has(mode)):
+		return "render is one of %s" % GodotMcpRenderModes.names()
+	view["render"] = mode
+	view["debug_draw"] = GodotMcpRenderModes.MODES.get(mode, Viewport.DEBUG_DRAW_DISABLED)
+	if not (mode as String).is_empty() and not description.has("label"):
+		view["label"] = "%s, %s" % [view["label"], mode]
+	return view
+
+
 static func _parse_view(request: Variant, bounds_of: Callable) -> Variant:
 	if request is String:
 		return _preset_view({"preset": request}, bounds_of)
@@ -74,7 +86,7 @@ static func _preset_view(description: Dictionary, bounds_of: Callable) -> Varian
 	if bounds is GodotMcpCommandError:
 		return bounds
 	var default_label := preset if (target as String).is_empty() else "%s of %s" % [preset, target]
-	return {"label": _label_of(description, default_label), "transform": GodotMcpCameraViews.preset(preset, bounds, fov), "fov": fov}
+	return _with_render_mode(description, {"label": _label_of(description, default_label), "transform": GodotMcpCameraViews.preset(preset, bounds, fov), "fov": fov})
 
 
 static func _positioned_view(description: Dictionary, bounds_of: Callable) -> Variant:
@@ -89,7 +101,7 @@ static func _positioned_view(description: Dictionary, bounds_of: Callable) -> Va
 		return target
 	if (target as Vector3).is_equal_approx(position):
 		return "the camera cannot look at its own position"
-	return {"label": _label_of(description, "from %s" % _point_text(position)), "transform": GodotMcpCameraViews.looking(position, target), "fov": fov}
+	return _with_render_mode(description, {"label": _label_of(description, "from %s" % _point_text(position)), "transform": GodotMcpCameraViews.looking(position, target), "fov": fov})
 
 
 static func _look_target_of(description: Dictionary, bounds_of: Callable) -> Variant:

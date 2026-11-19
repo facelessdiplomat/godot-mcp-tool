@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { respondToEditedScript } from '../../src/hooks/hookResponse.js';
+import { respondToEditedScript, respondToSceneEdit } from '../../src/hooks/hookResponse.js';
 
 const report = ['1 error in 1 of 1 script (checked with the editor\'s language server).', 'res://player/player.gd', '  12:5 error: Identifier "SPEEDD" not declared in the current scope.'].join('\n');
 
@@ -18,6 +18,22 @@ describe('the answer of the hook to Claude Code', () => {
     expect(respondToEditedScript({ kind: 'problems', hasErrors: false, report: warnings })).toEqual({
       exitCode: 0,
       standardOutput: [JSON.stringify({ hookSpecificOutput: { hookEventName: 'PostToolUse', additionalContext: warnings } })],
+      standardError: [],
+    });
+  });
+});
+
+describe('the answer of the hook before Claude edits a scene or a resource', () => {
+  it('says nothing when the edit may go ahead', () => {
+    expect(respondToSceneEdit({ kind: 'silent' })).toEqual({ exitCode: 0, standardOutput: [], standardError: [] });
+  });
+
+  it('denies the edit with its reason in the form Claude Code reads before a tool runs', () => {
+    const reason = 'res://levels/arena.tscn was not changed: the Godot editor is open on this project.';
+
+    expect(respondToSceneEdit({ kind: 'denied', reason })).toEqual({
+      exitCode: 0,
+      standardOutput: [JSON.stringify({ hookSpecificOutput: { hookEventName: 'PreToolUse', permissionDecision: 'deny', permissionDecisionReason: reason } })],
       standardError: [],
     });
   });

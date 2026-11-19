@@ -16,6 +16,7 @@ const CONFLICT := -32007
 const TIMEOUT := -32008
 const UNSAFE_DISABLED := -32009
 const OPERATION_FAILED := -32010
+const CHANGES_HELD := -32011
 
 
 static func success(request_id: Variant, result: Variant) -> Dictionary:

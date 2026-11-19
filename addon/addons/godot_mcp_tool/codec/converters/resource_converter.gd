@@ -1,5 +1,6 @@
 extends "converter.gd"
 
+const GodotMcpDynamicProperties := preload("../dynamic_properties.gd")
 const GodotMcpResourceFactory := preload("../../resources/resource_factory.gd")
 
 const CLASS_KEY := "new"
@@ -47,12 +48,15 @@ func _create_resource(specification: Dictionary, allowed_types: PackedStringArra
 	for resource_property in resource.get_property_list():
 		properties_by_name[resource_property["name"]] = resource_property
 	var values := _values_of(specification, properties_by_name)
-	for property_name in values:
-		if not properties_by_name.has(property_name):
+	for property_name: String in GodotMcpDynamicProperties.counts_first(values.keys()):
+		var property: Variant = properties_by_name.get(property_name, GodotMcpDynamicProperties.describe(resource, property_name, values))
+		if property is String:
+			return _failure("%s.%s: %s" % [type_name, property_name, property])
+		if (property as Dictionary).is_empty():
 			var similar := _similar_names(property_name, properties_by_name.keys())
 			var suggestion := "" if similar.is_empty() else " Similar: %s." % ", ".join(similar)
 			return _failure("%s has no property \"%s\".%s" % [type_name, property_name, suggestion])
-		var nested := decoder.decode(values[property_name], properties_by_name[property_name], resource)
+		var nested := decoder.decode(values[property_name], property, resource)
 		if not nested.is_success:
 			return _failure("%s.%s: %s" % [type_name, property_name, nested.error])
 		resource.set(property_name, nested.value)

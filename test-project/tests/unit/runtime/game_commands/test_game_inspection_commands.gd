@@ -80,6 +80,18 @@ func test_reads_properties_and_getter_methods() -> void:
 	])
 
 
+func test_reads_several_nodes_at_the_same_moment() -> void:
+	_player.position = Vector3(1, 2, 3)
+	var result: Dictionary = await GodotMcpGamePropertiesGetCommand.new(_scene, _properties, _codec).execute({"paths": ["Player", "Bullet", "Ghost"], "names": ["position"]})
+	var nodes: Array = result["nodes"]
+	assert_eq(result["scene"], "res://levels/arena.tscn")
+	assert_eq(nodes.size(), 3)
+	assert_eq((nodes[0] as Dictionary)["properties"], [{"name": "position", "type": "Vector3", "value": "Vector3(1, 2, 3)"}])
+	assert_eq((nodes[1] as Dictionary)["path"], "Bullet")
+	assert_eq((nodes[2] as Dictionary)["path"], "Ghost")
+	assert_true((nodes[2] as Dictionary).has("error"))
+
+
 func test_reads_only_methods_that_look_like_getters() -> void:
 	var result: Dictionary = await GodotMcpGamePropertiesGetCommand.new(_scene, _properties, _codec).execute({"path": "Player", "names": ["queue_free()"]})
 	assert_string_contains(((result["properties"] as Array)[0] as Dictionary)["error"], "is_, get_, has_ or can_")

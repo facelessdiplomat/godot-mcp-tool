@@ -52,6 +52,17 @@ When running one, record whether it passed, the number of tool calls and the tok
 | [translate-the-menu.md](translate-the-menu.md) | a CSV translation and `game_run` with `locale` |
 | [pave-the-courtyard.md](pave-the-courtyard.md) | the cells of a `GridMap` in the saved scene |
 | [a-level-of-tiles.md](a-level-of-tiles.md) | a 2D level: a `TileSet`, the cells of a `TileMapLayer`, a `Camera2D` |
+| [only-the-player-opens-the-door.md](only-the-player-opens-the-door.md) | physics layers by name in `project_info`, masks and the running game |
+| [sparks-on-impact.md](sparks-on-impact.md) | a one-shot `GPUParticles3D` started by a signal, checked at the frame of the hit |
+| [skin-the-menu.md](skin-the-menu.md) | a `Theme` built item by item with `resource_create`, checked on buttons in the running game |
+| [ride-the-rail.md](ride-the-rail.md) | a closed `Curve3D` by its points, `PathFollow3D`, a speed measured with read steps |
+| [swing-the-gate.md](swing-the-gate.md) | a `HingeJoint3D` and its axis, a player that pushes rigid bodies |
+| [sword-in-hand.md](sword-in-hand.md) | a `BoneAttachment3D` on a bone of a `Skeleton3D`, followed through an animation |
+| [blocks-from-a-scene.md](blocks-from-a-scene.md) | a `MeshLibrary` made from a scene of blocks, with collision, for a `GridMap` |
+| [reach-the-island.md](reach-the-island.md) | `navigation_get_path` on a level whose regions do not connect |
+| [silence-in-the-arena.md](silence-in-the-arena.md) | `audio_buses_get` with `in_game`: a muted bus and a player that never starts |
+| [why-is-it-dark.md](why-is-it-dark.md) | `render` modes of views: a room without light and a black material |
+| [same-look-after-the-refactor.md](same-look-after-the-refactor.md) | `compare_to` of `editor_screenshot` after turning nodes into instances |
 
 ## Running them
 
@@ -62,6 +73,8 @@ belong to `npm test` or the integration tests.
 
 - `EVAL_REFERENCE=1 GODOT_BIN=<godot> npm run eval` applies each reference solution instead of an agent and runs the
   checks. It costs nothing and shows that every scenario can be solved and that its checks pass on a correct result.
+- `EVAL_UNSOLVED=1 GODOT_BIN=<godot> npm run eval` runs the checks on the starting point with nothing done and
+  expects a failed check, so a scenario cannot pass without the work it asks for.
 - `CLAUDE_BIN=<claude> GODOT_BIN=<godot> npm run eval` gives each request to `claude -p` in the project folder, with
   the server of this checkout (`server/dist`, so build first), the plugin's hook and skill, `--restricted` and a
   budget (`EVAL_BUDGET_USD`, 5 by default), then runs the checks. `EVAL_SCENARIOS=a,b` picks scenarios and
@@ -369,3 +382,35 @@ with an agent:
   `gridmap_set_cells`, and built the level with `tileset_add_atlas`, collision included, and one `tilemap_set_cells`.
 - In `keep-the-best-score` `game_set_properties` set `best` at once, its setter saved the score, and `user_data_get`
   showed `save.json`.
+
+### Six scenarios for areas that none covered, 2026-11-19
+
+Task T7 of the [plan for the next version](../NEXT_VERSION_PLAN.md) added six scenarios for areas that no scenario
+touched: particles, themes, joints, paths, skeletons and a `MeshLibrary` made from a scene. Each passes with its
+reference solution and fails when nothing is done (`EVAL_REFERENCE=1` and `EVAL_UNSOLVED=1`, Godot 4.8 at the pinned
+commit). The runs with an agent are still to come.
+
+| Scenario | Reference run | Unsolved run |
+|---|---|---|
+| sparks-on-impact | 7/7 | fails |
+| skin-the-menu | 8/8 | fails |
+| ride-the-rail | 6/6 | fails |
+| swing-the-gate | 5/5 | fails |
+| sword-in-hand | 4/4 | fails |
+| blocks-from-a-scene | 6/6 | fails |
+
+Writing the reference solutions found four gaps before any agent did:
+
+- The items of a `Theme`, the points of a curve and the items of a `MeshLibrary` could not be set by name: these
+  objects list such properties only once they exist, so `resource_create` and the node tools rejected
+  `"Button/styles/normal"`, `"point_0/position"` and `"item/0/mesh"`. The codec now takes them, with their types
+  from the kind of theme item or from a fresh object that has one point or one item, and sets the count of points
+  before the points (`codec/dynamic_properties.gd`).
+- A `NodePath` property, such as `node_a` of a joint, took `"Post"` as a child of the joint, while the description of
+  `properties` promised paths from the scene root too. The hinge then joined nothing and the gate fell. Such a path
+  is now made relative to the node when it leads nowhere from the node but somewhere from the scene root.
+- A `MeshLibrary` made from a scene, which the editor does with Scene → Export As → MeshLibrary, still needs the
+  meshes and shapes of the scene: the reference solution of `blocks-from-a-scene` writes the library as a new file. The
+  agent run decides whether T14 needs a tool.
+- Three pieces of engine knowledge went to the 3D page of the skill: a `CharacterBody3D` does not push rigid bodies,
+  a `HingeJoint3D` turns around its own Z axis, and a burst of one-shot particles is checked by its `finished` signal.

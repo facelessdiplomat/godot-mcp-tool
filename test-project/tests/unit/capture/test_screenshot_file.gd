@@ -50,3 +50,26 @@ func test_explains_a_failed_save() -> void:
 	var error: Variant = GodotMcpScreenshotFile.write(_image(64, 32), {"max_size": 1280, "format": "gif"}, GodotMcpCaptureStore.new(_directory), "game")
 	assert_true(error is GodotMcpCommandError)
 	assert_string_contains((error as GodotMcpCommandError).message, "Could not save")
+
+
+func test_compares_the_image_with_an_earlier_one_and_outlines_the_change() -> void:
+	var store := GodotMcpCaptureStore.new(ProjectSettings.globalize_path("res://.godot/godot_mcp_tool/test_captures_%d" % Time.get_ticks_usec()))
+	var earlier: Dictionary = GodotMcpScreenshotFile.write(_image(320, 180), {"max_size": 1280, "format": "png", "compare_to": "", "tolerance": 0.1}, store, "game")
+	var changed := _image(320, 180)
+	changed.fill_rect(Rect2i(200, 100, 40, 40), Color.YELLOW)
+	var saved: Dictionary = GodotMcpScreenshotFile.write(changed, {"max_size": 1280, "format": "png", "compare_to": earlier["path"], "tolerance": 0.1}, store, "game")
+	var comparison: Dictionary = saved["comparison"]
+	var outlined := Image.load_from_file(saved["path"])
+	for file_name in DirAccess.get_files_at(store.directory):
+		DirAccess.remove_absolute(store.directory.path_join(file_name))
+	DirAccess.remove_absolute(store.directory)
+	assert_eq(comparison["earlier"], earlier["path"])
+	assert_eq(comparison["sizes_match"], true)
+	assert_almost_eq(float((comparison["changed_rect"] as Array)[0]), 200.0, 3.0)
+	assert_eq(outlined.get_pixel(198, 120), Color(1, 0, 1))
+
+
+func test_refuses_to_compare_with_an_image_it_cannot_read() -> void:
+	var refused: Variant = GodotMcpScreenshotFile.write(_image(64, 32), {"max_size": 1280, "format": "png", "compare_to": "res://missing_capture.png", "tolerance": 0.1}, GodotMcpCaptureStore.new(_directory), "game")
+	assert_true(refused is GodotMcpCommandError)
+	assert_eq((refused as GodotMcpCommandError).code, GodotMcpJsonRpc.INVALID_PARAMS)

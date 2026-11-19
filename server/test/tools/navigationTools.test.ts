@@ -1,6 +1,6 @@
 import type { CallToolResult } from '@modelcontextprotocol/server';
 import { describe, expect, it } from 'vitest';
-import { createNavigationBakeTool } from '../../src/tools/navigationTools.js';
+import { createNavigationBakeTool, createNavigationGetPathTool } from '../../src/tools/navigationTools.js';
 import { FakeEditorGateway } from '../support/FakeEditorGateway.js';
 
 function textOf(result: CallToolResult): string {
@@ -82,5 +82,115 @@ describe('navigation tools', () => {
         '- Empty: it has no NavigationMesh',
       ].join('\n'),
     );
+  });
+
+  it('navigation_get_path says that a path reaches the target, with its length and points', async () => {
+    const editor = new FakeEditorGateway().respondTo('navigation.get_path', {
+      scene: 'res://arena.tscn',
+      from: 'Vector3(-9, 0, 0)',
+      to: 'Vector3(-3, 0, 2)',
+      reached: true,
+      length: 6.4,
+      point_count: 3,
+      points: ['Vector3(-9, 0.5, 0)', 'Vector3(-4.5, 0.5, 1.5)', 'Vector3(-3, 0.5, 2)'],
+      end: 'Vector3(-3, 0.5, 2)',
+      short_by: 0,
+      start_off_mesh: 0.5,
+      target_off_mesh: 0.5,
+      navigation_layers: [{ number: 1, name: '' }],
+      unbaked_regions: [],
+    });
+
+    const result = await createNavigationGetPathTool(editor).execute({ from: [-9, 0, 0], to: [-3, 0, 2] });
+
+    expect(editor.requests[0]?.params).toEqual({ from: [-9, 0, 0], to: [-3, 0, 2], in_game: false });
+    expect(textOf(result)).toBe(
+      [
+        'A path from Vector3(-9, 0, 0) to Vector3(-3, 0, 2) in res://arena.tscn reaches the target: 6.4 m over 3 points, on navigation layer 1.',
+        'Points: Vector3(-9, 0.5, 0), Vector3(-4.5, 0.5, 1.5), Vector3(-3, 0.5, 2)',
+      ].join('\n'),
+    );
+  });
+
+  it('navigation_get_path says where a path stops short and why that usually happens', async () => {
+    const editor = new FakeEditorGateway().respondTo('navigation.get_path', {
+      scene: 'res://arena.tscn',
+      from: 'Vector3(-9, 0, 0)',
+      to: 'Vector3(10, 0, 0)',
+      reached: false,
+      length: 7.5,
+      point_count: 3,
+      points: ['Vector3(-9, 0.5, 0)', 'Vector3(-6, 0.5, 0)', 'Vector3(-1.5, 0.5, 0)'],
+      end: 'Vector3(-1.5, 0.5, 0)',
+      short_by: 11.5,
+      start_off_mesh: 0.5,
+      target_off_mesh: 0.5,
+      navigation_layers: [{ number: 1, name: 'ground' }],
+      unbaked_regions: ['Island'],
+    });
+
+    const text = textOf(await createNavigationGetPathTool(editor).execute({ from: [-9, 0, 0], to: [10, 0, 0] }));
+
+    expect(text).toBe(
+      [
+        'A path from Vector3(-9, 0, 0) to Vector3(10, 0, 0) in res://arena.tscn does not reach the target: it stops 11.5 m short, at Vector3(-1.5, 0.5, 0), after 7.5 m over 3 points, on navigation layer 1 "ground".',
+        'The navigation mesh around the start does not connect to the one around the target: regions that do not touch or overlap, an obstacle or a gap between them, or a link (NavigationLink3D) that is missing.',
+        'Points: Vector3(-9, 0.5, 0), Vector3(-6, 0.5, 0), Vector3(-1.5, 0.5, 0)',
+        'Not baked: Island. Bake it with navigation_bake.',
+      ].join('\n'),
+    );
+  });
+
+  it('navigation_get_path explains an empty path and ends far from the mesh', async () => {
+    const editor = new FakeEditorGateway().respondTo('navigation.get_path', {
+      scene: '',
+      from: 'Vector3(40, 0, 0)',
+      to: 'Vector3(0, 0, 0)',
+      reached: false,
+      length: 0,
+      point_count: 0,
+      points: [],
+      start_off_mesh: 30.2,
+      target_off_mesh: 3.4,
+      navigation_layers: [{ number: 1, name: '' }],
+      unbaked_regions: [],
+    });
+
+    const text = textOf(await createNavigationGetPathTool(editor).execute({ from: [40, 0, 0], to: [0, 0, 0], in_game: true }));
+
+    expect(text).toBe(
+      [
+        'No path from Vector3(40, 0, 0) to Vector3(0, 0, 0) in the running game, on navigation layer 1.',
+        'The start lies 30.2 m from the navigation mesh, and the target 3.4 m.',
+        'Usual causes: no baked region under these points, regions on other navigation layers, or a point far above or beside the floor.',
+      ].join('\n'),
+    );
+  });
+
+  it('navigation_get_path leaves out the middle of a long path', async () => {
+    const editor = new FakeEditorGateway().respondTo('navigation.get_path', {
+      scene: 'res://arena.tscn',
+      from: 'Vector3(0, 0, 0)',
+      to: 'Vector3(29, 0, 0)',
+      reached: true,
+      length: 29,
+      point_count: 30,
+      points: ['A', 'B', 'C', 'D', 'E', 'V', 'W', 'X', 'Y', 'Z'],
+      points_left_out: 20,
+      end: 'Z',
+      short_by: 0,
+      start_off_mesh: 0,
+      target_off_mesh: 0,
+      navigation_layers: [{ number: 1, name: '' }],
+      unbaked_regions: [],
+    });
+
+    const text = textOf(await createNavigationGetPathTool(editor).execute({ from: [0, 0, 0], to: [29, 0, 0] }));
+
+    expect(text).toContain('Points: A, B, C, D, E, … 20 more …, V, W, X, Y, Z');
+  });
+
+  it('navigation_get_path only reads', () => {
+    expect(createNavigationGetPathTool(new FakeEditorGateway()).definition.annotations.readOnlyHint).toBe(true);
   });
 });

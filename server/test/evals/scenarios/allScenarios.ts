@@ -1,6 +1,7 @@
 import type { Scenario } from '../Scenario.js';
 import { aLevelOfTiles } from './aLevelOfTiles.js';
 import { animateADoor } from './animateADoor.js';
+import { blocksFromAScene } from './blocksFromAScene.js';
 import { bringBackThePillars } from './bringBackThePillars.js';
 import { buildAnArena } from './buildAnArena.js';
 import { cameraFollow } from './cameraFollow.js';
@@ -24,18 +25,28 @@ import { importACharacter } from './importACharacter.js';
 import { keepTheBestScore } from './keepTheBestScore.js';
 import { landOnce } from './landOnce.js';
 import { musicOnItsOwnBus } from './musicOnItsOwnBus.js';
+import { onlyThePlayerOpensTheDoor } from './onlyThePlayerOpensTheDoor.js';
 import { patrolBetweenPoints } from './patrolBetweenPoints.js';
 import { paintOneEnemy } from './paintOneEnemy.js';
 import { pauseMenu } from './pauseMenu.js';
 import { paveTheCourtyard } from './paveTheCourtyard.js';
 import { playtestWithoutAWindow } from './playtestWithoutAWindow.js';
+import { reachTheIsland } from './reachTheIsland.js';
 import { renameEverywhere } from './renameEverywhere.js';
+import { sameLookAfterTheRefactor } from './sameLookAfterTheRefactor.js';
 import { resumeTheMenu } from './resumeTheMenu.js';
+import { rideTheRail } from './rideTheRail.js';
+import { silenceInTheArena } from './silenceInTheArena.js';
+import { skinTheMenu } from './skinTheMenu.js';
+import { sparksOnImpact } from './sparksOnImpact.js';
 import { stopTheSlowdown } from './stopTheSlowdown.js';
+import { swingTheGate } from './swingTheGate.js';
+import { swordInHand } from './swordInHand.js';
 import { thirdPersonPrototype } from './thirdPersonPrototype.js';
 import { tidyTheProject } from './tidyTheProject.js';
 import { translateTheMenu } from './translateTheMenu.js';
 import { turnOnAPlugin } from './turnOnAPlugin.js';
+import { whyIsItDark } from './whyIsItDark.js';
 
 export const allScenarios: readonly Scenario[] = [
   buildAnArena,
@@ -75,4 +86,15 @@ export const allScenarios: readonly Scenario[] = [
   translateTheMenu,
   paveTheCourtyard,
   aLevelOfTiles,
+  onlyThePlayerOpensTheDoor,
+  sparksOnImpact,
+  skinTheMenu,
+  rideTheRail,
+  swingTheGate,
+  swordInHand,
+  blocksFromAScene,
+  reachTheIsland,
+  silenceInTheArena,
+  whyIsItDark,
+  sameLookAfterTheRefactor,
 ];

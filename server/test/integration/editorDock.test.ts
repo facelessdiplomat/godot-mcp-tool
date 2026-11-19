@@ -44,6 +44,7 @@ describe.skipIf(godotBinary === '')('the Godot MCP dock of the editor', () => {
 
     expect(dock['status']).toMatch(/^Bridge: listening on 127\.0\.0\.1:\d+\nMCP clients: 1 connected\nGame: stopped$/);
     expect(dock['unsafe_tools']).toBe(false);
+    expect(dock['hold_changes']).toBe(false);
     expect(dock['commands']).toEqual(
       expect.arrayContaining([
         expect.stringMatching(/^\d\d:\d\d:\d\d {2}node_set_properties {2}failed: /),

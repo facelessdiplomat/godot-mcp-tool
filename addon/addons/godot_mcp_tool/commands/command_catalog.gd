@@ -41,9 +41,11 @@ const GodotMcpGameRunCommand := preload("game/game_run_command.gd")
 const GodotMcpGameStopCommand := preload("game/game_stop_command.gd")
 const GodotMcpGridMapGetCellsCommand := preload("grid/gridmap_get_cells_command.gd")
 const GodotMcpGridMapSetCellsCommand := preload("grid/gridmap_set_cells_command.gd")
+const GodotMcpHeldCommand := preload("held_command.gd")
 const GodotMcpInputMapGetCommand := preload("input/input_map_get_command.gd")
 const GodotMcpInputMapSetCommand := preload("input/input_map_set_command.gd")
 const GodotMcpNavigationBakeCommand := preload("navigation/navigation_bake_command.gd")
+const GodotMcpNavigationGetPathCommand := preload("navigation/navigation_get_path_command.gd")
 const GodotMcpNodeAddCollisionCommand := preload("node/node_add_collision_command.gd")
 const GodotMcpNodeAddCommand := preload("node/node_add_command.gd")
 const GodotMcpNodeCallMethodCommand := preload("node/node_call_method_command.gd")
@@ -88,18 +90,70 @@ const GodotMcpUnsafeCommand := preload("unsafe_command.gd")
 const GodotMcpUserDataDeleteCommand := preload("project/user_data_delete_command.gd")
 const GodotMcpUserDataGetCommand := preload("project/user_data_get_command.gd")
 
+const METHODS_THAT_CHANGE := [
+	"animation.delete",
+	"animation.set",
+	"animation_tree.set",
+	"asset.import_settings_set",
+	"audio.buses_set",
+	"autoload.add",
+	"autoload.remove",
+	"editor.redo",
+	"editor.reload_extensions",
+	"editor.rescan",
+	"editor.run_script",
+	"editor.select",
+	"editor.set_plugin_enabled",
+	"editor.undo",
+	"filesystem.delete",
+	"filesystem.move",
+	"game.eval",
+	"game.input",
+	"game.pause",
+	"game.run",
+	"game.set_properties",
+	"game.step",
+	"gridmap.set_cells",
+	"input_map.set",
+	"navigation.bake",
+	"node.add",
+	"node.add_collision",
+	"node.call_method",
+	"node.delete",
+	"node.duplicate",
+	"node.make_local",
+	"node.reparent",
+	"node.save_as_scene",
+	"node.set_groups",
+	"node.set_properties",
+	"node.snap_to_floor",
+	"project.settings_set",
+	"project.user_data_delete",
+	"resource.create",
+	"resource.set_properties",
+	"scene.batch_edit",
+	"scene.close",
+	"scene.create",
+	"scene.open",
+	"scene.save",
+	"script.rename_in_resources",
+	"signal.connect",
+	"signal.disconnect",
+	"tilemap.set_cells",
+	"tileset.add_atlas",
+]
 const INSPECTION_TIMEOUT_MSEC := 10_000
 const WAIT_TIMEOUT_MSEC := 65_000
 const INPUT_TIMEOUT_MSEC := 300_000
 const SCREENSHOT_TIMEOUT_MSEC := 30_000
 
 
-static func build_router(context: GodotMcpEditingContext, runtime: GodotMcpRuntimeContext, read_indentation: Callable, save_project_settings: Callable, autoloads: GodotMcpAutoloadRegistry, is_unsafe_allowed: Callable) -> GodotMcpCommandRouter:
+static func build_router(context: GodotMcpEditingContext, runtime: GodotMcpRuntimeContext, read_indentation: Callable, save_project_settings: Callable, autoloads: GodotMcpAutoloadRegistry, is_unsafe_allowed: Callable, is_changes_held: Callable) -> GodotMcpCommandRouter:
 	var captures := ProjectSettings.globalize_path("res://").path_join(GodotMcpAddonInfo.CAPTURES_RELATIVE_PATH)
 	var file_system := GodotMcpEditorFileSystemAccess.new()
 	var extensions := GodotMcpEditorExtensionAccess.new()
 	var router := GodotMcpCommandRouter.new()
-	router.register("ping", GodotMcpPingCommand.new())
+	router.register("ping", GodotMcpPingCommand.new(is_changes_held))
 	router.register("project.info", GodotMcpProjectInfoCommand.new(read_indentation))
 	router.register("shader.validate", GodotMcpShaderValidateCommand.new())
 	router.register("script.rename_in_resources", GodotMcpScriptRenameInResourcesCommand.new(context))
@@ -128,6 +182,7 @@ static func build_router(context: GodotMcpEditingContext, runtime: GodotMcpRunti
 	router.register("animation_tree.get", GodotMcpAnimationTreeGetCommand.new(context))
 	router.register("animation_tree.set", GodotMcpAnimationTreeSetCommand.new(context))
 	router.register("navigation.bake", GodotMcpNavigationBakeCommand.new(context))
+	router.register("navigation.get_path", GodotMcpNavigationGetPathCommand.new(context, GodotMcpGameRequestCommand.new(runtime, "navigation_path", INSPECTION_TIMEOUT_MSEC)))
 	router.register("input_map.get", GodotMcpInputMapGetCommand.new())
 	router.register("input_map.set", GodotMcpInputMapSetCommand.new(save_project_settings))
 	router.register("audio.buses_get", GodotMcpAudioBusesGetCommand.new(GodotMcpAudioBusLayoutFile.new(file_system)))
@@ -175,13 +230,22 @@ static func build_router(context: GodotMcpEditingContext, runtime: GodotMcpRunti
 	router.register("game.screenshot", GodotMcpGameRequestCommand.new(runtime, "screenshot", SCREENSHOT_TIMEOUT_MSEC, true))
 	router.register("game.pause", GodotMcpGameRequestCommand.new(runtime, "pause", INSPECTION_TIMEOUT_MSEC))
 	router.register("game.step", GodotMcpGameRequestCommand.new(runtime, "step", WAIT_TIMEOUT_MSEC, true))
+	router.register("game.audio_levels", GodotMcpGameRequestCommand.new(runtime, "audio_levels", WAIT_TIMEOUT_MSEC))
 	router.register("game.performance", GodotMcpGamePerformanceCommand.new(GodotMcpGameRequestCommand.new(runtime, "performance", WAIT_TIMEOUT_MSEC, true), runtime, _script_editor_debuggers))
 	router.register("game.eval", GodotMcpUnsafeCommand.new(GodotMcpGameRequestCommand.new(runtime, "eval", INSPECTION_TIMEOUT_MSEC), is_unsafe_allowed))
 	router.register("editor.run_script", GodotMcpUnsafeCommand.new(GodotMcpEditorRunScriptCommand.new(context), is_unsafe_allowed))
 	router.register("node.call_method", GodotMcpUnsafeCommand.new(GodotMcpNodeCallMethodCommand.new(context), is_unsafe_allowed))
 	router.register("filesystem.delete", GodotMcpUnsafeCommand.new(GodotMcpFilesystemDeleteCommand.new(context, file_system, GodotMcpFileTrash.new(), save_project_settings), is_unsafe_allowed))
 	router.register("project.user_data_delete", GodotMcpUnsafeCommand.new(GodotMcpUserDataDeleteCommand.new(GodotMcpFileTrash.new()), is_unsafe_allowed))
+	hold_changes_of(router, is_changes_held)
 	return router
+
+
+static func hold_changes_of(router: GodotMcpCommandRouter, is_changes_held: Callable) -> void:
+	for method: String in METHODS_THAT_CHANGE:
+		var command := router.find(method)
+		if command != null:
+			router.register(method, GodotMcpHeldCommand.new(command, is_changes_held))
 
 
 static func _script_editor_debuggers() -> Array:

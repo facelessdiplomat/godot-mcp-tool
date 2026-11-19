@@ -14,6 +14,9 @@ function hello(addonVersion: string): HelloResult {
   return { protocol: 1, godotVersion, addonVersion, projectPath: '/projects/game', executablePath: '/opt/godot/godot', methods: ['hello', 'ping'] };
 }
 
+const untypedDeclarationAdvice =
+  'advice   Untyped declarations go unreported. To get a warning for code without static types, set debug/gdscript/warnings/untyped_declaration to 1 (Warn) in the project settings, or ask Claude to.';
+
 describe('the doctor command', () => {
   let projectRoot: string;
 
@@ -31,10 +34,10 @@ describe('the doctor command', () => {
     writeFileSync(join(projectRoot, 'addons', 'godot_mcp_tool', 'plugin.cfg'), ['[plugin]', '', `version="${version}"`, ''].join('\n'));
   }
 
-  function enablePlugin(): void {
+  function enablePlugin(debugSettings: readonly string[] = ['[debug]', '', 'gdscript/warnings/untyped_declaration=1', '']): void {
     writeFileSync(
       join(projectRoot, 'project.godot'),
-      ['config_version=5', '', '[editor_plugins]', '', 'enabled=PackedStringArray("res://addons/godot_mcp_tool/plugin.cfg")', ''].join('\n'),
+      ['config_version=5', '', ...debugSettings, '[editor_plugins]', '', 'enabled=PackedStringArray("res://addons/godot_mcp_tool/plugin.cfg")', ''].join('\n'),
     );
   }
 
@@ -88,9 +91,21 @@ describe('the doctor command', () => {
       `ok       Godot ${godotVersion} at /usr/bin/godot (from PATH)`,
       `problem  Addon not installed in ${join(projectRoot, 'addons', 'godot_mcp_tool')}. Install it with: npx godot-mcp-tool install-addon`,
       `problem  Plugin not enabled in ${join(projectRoot, 'project.godot')}. Enable "Godot MCP Tool" in Project → Project Settings → Plugins.`,
+      untypedDeclarationAdvice,
       'warning  Editor not connected. The Godot editor of this project was closed. Open the project in the Godot editor, or ask Claude to start it with editor_launch.',
       '2 problems, 1 warning.',
     ]);
+  });
+
+  it('advises warnings for untyped declarations without counting them as a problem', async () => {
+    installAddon('0.2.0');
+    enablePlugin(['[debug]', '', 'gdscript/warnings/untyped_declaration=0', '']);
+
+    const report = await doctor().check();
+
+    expect(report.succeeded).toBe(true);
+    expect(report.lines).toContain(untypedDeclarationAdvice);
+    expect(report.lines.at(-1)).toBe('Everything is set up.');
   });
 
   it('warns about an addon of another version and an editor that still runs an older one', async () => {

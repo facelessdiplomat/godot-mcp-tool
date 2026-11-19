@@ -64,6 +64,11 @@ platform". Give large tasks in steps: the level first, then the player, then the
   To turn them on, set `GODOT_MCP_UNSAFE=1` for the server (see [Settings](setup.md#settings)) and allow them in
   the editor: Project → Tools → Godot MCP Tool → Allow Unsafe Tools in This Project, or the switch in the Godot MCP
   panel. Claude Code then asks you before every call of these tools.
+- **Hold Changes.** When you want the scene to yourself for a while, turn on Project → Tools → Godot MCP Tool →
+  Hold Changes, or "Hold the agent's changes" in the Godot MCP panel. Until you turn it off or close the editor,
+  Claude can read the project and the running game, but its changes to scenes, resources, files and settings are
+  refused, and so are starting and playing the game; the panel lists what it refused. Tests and exports that Claude
+  runs without the editor are not held.
 - **Read-only mode.** With `GODOT_MCP_READ_ONLY=1` Claude can look at the project and the running game but cannot
   change anything.
 - **Single tools off.** `GODOT_MCP_DISABLE` turns off the tools you name, such as `export_project`.
@@ -81,12 +86,19 @@ The server brings two ready-made tasks. Type `/` in Claude Code and find them in
 Their full names depend on how the server was added: `/mcp__godot__playtest` and `/mcp__godot__fix_last_run` for the
 server `godot` of `.mcp.json`, and longer names with the plugin.
 
+With the plugin, Claude can also hand a playtest to the **playtester** subagent, which plays the game with the game
+tools, changes nothing in the project and reports what works, what does not and where its screenshots are, so the
+pictures and readings stay out of your conversation. Ask for it by name, such as "let the playtester check the
+jump", or let Claude choose it.
+
 ## Limitations
 
 - **Screenshots need a window.** In windowless mode (`GODOT_MCP_HEADLESS=1`) Claude checks the game with numbers:
   positions, sizes and states.
 - **Scenes are changed through the editor.** While the editor is open, Claude edits scenes and resources with its
-  tools and not as `.tscn` or `.tres` text, which the editor would overwrite.
+  tools and not as `.tscn` or `.tres` text, which the editor would overwrite. With the Claude Code plugin, a hook
+  refuses such an edit of an existing file and tells Claude which tools to use; edits made through the shell are not
+  seen by it.
 - **A breakpoint stops the game.** The game waits at a breakpoint until Claude continues or stops it. Script errors
   do not stop the game: Claude reads them with file, line and stack.
 - **One editor per project.** When the same project is open in two editors, only the first one talks to Claude.

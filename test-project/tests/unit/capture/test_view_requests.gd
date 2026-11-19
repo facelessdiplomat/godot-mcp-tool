@@ -95,3 +95,24 @@ func test_sizes_the_cells_so_that_the_sheet_fits_the_longest_side() -> void:
 func test_lists_the_labels_of_the_views() -> void:
 	var views: Array = GodotMcpViewRequests.parse(["iso", {"preset": "top", "target": "Player"}], _bounds_of)
 	assert_eq(GodotMcpViewRequests.labels_of(views), ["iso", "top of Player"])
+
+
+func test_reads_a_render_mode_and_names_it_in_the_label() -> void:
+	var views: Array = GodotMcpViewRequests.parse([{"preset": "iso", "render": "unshaded"}, {"position": [0, 10, 10], "look_at": [0, 0, 0], "render": "overdraw"}], _bounds_of)
+	assert_eq(views[0]["debug_draw"], Viewport.DEBUG_DRAW_UNSHADED)
+	assert_eq(views[0]["render"], "unshaded")
+	assert_eq(views[0]["label"], "iso, unshaded")
+	assert_eq(views[1]["debug_draw"], Viewport.DEBUG_DRAW_OVERDRAW)
+	assert_eq(views[1]["label"], "from (0, 10, 10), overdraw")
+
+
+func test_renders_with_light_and_materials_by_default() -> void:
+	var views: Array = GodotMcpViewRequests.parse(["iso"], _bounds_of)
+	assert_eq(views[0]["debug_draw"], Viewport.DEBUG_DRAW_DISABLED)
+	assert_eq(views[0]["render"], "")
+
+
+func test_explains_an_unknown_render_mode() -> void:
+	var outcome: Variant = GodotMcpViewRequests.parse([{"preset": "iso", "render": "xray"}], _bounds_of)
+	assert_true(outcome is GodotMcpCommandError)
+	assert_string_contains((outcome as GodotMcpCommandError).message, "unshaded, lighting, overdraw, wireframe, normals")

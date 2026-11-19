@@ -6,7 +6,9 @@ import type { EditorStatus, EditorStatusProvider } from '../bridge/EditorConnect
 import type { BinaryLocator } from '../godot/GodotBinaryLocator.js';
 import type { GodotVersion } from '../godot/GodotVersion.js';
 import { isSupportedGodotVersion, minimumGodotVersionText } from '../godot/supportedGodotVersion.js';
+import { readConfigSections } from '../project/ConfigText.js';
 import type { ProjectLookup } from '../project/ProjectLocator.js';
+import { untypedDeclarationWarningKey } from '../project/ProjectTemplate.js';
 import { counted } from '../tools/formatting/counting.js';
 import { describeError } from '../util/errors.js';
 import type { CommandReport } from './CommandReport.js';
@@ -20,7 +22,7 @@ export interface DoctorDependencies {
   readonly readVersion: (executablePath: string) => Promise<GodotVersion>;
 }
 
-type CheckStatus = 'ok' | 'warning' | 'problem';
+type CheckStatus = 'ok' | 'advice' | 'warning' | 'problem';
 
 interface Check {
   readonly status: CheckStatus;
@@ -43,6 +45,7 @@ export class Doctor {
         await this.checkGodot(editorStatus),
         this.checkAddon(project.root),
         checkPlugin(project.root),
+        ...adviseOnUntypedDeclarations(project.root),
         this.checkEditor(editorStatus),
       );
     } else {
@@ -119,6 +122,20 @@ function checkPlugin(projectRoot: string): Check {
   return isPluginEnabled(readFileSync(projectFile, 'utf8'))
     ? { status: 'ok', text: `Plugin enabled in ${projectFile}` }
     : { status: 'problem', text: `Plugin not enabled in ${projectFile}. Enable "Godot MCP Tool" in Project → Project Settings → Plugins.` };
+}
+
+function adviseOnUntypedDeclarations(projectRoot: string): Check[] {
+  const debugSettings = readConfigSections(readFileSync(join(projectRoot, 'project.godot'), 'utf8')).find((section) => section.name === 'debug');
+  const level = Number(debugSettings?.values.get(untypedDeclarationWarningKey) ?? '0');
+  if (level > 0) {
+    return [];
+  }
+  return [
+    {
+      status: 'advice',
+      text: 'Untyped declarations go unreported. To get a warning for code without static types, set debug/gdscript/warnings/untyped_declaration to 1 (Warn) in the project settings, or ask Claude to.',
+    },
+  ];
 }
 
 function reportOf(packageVersion: string, checks: readonly Check[]): CommandReport {

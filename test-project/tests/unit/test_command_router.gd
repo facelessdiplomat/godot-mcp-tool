@@ -23,4 +23,4 @@ func test_lists_methods_in_alphabetical_order() -> void:
 
 
 func test_ping_answers_with_pong() -> void:
-	assert_eq_deep(GodotMcpPingCommand.new().execute({}), {"pong": true})
+	assert_eq_deep(GodotMcpPingCommand.new().execute({}), {"pong": true, "changes_held": false})

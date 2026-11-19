@@ -2,7 +2,7 @@ import * as z from 'zod/v4';
 import type { EditorGateway } from '../editor/EditorGateway.js';
 import { changingAnnotations, readingAnnotations } from './annotations.js';
 import { BridgeTool } from './bridge/BridgeTool.js';
-import { applyReportSchema, formatApplyReport, formatNodePath, formatValue } from './formatting/propertyReports.js';
+import { applyReportSchema, formatApplyReport, formatNamedLayers, formatNodePath, formatValue, namedLayerSchema } from './formatting/propertyReports.js';
 import { errorResult, textResult } from './results.js';
 
 export const autoloadSchema = z.object({ name: z.string(), path: z.string(), singleton: z.boolean() });
@@ -30,6 +30,7 @@ const projectInfoSchema = z.object({
   global_classes: globalClassesSchema,
   indentation: z.object({ style: z.enum(['tabs', 'spaces']), size: z.number().int() }),
   folders: z.array(z.string()),
+  layer_names: z.record(z.string(), z.array(namedLayerSchema)).optional(),
 });
 
 type ProjectInfo = z.infer<typeof projectInfoSchema>;
@@ -78,7 +79,19 @@ function describeProject(info: ProjectInfo): string {
     describeProjectClasses(info.global_classes),
     ...describeAddonClasses(info.global_classes.addons),
     `Top-level folders: ${listOrNone(info.folders)}`,
+    ...describeNamedLayers(info.layer_names),
   ].join('\n');
+}
+
+function describeNamedLayers(layerNames: ProjectInfo['layer_names']): string[] {
+  if (layerNames === undefined) {
+    return [];
+  }
+  const kinds = Object.entries(layerNames);
+  if (kinds.length === 0) {
+    return ['Named layers: none; name a layer with project_settings_set, such as layer_names/3d_physics/layer_2, and masks take its name'];
+  }
+  return [`Named layers (masks such as collision_mask take these names): ${kinds.map(([kind, layers]) => `${kind} ${formatNamedLayers(layers)}`).join('; ')}`];
 }
 
 function describeProjectClasses({ project, project_count: projectCount }: GlobalClasses): string {

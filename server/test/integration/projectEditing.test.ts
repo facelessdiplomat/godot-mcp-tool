@@ -112,4 +112,20 @@ describe.skipIf(godotBinary === '')('autoloads, groups, selection and closing sc
     expect(tree.isError).toBe(true);
     expect(workspace().read('arena.tscn')).not.toContain('Unsaved');
   });
+
+  it('names physics layers and sets and reads a mask by those names', async () => {
+    const named = await tools().call('project_settings_set', { values: { 'layer_names/3d_physics/layer_2': 'player', 'layer_names/3d_physics/layer_3': 'enemies' } });
+    const info = await tools().call('project_info');
+    await tools().call('scene_create', { path: 'res://door.tscn', root_type: 'Area3D' });
+    const changed = await tools().call('node_set_properties', { path: '.', properties: { collision_mask: ['player'] } });
+    const unknown = await tools().call('node_set_properties', { path: '.', properties: { collision_mask: ['ghosts'] } });
+    const read = await tools().call('node_get_properties', { path: '.', names: ['collision_mask'] });
+
+    expect(named.isError).toBe(false);
+    expect(workspace().read('project.godot')).toContain('3d_physics/layer_2="player"');
+    expect(info.text).toContain('Named layers (masks such as collision_mask take these names): 3d_physics 2 "player", 3 "enemies"');
+    expect(changed.text).toContain('Applied: collision_mask');
+    expect(unknown.text).toContain('collision_mask: no 3D physics layer is named "ghosts"; the named 3D physics layers are 2 "player", 3 "enemies"');
+    expect(read.text).toContain('collision_mask = 2 (layer 2 "player")  [3d_physics layers]');
+  });
 });

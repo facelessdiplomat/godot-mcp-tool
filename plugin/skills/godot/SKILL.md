@@ -17,7 +17,8 @@ are described in the files linked at the end.
 2. `project_info`: main scene, autoloads, `class_name` classes and the indentation of `.gd` files. Use that
    indentation in every script; never mix tabs and spaces. `input_map_get` lists the input actions.
 3. Read before you change: `scene_get_tree` or `node_find` for node paths, `node_get_properties` for values,
-   `docs_class` for any engine API you are not sure of.
+   `docs_class` for any engine API you are not sure of. `node_get_properties`, `game_get_properties` and
+   `node_get_bounds` take `paths` to read several nodes in one call; the game reads them in the same frame.
 
 ## The loop: change, check, run, observe
 
@@ -47,7 +48,9 @@ are described in the files linked at the end.
 6. **Observe** the running game: `game_input` for actions, keys, the mouse and the gamepad, with `read` steps for
    values at exact moments; `game_wait` for a state such as `is_on_floor()`; `game_get_properties` for values,
    getters included; `node_get_bounds` for placement and scale; `game_screenshot`, with `views` for 3D; `game_pause`
-   and `game_step` for frame-exact checks; `game_performance`; `user_data_get` for what the game saved in `user://`.
+   and `game_step` for frame-exact checks; `game_performance`; `user_data_get` for what the game saved in `user://`;
+   `audio_buses_get` with `in_game` to hear whether a bus carries sound and which players play;
+   `navigation_get_path` to see whether an agent can walk from one point to another.
 7. **Test** with GUT tests in `res://test` and `test_run`.
    To find why code misbehaves, stop the game on a line with `debug_breakpoints`, read the stack and the variables
    with `debug_state`, step with `debug_continue`, and remove the breakpoints when done.
@@ -79,3 +82,5 @@ are described in the files linked at the end.
 - [3d.md](3d.md): axes, transforms, character controllers, cameras, collisions, lighting and scale. Read it before
   building 3D scenes or movement.
 - [testing.md](testing.md): GUT tests and `test_run`. Read it before writing or running tests.
+- [ui.md](ui.md): containers, anchors, HUDs, themes, focus, pause menus, and how to check a UI. Read it before
+  building menus or a HUD.

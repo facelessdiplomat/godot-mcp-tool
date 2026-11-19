@@ -141,6 +141,15 @@ describe.skipIf(godotBinary === '')('editing the structure and the signals of a 
     expect(found.text).toContain('Goal/Shape: CollisionShape3D');
   });
 
+  it('reads several nodes in one call', async () => {
+    const read = await tools().call('node_get_properties', { paths: ['Player', 'Goal', 'Ghost'], names: ['position'] });
+
+    expect(read.isError).toBe(false);
+    expect(read.text).toMatch(/^Player \(CharacterBody3D\) in res:\/\/main\.tscn\nposition = /);
+    expect(read.text).toMatch(/\n\nGoal \(\w+\) in res:\/\/main\.tscn\nposition = /);
+    expect(read.text).toContain('\n\nNode "Ghost" not found');
+  });
+
   it('moves the camera out of the player without moving it in the world', async () => {
     const moved = await tools().call('node_reparent', { path: 'Player/Camera', parent: '.' });
     const camera = await tools().call('node_get_properties', { path: 'Camera', names: ['position'] });

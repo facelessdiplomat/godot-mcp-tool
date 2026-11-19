@@ -10,6 +10,9 @@ export interface ProjectTemplateOptions {
 }
 
 export const mainScenePath = 'res://main.tscn';
+export const untypedDeclarationWarningKey = 'gdscript/warnings/untyped_declaration';
+
+const warnLevel = 1;
 
 const rendererFeatures: Readonly<Record<Renderer, string>> = { forward_plus: 'Forward Plus', mobile: 'Mobile', gl_compatibility: 'GL Compatibility' };
 const wordSeparators = /[-_\s]+/;
@@ -38,6 +41,10 @@ export function projectFileText(options: ProjectTemplateOptions): string {
     `config/name=${quoted(options.name)}`,
     `run/main_scene="${mainScenePath}"`,
     `config/features=PackedStringArray(${features.map(quoted).join(', ')})`,
+    '',
+    '[debug]',
+    '',
+    `${untypedDeclarationWarningKey}=${String(warnLevel)}`,
     '',
     '[display]',
     '',

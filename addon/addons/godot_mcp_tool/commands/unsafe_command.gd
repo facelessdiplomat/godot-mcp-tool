@@ -1,6 +1,7 @@
 extends "command.gd"
 
 const GodotMcpCommand := preload("command.gd")
+const GodotMcpToolsMenu := preload("../editor/tools_menu.gd")
 const GodotMcpUnsafeToolsSwitch := preload("../editor/unsafe_tools_switch.gd")
 
 var _inner: GodotMcpCommand
@@ -17,6 +18,6 @@ func execute(params: Dictionary) -> Variant:
 		return GodotMcpCommandError.new(
 			GodotMcpJsonRpc.UNSAFE_DISABLED,
 			"Unsafe tools are turned off in the editor for this project",
-			"The user can turn them on in the editor with Project → Tools → %s → %s." % [GodotMcpUnsafeToolsSwitch.MENU_TITLE, GodotMcpUnsafeToolsSwitch.ALLOW_ITEM_TEXT],
+			"The user can turn them on in the editor with Project → Tools → %s → %s." % [GodotMcpToolsMenu.MENU_TITLE, GodotMcpUnsafeToolsSwitch.ITEM_TEXT],
 		)
 	return await _inner.execute(params)

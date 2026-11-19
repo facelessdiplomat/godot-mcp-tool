@@ -2,39 +2,13 @@ extends RefCounted
 
 const GodotMcpAddonInfo := preload("../addon_info.gd")
 
-const MENU_TITLE := "Godot MCP Tool"
-const ALLOW_ITEM_TEXT := "Allow Unsafe Tools in This Project"
-const ALLOW_ITEM_ID := 0
-
-var _menu: PopupMenu
+const ITEM_TEXT := "Allow Unsafe Tools in This Project"
 
 
 func is_allowed() -> bool:
 	return bool(EditorInterface.get_editor_settings().get_project_metadata(GodotMcpAddonInfo.SETTINGS_SECTION, GodotMcpAddonInfo.UNSAFE_TOOLS_KEY, false))
 
 
-func install(plugin: EditorPlugin) -> void:
-	_menu = PopupMenu.new()
-	_menu.add_check_item(ALLOW_ITEM_TEXT, ALLOW_ITEM_ID)
-	_menu.set_item_checked(_menu.get_item_index(ALLOW_ITEM_ID), is_allowed())
-	_menu.id_pressed.connect(_on_item_pressed)
-	plugin.add_tool_submenu_item(MENU_TITLE, _menu)
-
-
-func uninstall(plugin: EditorPlugin) -> void:
-	plugin.remove_tool_menu_item(MENU_TITLE)
-	if is_instance_valid(_menu):
-		_menu.queue_free()
-	_menu = null
-
-
 func set_allowed(allowed: bool) -> void:
 	EditorInterface.get_editor_settings().set_project_metadata(GodotMcpAddonInfo.SETTINGS_SECTION, GodotMcpAddonInfo.UNSAFE_TOOLS_KEY, allowed)
-	if is_instance_valid(_menu):
-		_menu.set_item_checked(_menu.get_item_index(ALLOW_ITEM_ID), allowed)
 	print("Godot MCP Tool: unsafe tools are %s in this project." % ("allowed" if allowed else "turned off"))
-
-
-func _on_item_pressed(item_id: int) -> void:
-	if item_id == ALLOW_ITEM_ID:
-		set_allowed(not is_allowed())

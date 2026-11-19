@@ -3,6 +3,7 @@ import type { EditorGateway } from '../editor/EditorGateway.js';
 import { changingAnnotations, readingAnnotations } from './annotations.js';
 import { BridgeTool } from './bridge/BridgeTool.js';
 import { textResult } from './results.js';
+import type { Tool, ToolDefinition } from './Tool.js';
 
 const audioBusSchema = z.object({
   name: z.string(),
@@ -20,23 +21,133 @@ const audioBusesSchema = z.object({ layout: z.string(), saved: z.boolean(), buse
 
 type AudioBuses = z.infer<typeof audioBusesSchema>;
 
-const audioBusesGetInput = z.object({});
+const audioBusLevelSchema = z.object({
+  name: z.string(),
+  volume_db: z.number(),
+  send: z.string(),
+  mute: z.boolean(),
+  solo: z.boolean(),
+  highest_peak_db: z.number(),
+  silent: z.boolean(),
+});
 
-export function createAudioBusesGetTool(projectReader: EditorGateway): BridgeTool<typeof audioBusesGetInput, AudioBuses> {
-  return new BridgeTool(projectReader, {
+type AudioBusLevel = z.infer<typeof audioBusLevelSchema>;
+
+const playingPlayerSchema = z.object({ path: z.string(), type: z.string(), bus: z.string(), stream: z.string(), volume_db: z.number() });
+const idlePlayerSchema = z.object({ path: z.string(), type: z.string(), bus: z.string(), autoplay: z.boolean() });
+
+type PlayingPlayer = z.infer<typeof playingPlayerSchema>;
+type IdlePlayer = z.infer<typeof idlePlayerSchema>;
+
+const audioLevelsSchema = z.object({
+  scene: z.string(),
+  window_physics_frames: z.number().int(),
+  silence_below_db: z.number(),
+  buses: z.array(audioBusLevelSchema),
+  players: z.array(playingPlayerSchema),
+  idle_players: z.array(idlePlayerSchema),
+});
+
+type AudioLevels = z.infer<typeof audioLevelsSchema>;
+
+const defaultListeningFrames = 30;
+const longestListeningFrames = 600;
+
+const audioBusesGetInput = z.object({
+  in_game: z
+    .boolean()
+    .default(false)
+    .describe(
+      'Listen to the running game instead: the loudest peak of each bus over a few physics frames, whether that is silence, and the players that are playing, with their bus and stream. Works with or without the editor.',
+    ),
+  window_physics_frames: z
+    .number()
+    .int()
+    .min(1)
+    .max(longestListeningFrames)
+    .default(defaultListeningFrames)
+    .describe(`With in_game, how long to listen, in physics frames (60 per second by default). Default: ${String(defaultListeningFrames)}.`),
+});
+
+const audioBusesGetDescription =
+  'Read the audio bus layout of the project, as the Audio panel of the editor shows it: each bus in order with its volume in dB, the bus it sends to, mute, solo, bypass and its effects, and the file the layout is saved in. Players such as AudioStreamPlayer pick a bus by name with their "bus" property. Works without the editor. With in_game, listen to the running game: the level of each bus and the players that play, to tell a muted bus, a silent volume or a player that never starts from a sound that plays.';
+
+export function createAudioBusesGetTool(projectReader: EditorGateway, game: EditorGateway): Tool<typeof audioBusesGetInput> {
+  const definition: ToolDefinition<typeof audioBusesGetInput> = {
+    title: 'Read audio buses',
+    description: audioBusesGetDescription,
+    inputSchema: audioBusesGetInput,
+    annotations: readingAnnotations,
+    alwaysLoad: false,
+  };
+  const layoutReader = new BridgeTool(projectReader, {
     name: 'audio_buses_get',
-    definition: {
-      title: 'Read audio buses',
-      description:
-        'Read the audio bus layout of the project, as the Audio panel of the editor shows it: each bus in order with its volume in dB, the bus it sends to, mute, solo, bypass and its effects, and the file the layout is saved in. Players such as AudioStreamPlayer pick a bus by name with their "bus" property. Works without the editor.',
-      inputSchema: audioBusesGetInput,
-      annotations: readingAnnotations,
-      alwaysLoad: false,
-    },
+    definition,
     method: 'audio.buses_get',
     responseSchema: audioBusesSchema,
+    params: () => ({}),
     present: (layout) => textResult(describeAudioBuses(layout)),
   });
+  const listener = new BridgeTool(game, {
+    name: 'audio_buses_get',
+    definition,
+    method: 'game.audio_levels',
+    responseSchema: audioLevelsSchema,
+    params: (input) => ({ window_physics_frames: input.window_physics_frames }),
+    timeoutMs: (input) => listeningTimeoutMs(input.window_physics_frames),
+    present: (levels) => textResult(describeAudioLevels(levels)),
+  });
+  return {
+    name: 'audio_buses_get',
+    definition,
+    execute: (input) => (input.in_game === true ? listener.execute(input) : layoutReader.execute(input)),
+  };
+}
+
+const physicsFramesPerSecond = 60;
+const listeningAllowanceMs = 20_000;
+
+function listeningTimeoutMs(frames: number): number {
+  return (frames / physicsFramesPerSecond) * 1000 + listeningAllowanceMs;
+}
+
+function describeAudioLevels(levels: AudioLevels): string {
+  const place = levels.scene === '' ? 'the running game' : `the running game (${levels.scene})`;
+  const lines = [
+    `Sound of ${place} over ${String(levels.window_physics_frames)} physics frames; a bus below ${String(levels.silence_below_db)} dB is silent:`,
+    ...levels.buses.map((bus) => `- ${describeBusLevel(bus)}`),
+  ];
+  if (levels.players.length === 0) {
+    lines.push('No player is playing; a player starts with play(), or with autoplay when the scene starts.');
+  } else {
+    lines.push(`Playing: ${levels.players.map(describePlayingPlayer).join('; ')}`);
+  }
+  if (levels.idle_players.length > 0) {
+    lines.push(`Not playing: ${levels.idle_players.map(describeIdlePlayer).join('; ')}`);
+  }
+  return lines.join('\n');
+}
+
+function describeBusLevel(bus: AudioBusLevel): string {
+  const parts = [bus.silent ? 'silent' : `peak ${String(Number(bus.highest_peak_db.toFixed(1)))} dB`];
+  if (bus.volume_db !== 0) {
+    parts.push(`at ${String(Number(bus.volume_db.toFixed(2)))} dB`);
+  }
+  if (bus.mute) {
+    parts.push('muted');
+  }
+  if (bus.solo) {
+    parts.push('solo');
+  }
+  return `${bus.name}: ${parts.join(', ')}`;
+}
+
+function describePlayingPlayer(player: PlayingPlayer): string {
+  return `${player.path} (${player.type}) on ${player.bus}, ${player.stream} at ${String(Number(player.volume_db.toFixed(2)))} dB`;
+}
+
+function describeIdlePlayer(player: IdlePlayer): string {
+  return `${player.path} (${player.type}) on ${player.bus}${player.autoplay ? ', autoplay' : ''}`;
 }
 
 function describeAudioBuses(layout: AudioBuses): string {

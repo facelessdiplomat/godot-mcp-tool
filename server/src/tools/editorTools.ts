@@ -9,7 +9,7 @@ import { type CaptureReader, createEditorScreenshotTool } from './captureTools.j
 import { createFilesystemMoveTool, createResourceFindUsagesTool } from './fileTools.js';
 import { createGridMapGetCellsTool, createGridMapSetCellsTool } from './gridMapTools.js';
 import { createInputMapGetTool, createInputMapSetTool } from './inputTools.js';
-import { createNavigationBakeTool } from './navigationTools.js';
+import { createNavigationBakeTool, createNavigationGetPathTool } from './navigationTools.js';
 import { createNodeDuplicateTool, createNodeMakeLocalTool, createNodeReparentTool, createNodeSaveAsSceneTool } from './nodeStructureTools.js';
 import { createNodeAddCollisionTool, createNodeSnapToFloorTool, createSceneRaycastTool } from './placementTools.js';
 import {
@@ -37,7 +37,7 @@ import type { Tool } from './Tool.js';
 import { createEditorRedoTool, createEditorUndoTool } from './historyTools.js';
 import { createUserDataGetTool } from './userDataTools.js';
 
-export function createEditorTools(editor: EditorGateway, projectReader: EditorGateway, readCapture: CaptureReader): Tool[] {
+export function createEditorTools(editor: EditorGateway, projectReader: EditorGateway, readCapture: CaptureReader, game: EditorGateway = editor): Tool[] {
   return [
     createProjectInfoTool(projectReader),
     createProjectSettingsGetTool(projectReader),
@@ -47,7 +47,7 @@ export function createEditorTools(editor: EditorGateway, projectReader: EditorGa
     createEditorScreenshotTool(editor, readCapture),
     createInputMapGetTool(projectReader),
     createInputMapSetTool(editor),
-    createAudioBusesGetTool(projectReader),
+    createAudioBusesGetTool(projectReader, game),
     createAudioBusesSetTool(editor),
     createSceneCreateTool(editor),
     createSceneOpenTool(editor),
@@ -83,6 +83,7 @@ export function createEditorTools(editor: EditorGateway, projectReader: EditorGa
     createAssetImportSettingsGetTool(editor),
     createAssetImportSettingsSetTool(editor),
     createNavigationBakeTool(editor),
+    createNavigationGetPathTool(projectReader),
     createAnimationGetTool(editor),
     createAnimationSetTool(editor),
     createAnimationDeleteTool(editor),

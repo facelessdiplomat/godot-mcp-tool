@@ -55,6 +55,14 @@ func test_measures_a_node_of_the_running_game() -> void:
 	assert_eq(result["visual_count"], 1)
 
 
+func test_measures_several_nodes_of_the_running_game_at_once() -> void:
+	var result: Dictionary = await GodotMcpGameBoundsCommand.new(_scene, GodotMcpVariantCodec.new()).execute({"paths": ["Floor", "Ceiling"]})
+	var nodes: Array = result["nodes"]
+	assert_eq((nodes[0] as Dictionary)["size"], "Vector3(20, 1, 20)")
+	assert_eq((nodes[1] as Dictionary)["path"], "Ceiling")
+	assert_true((nodes[1] as Dictionary).has("error"))
+
+
 func test_measures_a_control_of_the_game_by_its_rectangle() -> void:
 	var label := Label.new()
 	label.name = "Score"

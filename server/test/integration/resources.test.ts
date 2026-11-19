@@ -58,6 +58,19 @@ describe.skipIf(godotBinary === '')('creating and changing resource files', () =
     expect(floor.text).toContain('physics_material_override = res://materials/ice.tres');
   });
 
+  it('creates a theme item by item and reads its items back', async () => {
+    const created = await tools().call('resource_create', {
+      path: 'res://ui/menu_theme.tres',
+      type: 'Theme',
+      properties: { 'Button/styles/normal': { new: 'StyleBoxFlat', corner_radius_top_left: 8 }, 'Button/font_sizes/font_size': 24 },
+    });
+    const read = await tools().call('resource_get', { path: 'res://ui/menu_theme.tres', names: ['Button/font_sizes/font_size', 'Button/styles/normal:corner_radius_top_left'] });
+
+    expect(created.text).toBe('Created res://ui/menu_theme.tres (Theme).\nApplied: Button/styles/normal, Button/font_sizes/font_size');
+    expect(read.text).toContain('Button/font_sizes/font_size = 24  [int]');
+    expect(read.text).toContain('Button/styles/normal:corner_radius_top_left = 8  [int]');
+  });
+
   it('creates a resource of a class of the project', async () => {
     workspace().write('enemy_stats.gd', enemyStatsScript);
     await tools().call('editor_rescan');

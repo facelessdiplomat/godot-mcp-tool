@@ -38,6 +38,7 @@ func _open_viewport(world: World3D, view: Dictionary, size: Vector2i, labelled: 
 	viewport.size = size
 	viewport.world_3d = world
 	viewport.render_target_update_mode = SubViewport.UPDATE_ALWAYS
+	viewport.debug_draw = view.get("debug_draw", Viewport.DEBUG_DRAW_DISABLED)
 	var camera := Camera3D.new()
 	camera.physics_interpolation_mode = Node.PHYSICS_INTERPOLATION_MODE_OFF
 	camera.fov = view["fov"]

@@ -60,6 +60,31 @@ describe('project tools', () => {
     );
   });
 
+  it('project_info lists the named layers of each kind, which masks take by name', async () => {
+    const editor = new FakeEditorGateway().respondTo('project.info', {
+      ...projectInfoWith({ project: [], project_count: 0, addons: [] }),
+      layer_names: {
+        '3d_physics': [
+          { number: 1, name: 'world' },
+          { number: 2, name: 'player' },
+        ],
+        avoidance: [{ number: 4, name: 'crowd' }],
+      },
+    });
+
+    const text = textOf(await createProjectInfoTool(editor).execute({}));
+
+    expect(text).toContain('Named layers (masks such as collision_mask take these names): 3d_physics 1 "world", 2 "player"; avoidance 4 "crowd"');
+  });
+
+  it('project_info says how to name layers when no layer has a name', async () => {
+    const editor = new FakeEditorGateway().respondTo('project.info', { ...projectInfoWith({ project: [], project_count: 0, addons: [] }), layer_names: {} });
+
+    const text = textOf(await createProjectInfoTool(editor).execute({}));
+
+    expect(text).toContain('Named layers: none; name a layer with project_settings_set, such as layer_names/3d_physics/layer_2, and masks take its name');
+  });
+
   it('project_info lists the classes of the project and counts those of each addon', async () => {
     const editor = new FakeEditorGateway().respondTo(
       'project.info',

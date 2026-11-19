@@ -58,7 +58,8 @@ GODOT_BIN=/path/to/Godot npm run test:integration
 With `GODOT_MCP_WINDOW_TESTS=1` they also run the tests that open Godot windows for screenshots.
 
 CI runs the same checks on Linux with Godot 4.7.2 and with the pinned `master` commit of the engine
-([ci.yml](.github/workflows/ci.yml)); the window tests run only on your machine.
+([ci.yml](.github/workflows/ci.yml)); the window tests run only on your machine. A nightly run tests the head of
+`master` (see [The Godot version](#the-godot-version)).
 
 ## Rules for the code
 
@@ -100,8 +101,24 @@ After a new build, reconnect the `godot` server in `/mcp`, and reopen the editor
 ## The Godot version
 
 The minimum is Godot 4.7 (ADR-11 in the plan). The primary target is a pinned `master` commit of the engine, recorded
-in [docs/spikes.md](docs/spikes.md) and as `GODOT_MASTER_COMMIT` in the CI workflow. Update it on purpose: rebuild
-Godot, run all the checks, then record the new commit in both places.
+in [docs/spikes.md](docs/spikes.md) and as the `commit` of the `godot-master` job in [ci.yml](.github/workflows/ci.yml).
+Both CI and the nightly run build the editor with the same reusable workflow,
+[godot-editor-build.yml](.github/workflows/godot-editor-build.yml), and cache it by commit.
+
+The nightly run, [godot-master.yml](.github/workflows/godot-master.yml), builds the head of `master` every night and
+runs the addon and integration tests against it; its summary names the engine commit and the result of each suite. It
+checks no pull request, so a red night blocks nothing, but it shows an engine change that breaks the addon before the
+pin moves. Start it by hand from the Actions tab with "Run workflow".
+
+Move the pin on purpose:
+
+1. Pick the commit of a green night from the summary of its run.
+2. Build that commit locally and run all the checks: `npm run lint`, `npm run typecheck`, `npm test`,
+   `scripts/test-addon.sh` and `npm run test:integration`.
+3. Record the commit as the `commit` of the `godot-master` job in `ci.yml`, under "Pinned engine" in
+   [docs/spikes.md](docs/spikes.md) and in §4 of the development plan.
+4. Look into the API dump of the new build (`godot --headless --dump-extension-api`) for what the plan waits for, such
+   as a bake method of `LightmapGI`.
 
 ## Pull requests
 

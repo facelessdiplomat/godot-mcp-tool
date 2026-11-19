@@ -54,4 +54,4 @@ func test_the_game_offers_its_inspection_commands() -> void:
 	var time := GodotMcpGameTime.new()
 	add_child_autoqfree(time)
 	var router := GameCommandCatalog.build_router(func() -> Node: return null, time)
-	assert_eq(router.methods(), PackedStringArray(["bounds", "eval", "input", "pause", "performance", "properties.get", "properties.set", "raycast", "screenshot", "step", "tree", "wait"]))
+	assert_eq(router.methods(), PackedStringArray(["audio_levels", "bounds", "eval", "input", "navigation_path", "pause", "performance", "properties.get", "properties.set", "raycast", "screenshot", "step", "tree", "wait"]))

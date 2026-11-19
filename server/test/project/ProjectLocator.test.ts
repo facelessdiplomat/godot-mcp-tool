@@ -89,7 +89,71 @@ describe('ProjectLocator', () => {
 
     const lookup = locator.locate();
 
-    expect(lookup.found).toBe(false);
-    expect(!lookup.found && lookup.reason).toContain('GODOT_PROJECT_PATH');
+    expect(lookup).toEqual({
+      found: false,
+      reason: `No project.godot was found in ${sandbox}, its parent folders or the folders up to three levels below it. Set GODOT_PROJECT_PATH to the Godot project folder.`,
+    });
+  });
+
+  describe('when no project lies above', () => {
+    it('finds the one project in a subfolder of the working directory', () => {
+      const projectRoot = createProject(join(sandbox, 'repository', 'game'));
+      mkdirSync(join(sandbox, 'repository', 'docs'));
+
+      expect(new ProjectLocator({}, join(sandbox, 'repository')).locate()).toEqual({ found: true, root: projectRoot, source: 'subfolder' });
+    });
+
+    it('looks below CLAUDE_PROJECT_DIR rather than below the working directory', () => {
+      const projectRoot = createProject(join(sandbox, 'repository', 'client', 'godot'));
+      createProject(join(sandbox, 'elsewhere', 'game'));
+
+      expect(new ProjectLocator({ CLAUDE_PROJECT_DIR: join(sandbox, 'repository') }, join(sandbox, 'elsewhere')).locate()).toEqual({
+        found: true,
+        root: projectRoot,
+        source: 'subfolder',
+      });
+    });
+
+    it('finds a project three levels down, but not four', () => {
+      const projectRoot = createProject(join(sandbox, 'repository', 'apps', 'client', 'game'));
+      createProject(join(sandbox, 'deeper', 'a', 'b', 'c', 'game'));
+
+      expect(new ProjectLocator({}, join(sandbox, 'repository')).locate()).toEqual({ found: true, root: projectRoot, source: 'subfolder' });
+      expect(new ProjectLocator({}, join(sandbox, 'deeper')).locate().found).toBe(false);
+    });
+
+    it('does not guess between several projects and names them', () => {
+      createProject(join(sandbox, 'repository', 'game'));
+      createProject(join(sandbox, 'repository', 'tools', 'level-editor'));
+
+      expect(new ProjectLocator({}, join(sandbox, 'repository')).locate()).toEqual({
+        found: false,
+        reason: `Several Godot projects lie below ${join(sandbox, 'repository')}: game, ${join('tools', 'level-editor')}. Set GODOT_PROJECT_PATH to the folder of the one to use.`,
+      });
+    });
+
+    it('skips hidden folders, node_modules and folders that Godot ignores', () => {
+      const projectRoot = createProject(join(sandbox, 'repository', 'game'));
+      createProject(join(sandbox, 'repository', '.cache', 'copy'));
+      createProject(join(sandbox, 'repository', 'node_modules', 'some-package', 'demo'));
+      createProject(join(sandbox, 'repository', 'vendor', 'samples'));
+      writeFileSync(join(sandbox, 'repository', 'vendor', '.gdignore'), '');
+
+      expect(new ProjectLocator({}, join(sandbox, 'repository')).locate()).toEqual({ found: true, root: projectRoot, source: 'subfolder' });
+    });
+
+    it('does not look inside a project for projects of its own', () => {
+      const projectRoot = createProject(join(sandbox, 'repository', 'game'));
+      createProject(join(sandbox, 'repository', 'game', 'addons', 'demo'));
+
+      expect(new ProjectLocator({}, join(sandbox, 'repository')).locate()).toEqual({ found: true, root: projectRoot, source: 'subfolder' });
+    });
+
+    it('keeps a project above the working directory before one below it', () => {
+      const projectRoot = createProject(join(sandbox, 'game'));
+      createProject(join(sandbox, 'game', 'levels', 'test-bed'));
+
+      expect(new ProjectLocator({}, join(sandbox, 'game', 'levels')).locate()).toEqual({ found: true, root: projectRoot, source: 'working directory' });
+    });
   });
 });

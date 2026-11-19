@@ -31,8 +31,9 @@ If the panel does not appear, enable **Godot MCP Tool** in Project → Project S
 
 ### With the Claude Code plugin (recommended)
 
-The plugin brings the server, a hook that checks every GDScript file Claude writes, and a skill that teaches Claude
-the Godot workflow.
+The plugin brings the server, a hook that checks every GDScript file Claude writes, a hook that keeps Claude from
+editing scenes as text while the editor is open, a skill that teaches Claude the Godot workflow, and a playtester
+subagent that plays the game and reports back.
 
 1. Add the marketplace and install the plugin from a terminal:
 
@@ -90,7 +91,7 @@ You can also write `.mcp.json` yourself:
 }
 ```
 
-Without the plugin you get every tool, but neither the hook nor the skill. Use either the plugin or this server,
+Without the plugin you get every tool, but neither the hooks, the skill nor the playtester. Use either the plugin or this server,
 not both.
 
 ## 4. Check the connection
@@ -122,6 +123,11 @@ ok       Editor connected: Godot 4.7.2.stable.official.ed1daf0bf, addon 0.2.0
 Everything is set up.
 ```
 
+A line marked `advice` is a suggestion, not a problem. One appears when the project does not warn about GDScript
+declarations without a static type: projects made by `npx godot-mcp-tool init` or Claude's `project_create` do, so
+that Claude's script checks point at untyped code. Turn it on in an existing project by setting
+`debug/gdscript/warnings/untyped_declaration` to 1 (Warn) in the project settings, or ask Claude to.
+
 ## 5. When something does not work
 
 Start with `npx godot-mcp-tool doctor` in the project folder: it checks each part and says how to fix what is wrong.
@@ -139,7 +145,11 @@ Start with `npx godot-mcp-tool doctor` in the project folder: it checks each par
   `npx godot-mcp-tool update-addon` in the project folder and open the editor again.
 - **Another editor already serves the project.** Only one editor per project talks to Claude; the panel of the
   other one says `off: the editor in process … already serves this project`. Close the editor you don't need.
-- **No project is found.** Start Claude Code in the project folder, or set `GODOT_PROJECT_PATH` to it.
+- **No project is found.** The server looks for `project.godot` in the folder where Claude Code starts and in the
+  folders above it, then in the folders up to three levels below it, skipping hidden folders, `node_modules` and
+  folders with a `.gdignore`. So a repository that keeps its game in a folder such as `game/` needs no setting. When
+  several projects lie below, the server names them and uses none: start Claude Code in the project folder, or set
+  `GODOT_PROJECT_PATH` to it.
 
 ## Settings
 
@@ -151,7 +161,7 @@ start it with the variable, such as `GODOT_MCP_READ_ONLY=1 claude`, or add the v
 | Variable | What it does |
 |---|---|
 | `GODOT_BIN` | The Godot executable, when the server does not find it by itself. |
-| `GODOT_PROJECT_PATH` | The project folder, when Claude Code runs somewhere else. |
+| `GODOT_PROJECT_PATH` | The project folder, when Claude Code runs somewhere else, or when several projects lie in the folders below it. |
 | `GODOT_MCP_HEADLESS=1` | Windowless mode: games and the editor that Claude starts run without a window, so there are no screenshots. For servers and CI. |
 | `GODOT_MCP_READ_ONLY=1` | Read-only mode: only the tools that read are available. |
 | `GODOT_MCP_UNSAFE=1` | Turns on the five unsafe tools; see [Safety](usage.md#safety). |

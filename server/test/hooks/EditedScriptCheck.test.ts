@@ -111,6 +111,14 @@ describe('checking a script that Claude just wrote or edited', () => {
     expect(checked).toEqual([]);
   });
 
+  it('leaves a script beside a project alone, though the project lies in a folder below it', async () => {
+    const looseScript = join(workspace, 'helper.gd');
+    writeFileSync(looseScript, 'extends RefCounted\n');
+
+    expect(await check(editOf(looseScript))).toEqual({ kind: 'silent' });
+    expect(checked).toEqual([]);
+  });
+
   it('stays silent when nothing can check the script', async () => {
     validation = () => Promise.reject(new ValidationUnavailableError('The Godot editor is not connected, and scripts cannot be checked without it.'));
 

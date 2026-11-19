@@ -162,6 +162,32 @@ func test_gets_the_non_default_properties_of_a_node() -> void:
 	assert_has(names, "position")
 
 
+func test_gets_the_properties_of_several_nodes_and_reports_a_missing_one_beside_them() -> void:
+	var player := _add_owned(_root, CharacterBody3D.new(), "Player") as CharacterBody3D
+	player.position = Vector3(1, 2, 3)
+	_add_owned(_root, Camera3D.new(), "Camera")
+	var result: Dictionary = await GodotMcpNodeGetPropertiesCommand.new(_context).execute({"paths": ["Player", "Playr", "Camera"], "names": ["position"]})
+	var nodes: Array = result["nodes"]
+	assert_eq(result["scene"], "res://levels/arena.tscn")
+	assert_eq(nodes.size(), 3)
+	assert_eq((nodes[0] as Dictionary)["path"], "Player")
+	assert_eq((nodes[0] as Dictionary)["properties"], [{"name": "position", "type": "Vector3", "value": "Vector3(1, 2, 3)"}])
+	assert_eq((nodes[1] as Dictionary)["path"], "Playr")
+	assert_eq((nodes[1] as Dictionary)["error"], "Node \"Playr\" not found")
+	assert_string_contains((nodes[1] as Dictionary)["hint"], "Player")
+	assert_eq((nodes[2] as Dictionary)["type"], "Camera3D")
+
+
+func test_takes_either_one_path_or_several() -> void:
+	_add_owned(_root, CharacterBody3D.new(), "Player")
+	var both: Variant = await GodotMcpNodeGetPropertiesCommand.new(_context).execute({"path": "Player", "paths": ["Player"]})
+	var none: Variant = await GodotMcpNodeGetPropertiesCommand.new(_context).execute({"paths": []})
+	var too_many: Variant = await GodotMcpNodeGetPropertiesCommand.new(_context).execute({"paths": range(21).map(func(index: int) -> String: return "Node%d" % index)})
+	assert_eq((both as GodotMcpCommandError).message, "Give either \"path\" or \"paths\", not both")
+	assert_eq((none as GodotMcpCommandError).message, "\"paths\" needs at least one node path")
+	assert_eq((too_many as GodotMcpCommandError).message, "\"paths\" takes at most 20 node paths")
+
+
 func test_sets_properties_and_reports_each_one() -> void:
 	_add_owned(_root, CharacterBody3D.new(), "Player")
 	var result: Dictionary = await GodotMcpNodeSetPropertiesCommand.new(_context).execute({"path": "Player", "properties": {"position": [1, 2, 3], "speed": 5}})
@@ -192,6 +218,19 @@ func test_measures_the_bounds_of_a_node_in_the_scene() -> void:
 	assert_eq(result["position"], "Vector3(3, 0, -1)")
 	assert_eq(result["size"], "Vector3(2, 2, 2)")
 	assert_eq(result["visual_count"], 1)
+
+
+func test_measures_several_nodes_and_reports_one_that_cannot_be_measured_beside_them() -> void:
+	var crate := MeshInstance3D.new()
+	crate.mesh = BoxMesh.new()
+	_add_owned(_root, crate, "Crate")
+	_add_owned(_root, Node.new(), "Logic")
+	var result: Dictionary = await GodotMcpNodeGetBoundsCommand.new(_context, null).execute({"paths": ["Crate", "Logic"]})
+	var nodes: Array = result["nodes"]
+	assert_eq(result["scene"], "res://levels/arena.tscn")
+	assert_eq((nodes[0] as Dictionary)["size"], "Vector3(1, 1, 1)")
+	assert_eq((nodes[1] as Dictionary)["path"], "Logic")
+	assert_string_contains((nodes[1] as Dictionary)["error"], "neither a 3D nor a 2D node")
 
 
 func test_explains_bounds_of_a_node_that_is_neither_3d_nor_2d() -> void:
