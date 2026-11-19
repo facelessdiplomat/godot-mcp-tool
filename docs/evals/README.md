@@ -65,6 +65,7 @@ When running one, record whether it passed, the number of tool calls and the tok
 | [same-look-after-the-refactor.md](same-look-after-the-refactor.md) | `compare_to` of `editor_screenshot` after turning nodes into instances |
 | [one-more-argument.md](one-more-argument.md) | `script_find_references` before a function gets a second argument: typed and untyped calls, a bound signal value, a method track, and a barrel with a `take_damage` of its own |
 | [the-crate-by-the-ramp.md](the-crate-by-the-ramp.md) | a node named by where it stands, found from positions in numbers or in pictures |
+| [light-the-cave.md](light-the-cave.md) | a `VoxelGI` that must be baked, which no tool does yet (T24) |
 
 ## Running them
 
@@ -93,9 +94,9 @@ belong to `npm test` or the integration tests.
   list of tools, as if the user confirmed every call.
 - A run writes `result.json` (the checks, the tool calls by name, turns, tokens, cost and duration) and the agent's
   stream to `server/test/evals/results/<time>-<scenario>/`, which Git ignores.
-- `build-an-arena`, `health-bar-hud`, `collect-coins` and `pause-menu` open an editor window: they ask for pictures
-  or for something on the screen, and a game started from an editor with a window has one too, so `game_screenshot`
-  works.
+- Scenarios marked `window: true`, such as `build-an-arena`, `why-is-it-dark` and `light-the-cave`, open an editor
+  window: they ask for pictures or for something on the screen, and a game started from an editor with a window has
+  one too, so `game_screenshot` works.
 - A scenario that an agent solved another valid way gets that way as another reference solution, so a check that
   rejects it fails in the reference run.
 
@@ -526,3 +527,37 @@ The agent found the tool with its first `ToolSearch`, built the library in one c
   key, and left the barrel alone. It still read the scripts, which `Edit` needs before a change, and checked
   `arena.tscn` with a `Grep` and a read, so it took five calls more than the runs with `Grep` alone. All three runs
   got the callers right.
+
+### Light baking, 2026-11-19
+
+Task T24 belongs to 0.3.0 since the decision of the same day, and it starts with the scenario `light-the-cave`: a cave
+that a `VoxelGI` lights only once it is baked. It passes with its reference solution (4/4) and fails when nothing is
+done (Godot 4.8 at the pinned commit). No tool bakes, so the reference solution bakes from the running game with a
+one-off script and gives the `VoxelGI` the saved data afterwards. The run with an agent decides whether a tool
+follows:
+
+| Scenario | Checks | Tool calls | Cost, $ | Time, s |
+|---|---|---|---|---|
+| light-the-cave | 4/4 | 34 | 0.97 | 103 |
+
+- The agent got there with the tools it has, by the same detour as the reference solution, only in the editor: an
+  `@tool` script on the `VoxelGI` bakes in `_ready()` and saves the data with `ResourceSaver`, and to run it the agent
+  closed the scene with a save and opened it again. Then it took the script off and gave the `VoxelGI` the saved file.
+- It raised `energy` and `propagation` of the baked data, so the back of the cave came out at [110, 98, 81] against
+  [39, 34, 27] with the reference solution, and it switched the `VoxelGI` off in the running game to show that the
+  light came from it.
+- One call failed: `resource_get` reads resource files only, not `res://cave.tscn::Environment` inside a scene; the
+  agent read the scene as text instead. `node_get_properties` with a path such as `environment:ambient_light_energy`
+  reads it, and the hint of the error could say so.
+- A one-off script and a reopened scene are the detour that made T14 a tool, and T24 got one too: `voxelgi_bake`
+  bakes a `VoxelGI` as the Bake VoxelGI button of the editor does, into `<scene>.<VoxelGI>_data.res`, and says which
+  `VoxelGI` found no static geometry. Without a window it refuses, since the engine then keeps no baked data. The
+  reference solution uses it, and the detour from the running game stays as another solution. One rerun with the same
+  model and Claude Code:
+
+  | Scenario | Checks | Tool calls | Cost, $ | Time, s |
+  |---|---|---|---|---|
+  | light-the-cave | 4/4 | 34 → 17 | 0.97 → 0.38 | 103 → 43 |
+
+  The agent found the tool with its first `ToolSearch`, baked in one call and needed neither a script nor a reopened
+  scene. It raised `energy` and `propagation` of the data again, to [133, 118, 98] at the back of the cave.

@@ -32,11 +32,13 @@ runs without an agent passes on the pinned 4.8 build; what each task still needs
 | T15 | done: `script_find_references` (way B), with `one-more-argument`. The spike (spikes.md §12) keeps way A, a language server in the plugin, for later: Claude Code runs it over stdio only and does not document what happens while the editor is closed. The scenario found that a windowless editor kept a changed script that no tab showed; `editor_rescan` now reloads it. The first agent run found the callers with `Grep` and passed every check but the one of the tool (6/7), so the tool stays and the scenario got a barrel with a `take_damage` of its own, which a text search mixes in; writing that version made the tool leave out the uses that the language server traces to a symbol of the same name in another script. The rerun with the barrel again used `Grep` (8/9): the agent saw the tool only by its name. With one line in the server instructions the third run called `script_find_references`, took its answer as the list of callers and passed 9/9 with 26 calls | — |
 | T16 | `game_record_input`; the integration test `gameInputRecording.test.ts` presses keys in the game as a person would, and the recorded steps, replayed with `fixed_fps`, bring the player to the same place | one check by hand: a walk and a jump played at the keyboard come back as steps that replay to the same place |
 | T17 | the subagent `plugin/agents/playtester.md` with a test of its tools, and the page `ui.md` of the skill; the plugin validates | the measurement with and without the subagent (two agent runs of `playtest-without-a-window`) |
-| T18 | the prompts `profile`, `add_tests` and `setup_ci`, and the page `ci.md` of the skill; the workflow parses, and its archive names, sums and template layout match the 4.7.2 release. A probe found that GUT exits with 0 when a test script does not load, so the workflow looks for that error | one run of the workflow on a scratch repository with a small game |
+| T18 | done: the prompts `profile`, `add_tests` and `setup_ci`, and the page `ci.md` of the skill; the workflow parses, and its archive names, sums and template layout match the 4.7.2 release. A probe found that GUT exits with 0 when a test script does not load, so the workflow looks for that error | put off: the run on GitHub waits until the workflow is used (your decision of 2026-11-19) |
 | T19 | the still of four views of the arena from `editor_screenshot` in both READMEs (`docs/media/arena-views.jpg`, 134 KB), and the script of the recording in `docs/media/README.md` | the recording and the still of the panel (you), then both READMEs |
 | T20 | step 1: the runner takes the server under test from `EVAL_SERVER` and leaves the plugin out with `EVAL_PLUGIN=0`; `result.json` records both; `AgentInvocation.test.ts` covers them | your yes to installing `hi-godot/godot-ai`, then steps 2–4 and the runs (your yes) |
 | T21 | the rules of the store read; the listing in `docs/asset-store.md`; the addon folder holds `LICENSE` and `README.md`, which users keep; `npm run pack:asset-store` packs the committed addon of a commit with `addons/godot_mcp_tool/` at the root | the thumbnail from the recording (T19), the AI usage disclosure and the submission (you) |
-| T22–T25 | not started | |
+| T22, T23 | after 0.3.0, by your decision of 2026-11-19 | |
+| T24 | done, in 0.3.0 by your decision of 2026-11-19: the first agent run of `light-the-cave` passed only with a one-off `@tool` script and a reopened scene (34 calls, $0.97), so `voxelgi_bake` bakes a `VoxelGI` as the editor's button does; the rerun with it passed with 17 calls for $0.38 and no script. `LightmapGI` still has no bake method at the pinned commit, and the steps for moving the pin in `CONTRIBUTING.md` name that check | — |
+| T25 | not started | |
 
 All checks above ran on the pinned `master` build only; CI runs them on 4.7.2 after the push. One window test fails
 on this machine at commit `d7f3ef3` as well, so before this work: the second test of `windowedRescan.test.ts`, whose
@@ -154,8 +156,8 @@ development plan.
 | [T12](#t12-node-markers-on-3d-views) | Node markers on 3D views | № 13 | M | — | T11 |
 | [T13](#t13-compare-a-screenshot-with-an-earlier-one) | Compare a screenshot with an earlier one | № 6 | M | — | — |
 | **Phase 4** | | | | | |
-| [T14](#t14-a-meshlibrary-from-a-scene) | A `MeshLibrary` from a scene | № 5 | M | maybe `meshlibrary_create` | T7 |
-| [T15](#t15-find-where-a-symbol-is-defined-and-used) | Find where a symbol is defined and used | № 4 | M | maybe `script_find_references` | — |
+| [T14](#t14-a-meshlibrary-from-a-scene) | A `MeshLibrary` from a scene | № 5 | M | `meshlibrary_create` | T7 |
+| [T15](#t15-find-where-a-symbol-is-defined-and-used) | Find where a symbol is defined and used | № 4 | M | `script_find_references` | — |
 | [T16](#t16-record-what-the-player-does) | Record what the player does | № 7 | L | `game_record_input` | — |
 | **Phase 5** | | | | | |
 | [T17](#t17-a-playtester-subagent-and-a-ui-page-in-the-skill) | A playtester subagent and a UI page in the skill | № 8 | S + S | — | — |
@@ -164,16 +166,16 @@ development plan.
 | [T20](#t20-the-comparison-with-an-existing-server) | The comparison with an existing server | plan | M | — | — |
 | [T21](#t21-the-godot-asset-store) | The Godot Asset Store | plan | S | — | T19 |
 | **Phase 6** | | | | | |
-| [T22](#t22-full-2d-support) | Full 2D support | plan | L | — | decision |
-| [T23](#t23-several-instances-of-the-game) | Several instances of the game | plan | L | — | decision |
-| [T24](#t24-light-baking) | Light baking | plan | S–M | maybe one | T7, T8 |
+| [T22](#t22-full-2d-support) | Full 2D support | plan | L | — | after 0.3.0 |
+| [T23](#t23-several-instances-of-the-game) | Several instances of the game | plan | L | — | after 0.3.0 |
+| [T24](#t24-light-baking) | Light baking | plan | S–M | `voxelgi_bake` | T7, T8 |
 | **Release** | | | | | |
 | [T25](#t25-release-030) | Release 0.3.0 | — | S | — | all that ship |
 
 The order inside a phase is the order of the table. Phases 1 and 2 can run side by side. T7 comes before the
 phases 3 and 4 are fixed for good: its runs may add tasks or show that T14 and T24 need no tool.
 
-The tool count goes from 91 to 93 for certain (T9, T16) and to at most 96 if T14, T15 and T24 each need their own.
+The tool count goes from 91 to 93 for certain (T9, T16) and to at most 96 if T14, T15 and T24 each need their own; they each got one, so 0.3.0 has 96 tools.
 
 ---
 
@@ -738,6 +740,8 @@ Each of these is as large as several tasks above. The first step of each is your
 0.3.0 or to the version after. My recommendation: T24 with its scenario only, T22 and T23 after 0.3.0, because
 phases 1–5 already hold twenty tasks and a release that waits for 2D waits a long time.
 
+Decided on 2026-11-19: T24 belongs to 0.3.0, and T22 and T23 wait for the version after it.
+
 ### T22. Full 2D support
 
 **Why.** §12 calls it "a milestone of its own, about the size of milestone 7" that "pays off only if the published
@@ -827,10 +831,8 @@ the check.
 
 | What | For | When |
 |---|---|---|
-| A yes to runs with an agent: $8–10 (T20), $15 (T25); the runs of T7 and T9–T15 are done | T20, T25 | before each batch |
+| A yes to runs with an agent: $8–10 (T20), $15 (T25); the runs of T7, T9–T15 and T24 are done | T20, T25 | before each batch |
 | A yes to installing `hi-godot/godot-ai` at a pinned version on this machine | T20 | before T20 |
-| The decision on T22, T23 and T24: in 0.3.0 or after | phase 6 | by the end of phase 2 |
-| A scratch repository on GitHub with a small game, or a yes to make one, to run the workflow of `ci.md` once | T18 | before the release |
 | A walk and a jump played at the keyboard while Claude records them with `game_record_input`, to see them replay to the same place | T16 | before the release |
 | The screen recording | T19 | phase 5 |
 | The submission to the Asset Store | T21 | after T19 |

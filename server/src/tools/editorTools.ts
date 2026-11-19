@@ -9,6 +9,7 @@ import { type CaptureReader, createEditorScreenshotTool } from './captureTools.j
 import { createFilesystemMoveTool, createResourceFindUsagesTool } from './fileTools.js';
 import { createGridMapGetCellsTool, createGridMapSetCellsTool, createMeshLibraryCreateTool } from './gridMapTools.js';
 import { createInputMapGetTool, createInputMapSetTool } from './inputTools.js';
+import { createVoxelGiBakeTool } from './lightingTools.js';
 import { createNavigationBakeTool, createNavigationGetPathTool } from './navigationTools.js';
 import { createNodeDuplicateTool, createNodeMakeLocalTool, createNodeReparentTool, createNodeSaveAsSceneTool } from './nodeStructureTools.js';
 import { createNodeAddCollisionTool, createNodeSnapToFloorTool, createSceneRaycastTool } from './placementTools.js';
@@ -85,6 +86,7 @@ export function createEditorTools(editor: EditorGateway, projectReader: EditorGa
     createAssetImportSettingsSetTool(editor),
     createNavigationBakeTool(editor),
     createNavigationGetPathTool(projectReader),
+    createVoxelGiBakeTool(editor),
     createAnimationGetTool(editor),
     createAnimationSetTool(editor),
     createAnimationDeleteTool(editor),

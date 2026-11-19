@@ -47,6 +47,8 @@ const GodotMcpHeldCommand := preload("held_command.gd")
 const GodotMcpInputMapGetCommand := preload("input/input_map_get_command.gd")
 const GodotMcpInputMapSetCommand := preload("input/input_map_set_command.gd")
 const GodotMcpNavigationBakeCommand := preload("navigation/navigation_bake_command.gd")
+const GodotMcpVoxelGiBakeCommand := preload("lighting/voxelgi_bake_command.gd")
+const GodotMcpEditorVoxelGiBaker := preload("../editor/editor_voxel_gi_baker.gd")
 const GodotMcpNavigationGetPathCommand := preload("navigation/navigation_get_path_command.gd")
 const GodotMcpNodeAddCollisionCommand := preload("node/node_add_collision_command.gd")
 const GodotMcpNodeAddCommand := preload("node/node_add_command.gd")
@@ -145,6 +147,7 @@ const METHODS_THAT_CHANGE := [
 	"signal.disconnect",
 	"tilemap.set_cells",
 	"tileset.add_atlas",
+	"voxelgi.bake",
 ]
 const INSPECTION_TIMEOUT_MSEC := 10_000
 const WAIT_TIMEOUT_MSEC := 65_000
@@ -187,6 +190,7 @@ static func build_router(context: GodotMcpEditingContext, runtime: GodotMcpRunti
 	router.register("animation_tree.get", GodotMcpAnimationTreeGetCommand.new(context))
 	router.register("animation_tree.set", GodotMcpAnimationTreeSetCommand.new(context))
 	router.register("navigation.bake", GodotMcpNavigationBakeCommand.new(context))
+	router.register("voxelgi.bake", GodotMcpVoxelGiBakeCommand.new(context, GodotMcpEditorVoxelGiBaker.new()))
 	router.register("navigation.get_path", GodotMcpNavigationGetPathCommand.new(context, GodotMcpGameRequestCommand.new(runtime, "navigation_path", INSPECTION_TIMEOUT_MSEC)))
 	router.register("input_map.get", GodotMcpInputMapGetCommand.new())
 	router.register("input_map.set", GodotMcpInputMapSetCommand.new(save_project_settings))

@@ -55,6 +55,7 @@ describe('createEditorTools', () => {
       'asset_import_settings_set',
       'navigation_bake',
       'navigation_get_path',
+      'voxelgi_bake',
       'animation_get',
       'animation_set',
       'animation_delete',

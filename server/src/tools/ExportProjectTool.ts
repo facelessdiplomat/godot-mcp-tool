@@ -3,6 +3,7 @@ import * as z from 'zod/v4';
 import { ExportError } from '../export/ExportError.js';
 import type { ExportRequest, ExportResult } from '../export/ProjectExporter.js';
 import { changingAnnotations } from './annotations.js';
+import { sizeText } from './formatting/fileSize.js';
 import { errorResult, textResult } from './results.js';
 import type { Tool, ToolDefinition } from './Tool.js';
 
@@ -32,8 +33,6 @@ const exportProjectInput = z.object({
   timeout_ms: z.number().int().min(10_000).max(3_600_000).default(600_000).describe('Stop the export after this many milliseconds.'),
 });
 
-const bytesPerKilobyte = 1024;
-const sizeUnits = ['KB', 'MB', 'GB'];
 
 export class ExportProjectTool implements Tool<typeof exportProjectInput> {
   readonly name = 'export_project';
@@ -78,17 +77,4 @@ function describeExport(result: ExportResult): string {
       ? []
       : [`Not in this build: unsaved changes in the editor to ${result.unsavedFiles.join(', ')}. Save them (scene_save saves scenes) and export again.`]),
   ].join('\n');
-}
-
-function sizeText(bytes: number): string {
-  if (bytes < bytesPerKilobyte) {
-    return `${String(bytes)} B`;
-  }
-  let value = bytes / bytesPerKilobyte;
-  let unitIndex = 0;
-  while (value >= bytesPerKilobyte && unitIndex < sizeUnits.length - 1) {
-    value /= bytesPerKilobyte;
-    unitIndex += 1;
-  }
-  return `${value.toFixed(1)} ${sizeUnits[unitIndex] ?? ''}`;
 }

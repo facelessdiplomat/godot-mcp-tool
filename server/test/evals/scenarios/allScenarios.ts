@@ -26,6 +26,7 @@ import { keepTheBestScore } from './keepTheBestScore.js';
 import { landOnce } from './landOnce.js';
 import { musicOnItsOwnBus } from './musicOnItsOwnBus.js';
 import { oneMoreArgument } from './oneMoreArgument.js';
+import { lightTheCave } from './lightTheCave.js';
 import { theCrateByTheRamp } from './theCrateByTheRamp.js';
 import { onlyThePlayerOpensTheDoor } from './onlyThePlayerOpensTheDoor.js';
 import { patrolBetweenPoints } from './patrolBetweenPoints.js';
@@ -101,4 +102,5 @@ export const allScenarios: readonly Scenario[] = [
   sameLookAfterTheRefactor,
   oneMoreArgument,
   theCrateByTheRamp,
+  lightTheCave,
 ];

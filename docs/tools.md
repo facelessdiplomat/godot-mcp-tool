@@ -28,7 +28,7 @@ The line under each tool says what kind of tool it is:
 - [The running game](#the-running-game): `game_run`, `game_stop`, `game_get_output`, `game_get_tree`, `game_get_properties`, `game_set_properties`, `game_wait`, `game_input`, `game_record_input`, `game_screenshot`, `game_pause`, `game_step`, `game_performance`, `game_eval`
 - [Debugging](#debugging): `debug_breakpoints`, `debug_state`, `debug_continue`
 - [Engine reference](#engine-reference): `docs_class`, `docs_search`
-- [Other tools](#other-tools): `meshlibrary_create`
+- [Other tools](#other-tools): `meshlibrary_create`, `voxelgi_bake`
 - [Prompts](#prompts)
 - [Resources](#resources)
 
@@ -1196,6 +1196,15 @@ No parameters.
 - `path` (required): string. The MeshLibrary file to write, such as "res://blocks/blocks.tres".
 - `update`: boolean, default `false`. Update the library at path: blocks keep their ids by name, new blocks get new ids, and blocks the scene no longer has stay. Needed when the file exists, since the cells of a GridMap store the ids.
 - `apply_transforms`: boolean, default `false`. Keep the transform that each block has in the scene, such as a rotation, in its item. Default: false, as the Import from Scene of the editor does, so blocks laid out side by side in the scene each sit in the middle of their cell.
+
+### `voxelgi_bake`
+
+**Bake VoxelGI.** Bake a VoxelGI, or every one in the scene, as the editor's Bake VoxelGI button does, so that it bounces light: it voxelizes the meshes and CSG shapes with GI mode Static inside its box and saves the data next to the scene as <scene>.<VoxelGI>_data.res, or into the file the VoxelGI already uses. A VoxelGI lights nothing until it is baked, and needs a bake again after the geometry inside changes. The link to the data is one Undo step, and the scene stays unsaved until scene_save. Needs the editor with a window and the Forward+ renderer. A LightmapGI or an OccluderInstance3D has no bake method for tools; the result says which button of the editor bakes it.
+
+*Makes changes*
+
+- `path`: string. Path of the VoxelGI relative to the scene root, such as "Cave/VoxelGI". Default: every VoxelGI of the scene.
+- `scene`: string. The scene to bake in, as a res:// path; it is opened in the editor if it is not open yet. Default: the scene currently open in the editor.
 
 ## Prompts
 

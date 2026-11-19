@@ -1,6 +1,7 @@
 import type { McpSession } from '../../integration/harness.js';
-import { decodePng, type PngImage, type Rgb } from '../../integration/pngImage.js';
+import { decodePng, type Rgb } from '../../integration/pngImage.js';
 import { type CheckResult, checked, findNodes, gameVector, type Scenario } from '../Scenario.js';
+import { averageColorOf } from './imageAverage.js';
 
 const levelScene = 'res://level.tscn';
 const roomBCenter = { x: 12, y: 1.5, z: 0 };
@@ -68,23 +69,6 @@ const level = [
   '',
 ].join('\n');
 
-function averageOf(image: PngImage, share: number): Rgb {
-  const left = Math.floor(image.width * (0.5 - share / 2));
-  const top = Math.floor(image.height * (0.5 - share / 2));
-  const width = Math.max(1, Math.floor(image.width * share));
-  const height = Math.max(1, Math.floor(image.height * share));
-  const sums = [0, 0, 0];
-  for (let y = top; y < top + height; y += 1) {
-    for (let x = left; x < left + width; x += 1) {
-      image.pixel(x, y).forEach((channel, index) => {
-        sums[index] = (sums[index] ?? 0) + channel;
-      });
-    }
-  }
-  const count = width * height;
-  return [Math.round((sums[0] ?? 0) / count), Math.round((sums[1] ?? 0) / count), Math.round((sums[2] ?? 0) / count)];
-}
-
 function isOrange([red, green, blue]: Rgb): boolean {
   return red > 150 && green > 50 && green < 200 && blue < 90 && red > green;
 }
@@ -103,7 +87,7 @@ async function lightsInRoomB(tools: McpSession): Promise<CheckResult> {
 
 async function viewOfTheCrate(tools: McpSession, render: string | undefined, share: number): Promise<Rgb | undefined> {
   const shot = await tools.callForImage('game_screenshot', { views: [{ position: [12, 1.6, 2.5], look_at: [12, 0.6, 0], ...(render === undefined ? {} : { render }) }] });
-  return shot.image === undefined ? undefined : averageOf(decodePng(shot.image), share);
+  return shot.image === undefined ? undefined : averageColorOf(decodePng(shot.image), share);
 }
 
 export const whyIsItDark: Scenario = {
