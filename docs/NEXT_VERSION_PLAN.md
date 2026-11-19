@@ -15,10 +15,10 @@ runs without an agent passes on the pinned 4.8 build; what each task still needs
 
 | Task | State | Still open |
 |---|---|---|
-| T1 | done | one check by hand with `claude -p` and the staged plugin (needs your yes: a run with an agent) |
+| T1 | done | one check by hand with `claude -p` and the staged plugin: approved, by your decision of 2026-11-19 |
 | T2 | done; the agent run of `only-the-player-opens-the-door` passed (4/4) | — |
 | T3 | done | — |
-| T4 | done: 82 of 913 calls of the third full run were reads of a node right after a read of another | the reruns of `follow-the-player` and `extract-an-enemy-scene` with an agent |
+| T4 | done: 82 of 913 calls of the third full run were reads of a node right after a read of another | the reruns of `follow-the-player` and `extract-an-enemy-scene` with an agent: approved, by your decision of 2026-11-19 |
 | T5 | done | — |
 | T6 | done | — |
 | T7 | six scenarios with reference solutions; their writing found and fixed two gaps (dynamic properties, node paths); the six agent runs passed | — |
@@ -30,15 +30,15 @@ runs without an agent passes on the pinned 4.8 build; what each task still needs
 | T13 | done, with `same-look-after-the-refactor`; screenshots keep the last 100 captures; the agent run passed and used `compare_to` | — |
 | T14 | `meshlibrary_create`, decided by the first agent run of `blocks-from-a-scene`, which could not set the item shapes and built the library with a script of its own; the rerun with the tool passed with 13 calls instead of 33, for $0.23 instead of $0.62, and without a script | — |
 | T15 | done: `script_find_references` (way B), with `one-more-argument`. The spike (spikes.md §12) keeps way A, a language server in the plugin, for later: Claude Code runs it over stdio only and does not document what happens while the editor is closed. The scenario found that a windowless editor kept a changed script that no tab showed; `editor_rescan` now reloads it. The first agent run found the callers with `Grep` and passed every check but the one of the tool (6/7), so the tool stays and the scenario got a barrel with a `take_damage` of its own, which a text search mixes in; writing that version made the tool leave out the uses that the language server traces to a symbol of the same name in another script. The rerun with the barrel again used `Grep` (8/9): the agent saw the tool only by its name. With one line in the server instructions the third run called `script_find_references`, took its answer as the list of callers and passed 9/9 with 26 calls | — |
-| T16 | `game_record_input`; the integration test `gameInputRecording.test.ts` presses keys in the game as a person would, and the recorded steps, replayed with `fixed_fps`, bring the player to the same place | one check by hand: a walk and a jump played at the keyboard come back as steps that replay to the same place |
-| T17 | the subagent `plugin/agents/playtester.md` with a test of its tools, and the page `ui.md` of the skill; the plugin validates | the measurement with and without the subagent (two agent runs of `playtest-without-a-window`) |
+| T16 | `game_record_input`; the integration test `gameInputRecording.test.ts` presses keys in the game as a person would, and the recorded steps, replayed with `fixed_fps`, bring the player to the same place | the check by hand at the keyboard is left out, by your decision of 2026-11-19 |
+| T17 | the subagent `plugin/agents/playtester.md` with a test of its tools, and the page `ui.md` of the skill; the plugin validates | the measurement with and without the subagent (two agent runs of `playtest-without-a-window`): approved, by your decision of 2026-11-19 |
 | T18 | done: the prompts `profile`, `add_tests` and `setup_ci`, and the page `ci.md` of the skill; the workflow parses, and its archive names, sums and template layout match the 4.7.2 release. A probe found that GUT exits with 0 when a test script does not load, so the workflow looks for that error | put off: the run on GitHub waits until the workflow is used (your decision of 2026-11-19) |
-| T19 | the still of four views of the arena from `editor_screenshot` in both READMEs (`docs/media/arena-views.jpg`, 134 KB), and the script of the recording in `docs/media/README.md` | the recording and the still of the panel (you), then both READMEs |
-| T20 | step 1: the runner takes the server under test from `EVAL_SERVER` and leaves the plugin out with `EVAL_PLUGIN=0`; `result.json` records both; `AgentInvocation.test.ts` covers them | your yes to installing `hi-godot/godot-ai`, then steps 2–4 and the runs (your yes) |
-| T21 | the rules of the store read; the listing in `docs/asset-store.md`; the addon folder holds `LICENSE` and `README.md`, which users keep; `npm run pack:asset-store` packs the committed addon of a commit with `addons/godot_mcp_tool/` at the root | the thumbnail from the recording (T19), the AI usage disclosure and the submission (you) |
+| T19 | the still of four views of the arena from `editor_screenshot` in both READMEs (`docs/media/arena-views.jpg`, 134 KB), and the script of the recording in `docs/media/README.md` | the recording is not made, by your decision of 2026-11-19, so the READMEs keep the still |
+| T20 | step 1: the runner takes the server under test from `EVAL_SERVER` and leaves the plugin out with `EVAL_PLUGIN=0`; `result.json` records both; `AgentInvocation.test.ts` covers them | the comparison is not made in 0.3.0, by your decision of 2026-11-19; the runner setting stays for a later one |
+| T21 | the rules of the store read; the listing in `docs/asset-store.md`; the addon folder holds `LICENSE` and `README.md`, which users keep; `npm run pack:asset-store` packs the committed addon of a commit with `addons/godot_mcp_tool/` at the root | later, by your decision of 2026-11-19: the thumbnail, the AI usage disclosure and the submission (you) |
 | T22, T23 | after 0.3.0, by your decision of 2026-11-19 | |
 | T24 | done, in 0.3.0 by your decision of 2026-11-19: the first agent run of `light-the-cave` passed only with a one-off `@tool` script and a reopened scene (34 calls, $0.97), so `voxelgi_bake` bakes a `VoxelGI` as the editor's button does; the rerun with it passed with 17 calls for $0.38 and no script. `LightmapGI` still has no bake method at the pinned commit, and the steps for moving the pin in `CONTRIBUTING.md` name that check | — |
-| T25 | not started | |
+| T25 | part of step 2 done ahead: `docs/usage.md` names the new capabilities, and the development plan has the record of 0.3.0 in §12, a new risk in §15 and new next steps in §16 | the fourth full run (your yes), its fixes, the version, the checks on 4.7.2, `npm publish` (you), the push |
 
 All checks above ran on the pinned `master` build only; CI runs them on 4.7.2 after the push. One window test fails
 on this machine at commit `d7f3ef3` as well, so before this work: the second test of `windowedRescan.test.ts`, whose
@@ -829,11 +829,10 @@ the check.
 
 ## 11. What needs you
 
+Decided on 2026-11-19: the runs of T1, T4 and T17 and the release (T25, with its fourth full run) go ahead; the check
+by hand of T16, the recording of T19 and the comparison of T20 are left out of 0.3.0; the Asset Store (T21) waits.
+
 | What | For | When |
 |---|---|---|
-| A yes to runs with an agent: $8–10 (T20), $15 (T25); the runs of T7, T9–T15 and T24 are done | T20, T25 | before each batch |
-| A yes to installing `hi-godot/godot-ai` at a pinned version on this machine | T20 | before T20 |
-| A walk and a jump played at the keyboard while Claude records them with `game_record_input`, to see them replay to the same place | T16 | before the release |
-| The screen recording | T19 | phase 5 |
-| The submission to the Asset Store | T21 | after T19 |
+| The submission to the Asset Store | T21 | after 0.3.0 |
 | `npm publish` | T25 | at the release |

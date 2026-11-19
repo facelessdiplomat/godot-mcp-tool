@@ -2096,6 +2096,53 @@ Open questions, for you to decide:
   it pays off only if the published package is meant for other people's projects.
 - Whether `project_create` moves up into milestone 6, if new users matter more than the game.
 
+### Version 0.3.0
+
+The tasks of [NEXT_VERSION_PLAN.md](NEXT_VERSION_PLAN.md), planned on 2026-11-19 from a survey of this plan, the code
+and the evaluations. What each one found:
+
+- [x] T1, a hook of the plugin for `Write` and `Edit` of an existing `.tscn` or `.tres`: `check-scene-edit` denies
+      the call while an editor is connected and names the tools to use. The hooks start the published package, so
+      a release reaches npm before the push that changes them (§15).
+- [x] T2, layers by name: masks take names next to numbers, reads show the names, and `project_info` lists the
+      named layers.
+- [x] T3: a project up to three folders below the working directory is found; several are named, never guessed.
+- [x] T4: `node_get_properties`, `game_get_properties` and `node_get_bounds` take `paths`; 82 of the 913 calls of
+      the third full run had read one node right after another.
+- [x] T5: new projects warn about untyped declarations, and `doctor` advises it for older ones.
+- [x] T6, Hold Changes: the user's switch in the editor refuses every change with `CHANGES_HELD` while reading goes
+      on.
+- [x] T7, six scenarios for areas no scenario covered. Writing them found that the codec could not set properties
+      that objects list only once they exist, such as the items of a `Theme` and of a `MeshLibrary` and the points
+      of a curve, and that a `NodePath` from the scene root led nowhere; both work now.
+- [x] T8: a nightly run builds the head of Godot `master` and runs the addon and integration tests against it;
+      `CONTRIBUTING.md` has the steps for moving the pin.
+- [x] T9 to T11: `navigation_get_path`, the sound levels of the running game with `in_game`, and render modes of
+      views; each scenario's agent run used the new capability where it answered the question.
+- [x] T12: numbered markers on views were built and removed again, since the agent run read the positions in one
+      call and used none.
+- [x] T13: `compare_to` of the screenshots; captures keep the last 100.
+- [x] T14: `meshlibrary_create`, after the first run could not set the item shapes of a library and wrote a script;
+      the rerun took 13 calls instead of 33.
+- [x] T15: `script_find_references`. A windowless editor kept a changed script that no tab showed, until
+      `editor_rescan` reloaded it; uses that the language server traces to a symbol of the same name in another
+      script are left out. Agents searched with `Grep` by habit until the server instructions named the tool.
+- [x] T16: `game_record_input` records what a person plays as steps of `game_input`.
+- [x] T17: the playtester subagent and the UI page of the skill.
+- [x] T18: the prompts `profile`, `add_tests` and `setup_ci`, and the CI page of the skill. GUT exits with 0 when a
+      test script does not load, so the workflow looks for that error; its first run on GitHub waits until a game
+      uses it.
+- [x] T24: `voxelgi_bake`, after the first run lit the cave only through a one-off `@tool` script and a reopened
+      scene; the rerun took 17 calls instead of 34. `LightmapGI` still has no bake method for scripts.
+- [x] T19: the README shows the views that `editor_screenshot` takes of the arena of the quick start; the screen
+      recording is not made, by the decision of 2026-11-19.
+- [ ] T21: the listing of the Asset Store, the license and README in the addon folder, and `npm run
+      pack:asset-store` are ready; the submission comes after 0.3.0.
+- T20, the comparison with an existing server, is not made in 0.3.0; the runner takes the server under test from
+  `EVAL_SERVER` for a later one.
+- T22, full 2D, and T23, several instances of the game, move to the version after 0.3.0 by the decision of
+  2026-11-19.
+
 ### User documentation
 
 At the end of development we write user documentation that is short and simple: plain language, short numbered
@@ -2261,6 +2308,7 @@ in the Claude Code CLI — `claude --debug=mcp` (the server's stderr ends up in 
 | Too many tools confuse the agent | medium | medium | tool search and `alwaysLoad` for the core, evaluations, merging rare operations |
 | The agent and the user edit the same scene | medium | medium | everything through the editor and Undo/Redo, explicit saving, no text edits of `.tscn` (a hook of the plugin refuses them), and Hold Changes, the user's switch in the editor |
 | Server and addon versions drift apart | medium | low | protocol version in the handshake, `update-addon` |
+| A push reaches plugin users before its package is on npm | medium | high | the hooks of the plugin start the published version; a release publishes first and pushes only once `npm view` answers, and `packageVersions.test.ts` keeps the versions together |
 | The MCP specification changes | medium | low | version negotiation is handled by SDK v2; we keep the SDK up to date |
 | An attack on the local port | low | high | 127.0.0.1, a token, TCP instead of HTTP/WS, dangerous tools off |
 | No screenshots in headless mode | high | low | a clear error; process runs get a window; rendering in CI via Xvfb |
@@ -2270,10 +2318,10 @@ in the Claude Code CLI — `claude --debug=mcp` (the server's stderr ends up in 
 
 ## 16. Next steps
 
-1. Check the user guides on a fresh project (Milestone 5).
-2. Publish the addon to the Godot Asset Store — when you say so.
-3. Decide the open questions of the second round (§12): 2D, and whether `project_create` moves into milestone 6.
-4. Start milestone 6 with the check of what a saved scene keeps of a property change inside an instance.
+1. The runs of T1, T4 and T17 and the release of 0.3.0 with its fourth full run (T25 in
+   [NEXT_VERSION_PLAN.md](NEXT_VERSION_PLAN.md)).
+2. After 0.3.0: the Asset Store (T21), full 2D (T22), several instances of the game (T23) and the comparison with
+   an existing server (T20).
 
 ---
 

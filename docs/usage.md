@@ -52,7 +52,9 @@ Run the tests:
 > Write a GUT test for Player.dash() and run all the tests.
 
 More ideas: import a model and scale it to 1.8 m, add a health bar or a pause menu, let the player use a gamepad,
-bake navigation so an enemy follows the player, make a build of the game.
+bake navigation so an enemy follows the player, make a build of the game. Claude can also find out why a room renders
+dark or why an enemy cannot reach a place, check that a refactor left the look of a level alone, build a level of
+blocks with a `GridMap`, list every caller of a function before it changes, and bake the bounced light of a cave.
 
 Requests work best when they say how to tell that the result is right, such as "the player lands on the
 platform". Give large tasks in steps: the level first, then the player, then the enemies.
@@ -120,6 +122,9 @@ jump", or let Claude choose it.
 - **GDScript, and 3D first.** C# is not supported. For 2D, besides the node tools and screenshots, there are tools
   for tiles: `tileset_add_atlas` builds a TileSet from an image and `tilemap_set_cells` paints a `TileMapLayer`.
   Navigation baking is for 3D only.
+- **Lightmaps are baked in the editor.** Claude bakes a `VoxelGI` with `voxelgi_bake`, with the editor's window open
+  and the Forward+ renderer. A `LightmapGI` and occluders have no bake method for tools, so you press Bake Lightmaps
+  or Bake Occluders in the editor yourself.
 
 ## All tools
 

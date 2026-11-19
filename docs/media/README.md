@@ -25,7 +25,9 @@ a JPEG at quality 88:
 The first two views place their cameras, because a preset frames the bounding sphere of the whole scene and leaves a
 flat arena at about half the height of the view.
 
-## The recording, still to make
+## A recording, for later
+
+Not made for 0.3.0, by the decision of 2026-11-19; the script stays for a later version.
 
 A screen recording of 30 to 40 seconds for the top of both READMEs, in which Claude Code builds the arena of the quick
 start in the open editor.
