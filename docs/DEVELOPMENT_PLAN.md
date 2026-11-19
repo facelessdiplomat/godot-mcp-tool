@@ -742,7 +742,10 @@ Connected to Godot <version>, project "<name>" (3D). Indentation: <tabs | N spac
   `closed` and its `pid` is alive) and the file exists, it denies the call with `permissionDecision: "deny"` and a
   reason that names the tools that change scenes and resources through the editor (ADR-7). It says nothing for a new
   file, which the editor has no copy of, for a closed editor and outside a project. Edits through the shell pass it;
-  there the server instructions stay the only rule.
+  there the server instructions stay the only rule. Checked with an agent on 2026-11-19: asked only to move a node of
+  an open scene, "the scene file is plain text", it used the tools from the start; asked to change the scene with
+  `Edit`, it got the denial with its reason, told the user so, and moved the node with `scene_batch_edit` and
+  `scene_save` (7 calls, $0.15).
 - Claude Code runs the tool calls of one message at the same time only when all of them only read; otherwise it runs
   them one after another, in the order sent. The debug logs of the first evaluation run show it: a `game_wait` sent
   with a `game_input` ended before the input began, so it never saw the jump. And a later call comes seconds after a
@@ -1354,7 +1357,6 @@ godot-mcp-tool/
 │   ├── .claude-plugin/plugin.json
 │   ├── .mcp.json                 starts the server with npx
 │   ├── hooks/hooks.json          checks every .gd file that Claude writes, guards scenes and resources
-│   ├── agents/playtester.md      a subagent that playtests with the game tools and reports back
 │   └── skills/godot/             the companion skill: SKILL.md, gdscript.md, 3d.md, testing.md, ui.md, ci.md
 ├── test-project/                 3D Godot project for integration tests (addon symlinked)
 └── scripts/                      dev scripts: install GUT and gdUnit4, run the addon tests, release
@@ -2128,7 +2130,8 @@ and the evaluations. What each one found:
       `editor_rescan` reloaded it; uses that the language server traces to a symbol of the same name in another
       script are left out. Agents searched with `Grep` by habit until the server instructions named the tool.
 - [x] T16: `game_record_input` records what a person plays as steps of `game_input`.
-- [x] T17: the playtester subagent and the UI page of the skill.
+- [x] T17: the UI page of the skill. A playtester subagent was built and removed again by the decision of
+      2026-11-19: measured with and without it, the agent never handed it the playtest.
 - [x] T18: the prompts `profile`, `add_tests` and `setup_ci`, and the CI page of the skill. GUT exits with 0 when a
       test script does not load, so the workflow looks for that error; its first run on GitHub waits until a game
       uses it.

@@ -103,11 +103,6 @@ The server brings five ready-made tasks. Type `/` in Claude Code and find them i
 Their full names depend on how the server was added: `/mcp__godot__playtest` and `/mcp__godot__fix_last_run` for the
 server `godot` of `.mcp.json`, and longer names with the plugin.
 
-With the plugin, Claude can also hand a playtest to the **playtester** subagent, which plays the game with the game
-tools, changes nothing in the project and reports what works, what does not and where its screenshots are, so the
-pictures and readings stay out of your conversation. Ask for it by name, such as "let the playtester check the
-jump", or let Claude choose it.
-
 ## Limitations
 
 - **Screenshots need a window.** In windowless mode (`GODOT_MCP_HEADLESS=1`) Claude checks the game with numbers:

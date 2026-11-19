@@ -54,6 +54,36 @@ func test_sets_the_points_of_a_curve_after_their_count() -> void:
 	assert_true(curve.closed)
 
 
+func test_sets_the_handles_and_tilts_of_every_point_of_a_curve_also_the_first_and_the_last() -> void:
+	var curve := Curve3D.new()
+	var report := _editor.assign(curve, {
+		"point_count": 2,
+		"point_0/position": [0, 0, 0],
+		"point_0/in": [0, 0, -1],
+		"point_0/out": [0, 0, 1],
+		"point_0/tilt": 0.5,
+		"point_1/position": [0, 0, 6],
+		"point_1/in": [0, 0, -1],
+		"point_1/out": [0, 0, 1],
+	})
+	assert_eq(report["rejected"], [])
+	assert_eq(curve.get_point_in(0), Vector3(0, 0, -1))
+	assert_eq(curve.get_point_out(0), Vector3(0, 0, 1))
+	assert_eq(curve.get_point_tilt(0), 0.5)
+	assert_eq(curve.get_point_out(1), Vector3(0, 0, 1))
+
+
+func test_sets_the_tangents_of_the_first_and_the_last_point_of_a_curve_2d_and_a_curve() -> void:
+	var path_curve := Curve2D.new()
+	var shape := Curve.new()
+	var path_report := _editor.assign(path_curve, {"point_count": 2, "point_0/out": [1, 0], "point_1/in": [-1, 0]})
+	var shape_report := _editor.assign(shape, {"point_count": 2, "point_0/right_tangent": 1.0, "point_1/left_tangent": -1.0})
+	assert_eq(path_report["rejected"], [])
+	assert_eq(shape_report["rejected"], [])
+	assert_eq(path_curve.get_point_out(0), Vector2(1, 0))
+	assert_eq(shape.get_point_right_tangent(0), 1.0)
+
+
 func test_explains_a_point_beyond_the_count_of_a_curve() -> void:
 	var report := _editor.assign(Curve3D.new(), {"point_2/position": [1, 0, 0]})
 	assert_eq(report["rejected"].size(), 1)

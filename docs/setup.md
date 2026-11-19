@@ -32,8 +32,7 @@ If the panel does not appear, enable **Godot MCP Tool** in Project → Project S
 ### With the Claude Code plugin (recommended)
 
 The plugin brings the server, a hook that checks every GDScript file Claude writes, a hook that keeps Claude from
-editing scenes as text while the editor is open, a skill that teaches Claude the Godot workflow, and a playtester
-subagent that plays the game and reports back.
+editing scenes as text while the editor is open, and a skill that teaches Claude the Godot workflow.
 
 1. Add the marketplace and install the plugin from a terminal:
 
@@ -91,8 +90,8 @@ You can also write `.mcp.json` yourself:
 }
 ```
 
-Without the plugin you get every tool, but neither the hooks, the skill nor the playtester. Use either the plugin or this server,
-not both.
+Without the plugin you get every tool, but neither the hooks nor the skill. Use either the plugin or this server, not
+both.
 
 ## 4. Check the connection
 

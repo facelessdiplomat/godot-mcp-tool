@@ -561,3 +561,110 @@ follows:
 
   The agent found the tool with its first `ToolSearch`, baked in one call and needed neither a script nor a reopened
   scene. It raised `energy` and `propagation` of the data again, to [133, 118, 98] at the back of the cave.
+
+### The checks of T1, T4 and T17, 2026-11-19
+
+Approved together with the release; the same model and Claude Code.
+
+- T1, the hook against text edits of scenes, with the staged plugin and an open editor. Asked to move a node of the
+  open scene, "the scene file is plain text, so just edit the .tscn file", the agent used the tools from the start
+  and said why (4 calls, $0.40). Asked to change it with `Edit`, it got the denial of the hook with its reason, told
+  the user, and moved the node with `scene_batch_edit` and `scene_save` (7 calls, $0.15).
+- T4, reads of several nodes in one call, with the two scenarios that read most in the third full run:
+
+  | Scenario | Checks | Tool calls | Cost, $ | Time, s |
+  |---|---|---|---|---|
+  | follow-the-player | 5/5 | 48 → 34 | 0.64 → 0.50 | 165 → 86 |
+  | extract-an-enemy-scene | 6/6 | 23 → 16 | 0.34 → 0.28 | 37 → 29 |
+
+  The 11 single reads of `follow-the-player` became one read of several nodes and two single ones, and the three
+  reads of `extract-an-enemy-scene` all took `paths`.
+- T17, the playtester subagent, measured with `playtest-without-a-window` with and without it, the plugin staged
+  once without its subagent:
+
+  | Scenario | Checks | Tool calls | Cost, $ | Time, s |
+  |---|---|---|---|---|
+  | playtest-without-a-window, with the subagent | 6/6 | 8 | 0.16 | 20 |
+  | playtest-without-a-window, without it | 6/6 | 11 | 0.17 | 19 |
+
+  The agent never handed the check to the playtester: the request asks about one jump, and it played and read the
+  game itself. The main conversation read about 314k tokens of context in both runs, so the subagent saved nothing
+  here, and by the rule of T17 it was removed, by the decision of the same day.
+
+### Fourth full run, 2026-11-19
+
+The run of T25: the same model, Claude Code and Godot build, the server and addon of commit `243eea7`, one run per
+scenario, the 39 without a window three at a time and the 12 with one after them. For the 32 scenarios of the third
+full run, the numbers before the arrows are from that run.
+
+| Scenario | Checks | Tool calls | Cost, $ | Time, s |
+|---|---|---|---|---|
+| third-person-prototype | 8/8 | 20 → 22 | 0.39 → 0.43 | 65 → 68 |
+| follow-the-player | 5/5 | 42 → 29 | 0.61 → 0.48 | 101 → 89 |
+| gamepad-controls | 8/8 | 16 → 11 | 0.26 → 0.23 | 38 → 27 |
+| character-states | 6/6 | 18 → 21 | 0.32 → 0.40 | 37 → 43 |
+| dash-with-a-test | 6/6 | 23 → 24 | 0.40 → 0.49 | 64 → 84 |
+| playtest-without-a-window | 6/6 | 11 → 10 | 0.18 → 0.18 | 22 → 21 |
+| tidy-the-project | 9/9 | 17 → 16 | 0.24 → 0.22 | 26 → 26 |
+| paint-one-enemy | 4/4 | 17 → 7 | 0.28 → 0.19 | 30 → 16 |
+| export-the-game | 3/3 | 6 → 7 | 0.16 → 0.19 | 19 → 15 |
+| crates-on-the-hill | 3/3 | 27 → 18 | 0.43 → 0.34 | 65 → 41 |
+| fix-the-jump-error | 3/3 | 16 → 15 | 0.21 → 0.24 | 30 → 26 |
+| find-a-bug-with-breakpoints | 5/5 | 22 → 19 | 0.32 → 0.29 | 44 → 34 |
+| patrol-between-points | 6/6 | 18 → 12 | 0.26 → 0.24 | 37 → 33 |
+| rename-everywhere | 6/6 | 6 → 5 | 0.13 → 0.13 | 16 → 11 |
+| find-the-slow-function | 2/2 | 11 → 11 | 0.19 → 0.20 | 30 → 31 |
+| fix-the-water-shader | 5/5 | 13 → 8 | 0.20 → 0.15 | 28 → 23 |
+| camera-follow | 4/4 | 19 → 20 | 0.29 → 0.36 | 50 → 53 |
+| bring-back-the-pillars | 4/4 | 12 → 11 | 0.20 → 0.20 | 23 → 20 |
+| pave-the-courtyard | 4/4 | 6 | 0.15 | 12 |
+| only-the-player-opens-the-door | 4/4 | 23 | 0.37 | 47 |
+| exports-for-windows-and-linux | 5/5 | 8 → 11 | 0.16 → 0.20 | 27 → 28 |
+| stop-the-slowdown | 4/4 | 20 → 22 | 0.30 → 0.28 | 56 → 66 |
+| translate-the-menu | 3/3 | 19 | 0.30 | 35 |
+| skin-the-menu | 8/8 | 12 | 0.31 | 30 |
+| sparks-on-impact | 7/7 | 17 | 0.33 | 50 |
+| swing-the-gate | 5/5 | 34 | 0.71 | 162 |
+| extract-an-enemy-scene | 6/6 | 30 → 17 | 0.31 → 0.31 | 39 → 33 |
+| ride-the-rail | 6/6 | 19 | 0.39 | 74 |
+| import-a-character | 3/3 | 7 → 6 | 0.21 → 0.21 | 24 → 25 |
+| animate-a-door | 3/3 | 14 → 14 | 0.23 → 0.24 | 23 → 24 |
+| footsteps-and-blend | 5/5 | 20 → 31 | 0.36 → 0.48 | 49 → 70 |
+| sword-in-hand | 4/4 | 12 | 0.25 | 28 |
+| blocks-from-a-scene | 6/6 | 13 | 0.23 | 28 |
+| turn-on-a-plugin | 4/4 | 3 → 3 | 0.09 → 0.10 | 8 → 7 |
+| reach-the-island | 3/3 | 15 | 0.31 | 44 |
+| silence-in-the-arena | 3/3 | 13 | 0.22 | 22 |
+| build-an-arena | 6/6 | 17 → 15 | 0.68 → 0.37 | 54 → 51 |
+| health-bar-hud | 3/3 | 23 → 22 | 0.33 → 0.35 | 40 → 39 |
+| collect-coins | 6/6 | 22 → 21 | 0.35 → 0.38 | 50 → 47 |
+| pause-menu | 4/4 | 22 → 21 | 0.35 → 0.35 | 42 → 39 |
+| land-once | 3/3 | 15 → 15 | 0.29 → 0.32 | 44 → 43 |
+| resume-the-menu | 3/3 | 12 → 8 | 0.18 → 0.17 | 24 → 21 |
+| hud-at-two-sizes | 3/3 | 26 → 13 | 0.46 → 0.26 | 55 → 20 |
+| a-level-of-tiles | 5/5 | 28 | 0.40 | 51 |
+| why-is-it-dark | 3/3 | 13 | 0.30 | 33 |
+| same-look-after-the-refactor | 3/3 | 21 | 0.56 | 50 |
+| the-crate-by-the-ramp | 8/8 | 6 | 0.18 | 18 |
+| light-the-cave | 4/4 | 16 | 0.33 | 41 |
+| keep-the-best-score | 3/3 | 13 | 0.24 | 33 |
+| music-on-its-own-bus | 4/4 | 10 | 0.19 | 19 |
+| one-more-argument | 9/9 | 27 | 0.38 | 51 |
+| **51 of 51 passed** | | **802** | **15.10** | **2002** |
+
+- Every scenario passed. The 32 of the third run took 485 tool calls instead of 553, for $8.97 instead of $9.37 and
+  1174 seconds of the agent instead of 1260; `crates-on-the-hill` now passes, `hud-at-two-sizes` took 13 calls
+  instead of 26 and `paint-one-enemy` 7 instead of 17. `swing-the-gate` was the most expensive, with 34 calls for
+  $0.71 against 20 for $0.42 in its first run.
+- No agent wrote a scene or a resource as text, which T1 asks of this run.
+- 12 of the 802 calls failed. Three exports met the missing export templates, as `export-the-game` and
+  `exports-for-windows-and-linux` expect, and one `Glob` looked for the templates outside the project. Three calls
+  named a tool without its server prefix, or `ToolSearch` with it; two guessed a parameter: `class_name` for
+  `docs_class`, and `settings` as a JSON string for `project_settings_set`. `sparks-on-impact` set a property of a
+  material that did not exist yet, and the error said how. `ride-the-rail` met a gap: the codec took the handles
+  `in` and `out` of a curve's points only where the engine lists them, which it does not for the first `in` and the
+  last `out`; it now takes them, and the tangents of a `Curve`, at every point. The rerun of `ride-the-rail` gave its
+  curve eight points with eight handles in one call, with no failed call: 6/6, 17 calls instead of 19, $0.36.
+- Each editor with a window showed Godot's dialog "Can't open file 'arena.tscn'" at its start: a temporary project
+  named its main scene before the scenario created it, and an editor without a session opens the main scene. The
+  test harness now writes a session that names the main scene, which the editor skips while the file is missing.

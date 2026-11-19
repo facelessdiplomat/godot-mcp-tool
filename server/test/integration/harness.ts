@@ -224,6 +224,9 @@ export class TemporaryProject {
         '',
       ].join('\n'),
     );
+    if (options.mainScene !== undefined) {
+      this.rememberAsOpenScene(options.mainScene);
+    }
     mkdirSync(join(this.root, 'addons'));
     symlinkSync(addonDirectory, join(this.root, 'addons', 'godot_mcp_tool'), 'junction');
     if (options.withTestHelper === true) {
@@ -232,6 +235,12 @@ export class TemporaryProject {
     if (options.testFramework !== undefined) {
       symlinkSync(join(testProjectRoot, 'addons', options.testFramework), join(this.root, 'addons', options.testFramework), 'junction');
     }
+  }
+
+  private rememberAsOpenScene(scenePath: string): void {
+    const editorSettingsFolder = join(this.root, '.godot', 'editor');
+    mkdirSync(editorSettingsFolder, { recursive: true });
+    writeFileSync(join(editorSettingsFolder, 'editor_layout.cfg'), ['[EditorNode]', '', `open_scenes=PackedStringArray("${scenePath}")`, ''].join('\n'));
   }
 
   write(relativePath: string, content: string): void {

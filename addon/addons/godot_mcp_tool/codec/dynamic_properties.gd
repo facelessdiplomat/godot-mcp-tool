@@ -9,6 +9,8 @@ const THEME_ITEM_KINDS := {
 	"styles": {"type": TYPE_OBJECT, "hint": PROPERTY_HINT_RESOURCE_TYPE, "hint_string": "StyleBox"},
 }
 const POINT_COUNT_PROPERTY := "point_count"
+const PROBE_POINT_COUNT := 3
+const PROBE_MIDDLE_POINT := "point_1/"
 const INDEXED_NAME_PATTERN := "^(?<prefix>item/|point_)(?<index>\\d+)/(?<field>[a-z_]+)$"
 const COUNT_SUFFIX := "_count"
 
@@ -27,7 +29,7 @@ static func describe(object: Object, property_name: String, values: Dictionary) 
 		var count := int(values.get(POINT_COUNT_PROPERTY, object.get(POINT_COUNT_PROPERTY)))
 		if index >= count:
 			return "%s has %d points, so it has no %s; set point_count first, such as {\"point_count\": %d, \"%s\": …}" % [object.get_class(), count, property_name, index + 1, property_name]
-		return _template_of(_curve_probe(object), property_name, "point_0/" + parts.get_string("field"))
+		return _template_of(_curve_probe(object), property_name, PROBE_MIDDLE_POINT + parts.get_string("field"))
 	return {}
 
 
@@ -67,5 +69,5 @@ static func _mesh_library_probe() -> MeshLibrary:
 
 static func _curve_probe(object: Object) -> Resource:
 	var probe: Resource = ClassDB.instantiate(object.get_class())
-	probe.set(POINT_COUNT_PROPERTY, 1)
+	probe.set(POINT_COUNT_PROPERTY, PROBE_POINT_COUNT)
 	return probe
