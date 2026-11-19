@@ -8,7 +8,7 @@ const PATH_EXAMPLE := "Resource paths look like res://materials/ice.tres."
 
 
 static func validate_new_path(resource_path: String) -> GodotMcpCommandError:
-	var location_error := _validate_location(resource_path)
+	var location_error := validate_location(resource_path)
 	if location_error != null:
 		return location_error
 	if not resource_path.get_extension() in SAVED_EXTENSIONS:
@@ -19,7 +19,7 @@ static func validate_new_path(resource_path: String) -> GodotMcpCommandError:
 
 
 static func load_existing(resource_path: String) -> Variant:
-	var location_error := _validate_location(resource_path)
+	var location_error := validate_location(resource_path)
 	if location_error != null:
 		return location_error
 	if not ResourceLoader.exists(resource_path):
@@ -35,7 +35,7 @@ static func load_existing(resource_path: String) -> Variant:
 
 
 static func load_changeable(resource_path: String) -> Variant:
-	var location_error := _validate_location(resource_path)
+	var location_error := validate_location(resource_path)
 	if location_error != null:
 		return location_error
 	if FileAccess.file_exists(resource_path + ".import"):
@@ -63,7 +63,7 @@ static func _path_in(dependency: String) -> String:
 	return ""
 
 
-static func _validate_location(resource_path: String) -> GodotMcpCommandError:
+static func validate_location(resource_path: String) -> GodotMcpCommandError:
 	var inside_project := resource_path.begins_with("res://") and not ".." in resource_path.trim_prefix("res://").split("/")
 	if not inside_project or resource_path.contains("::"):
 		return GodotMcpCommandError.new(GodotMcpJsonRpc.INVALID_PARAMS, "\"%s\" is not a resource file in the project" % resource_path, PATH_EXAMPLE)

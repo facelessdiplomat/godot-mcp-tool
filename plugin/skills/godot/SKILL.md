@@ -34,9 +34,10 @@ are described in the files linked at the end.
    after a save, and do them again with `editor_redo`. Shared materials and other resources: `resource_create`,
    `resource_set_properties`. To change one instance of a scene only, such as making `Enemy2` red, set properties of
    its inner nodes (`Enemy2/Mesh`; `scene_get_tree` of `res://enemy.tscn` shows them); to change every instance,
-   edit the instanced scene itself. Paint levels of blocks with `gridmap_set_cells`; for 2D tiles build a TileSet from
-   an image with `tileset_add_atlas` and paint a `TileMapLayer` with `tilemap_set_cells`. Read the cells back with
-   `gridmap_get_cells` and `tilemap_get_cells`.
+   edit the instanced scene itself. Paint levels of blocks with `gridmap_set_cells`, after `meshlibrary_create` has
+   built their MeshLibrary from a scene of blocks; for 2D tiles build a TileSet from an image with `tileset_add_atlas`
+   and paint a `TileMapLayer` with `tilemap_set_cells`. Read the cells back with `gridmap_get_cells` and
+   `tilemap_get_cells`.
 3. **Project setup**: input actions with `input_map_set`, settings with `project_settings_set`, global singletons
    with `autoload_add`, editor plugins of `res://addons` with `plugin_set_enabled`, groups with `node_set_groups`,
    audio buses such as Music and Effects with `audio_buses_set`.

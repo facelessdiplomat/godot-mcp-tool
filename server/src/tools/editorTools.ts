@@ -7,7 +7,7 @@ import { createAutoloadAddTool, createAutoloadRemoveTool } from './autoloadTools
 import { createSceneBatchEditTool } from './batchTools.js';
 import { type CaptureReader, createEditorScreenshotTool } from './captureTools.js';
 import { createFilesystemMoveTool, createResourceFindUsagesTool } from './fileTools.js';
-import { createGridMapGetCellsTool, createGridMapSetCellsTool } from './gridMapTools.js';
+import { createGridMapGetCellsTool, createGridMapSetCellsTool, createMeshLibraryCreateTool } from './gridMapTools.js';
 import { createInputMapGetTool, createInputMapSetTool } from './inputTools.js';
 import { createNavigationBakeTool, createNavigationGetPathTool } from './navigationTools.js';
 import { createNodeDuplicateTool, createNodeMakeLocalTool, createNodeReparentTool, createNodeSaveAsSceneTool } from './nodeStructureTools.js';
@@ -69,6 +69,7 @@ export function createEditorTools(editor: EditorGateway, projectReader: EditorGa
     createNodeSetPropertiesTool(editor),
     createGridMapGetCellsTool(projectReader),
     createGridMapSetCellsTool(editor),
+    createMeshLibraryCreateTool(editor),
     createTileMapGetCellsTool(projectReader),
     createTileMapSetCellsTool(editor),
     createSignalListTool(projectReader),

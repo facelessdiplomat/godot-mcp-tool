@@ -1,4 +1,5 @@
 import { mkdirSync } from 'node:fs';
+import type { McpSession } from '../../integration/harness.js';
 import { type CheckResult, checked, conditionHolds, type Scenario } from '../Scenario.js';
 
 const yardScene = 'res://yard.tscn';
@@ -120,6 +121,22 @@ const yard = [
 
 const itemId = (name: string): string => `mesh_library.find_item_by_name("${name}")`;
 
+async function paveTheYard(tools: McpSession): Promise<void> {
+  await tools.call('node_set_properties', { scene: yardScene, path: 'Ground', properties: { mesh_library: libraryPath } });
+  await tools.call('gridmap_set_cells', {
+    scene: yardScene,
+    path: 'Ground',
+    boxes: [{ from: [0, 0, 0], to: [fieldSize - 1, 0, fieldSize - 1], item: 'Grass' }],
+    cells: [
+      { position: [0, 0, 0], item: 'Stone' },
+      { position: [9, 0, 0], item: 'Stone' },
+      { position: [0, 0, 9], item: 'Stone' },
+      { position: [9, 0, 9], item: 'Stone' },
+    ],
+  });
+  await tools.call('scene_save', { scene: yardScene });
+}
+
 export const blocksFromAScene: Scenario = {
   name: 'blocks-from-a-scene',
   request:
@@ -131,22 +148,16 @@ export const blocksFromAScene: Scenario = {
     project.write('yard.tscn', yard);
     await tools.call('editor_rescan');
   },
-  async solve({ project, tools }) {
-    project.write('blocks/blocks.tres', library);
-    await tools.call('editor_rescan');
-    await tools.call('node_set_properties', { scene: yardScene, path: 'Ground', properties: { mesh_library: libraryPath } });
-    await tools.call('gridmap_set_cells', {
-      scene: yardScene,
-      path: 'Ground',
-      boxes: [{ from: [0, 0, 0], to: [fieldSize - 1, 0, fieldSize - 1], item: 'Grass' }],
-      cells: [
-        { position: [0, 0, 0], item: 'Stone' },
-        { position: [9, 0, 0], item: 'Stone' },
-        { position: [0, 0, 9], item: 'Stone' },
-        { position: [9, 0, 9], item: 'Stone' },
-      ],
-    });
-    await tools.call('scene_save', { scene: yardScene });
+  async solve({ tools }) {
+    await tools.call('meshlibrary_create', { scene: 'res://blocks/blocks.tscn', path: libraryPath });
+    await paveTheYard(tools);
+  },
+  otherSolutions: {
+    'with the library written as text': async ({ project, tools }) => {
+      project.write('blocks/blocks.tres', library);
+      await tools.call('editor_rescan');
+      await paveTheYard(tools);
+    },
   },
   async check({ tools }) {
     const ground = await tools.call('node_get_properties', { scene: yardScene, path: 'Ground', names: ['mesh_library'] });

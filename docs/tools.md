@@ -28,6 +28,7 @@ The line under each tool says what kind of tool it is:
 - [The running game](#the-running-game): `game_run`, `game_stop`, `game_get_output`, `game_get_tree`, `game_get_properties`, `game_set_properties`, `game_wait`, `game_input`, `game_record_input`, `game_screenshot`, `game_pause`, `game_step`, `game_performance`, `game_eval`
 - [Debugging](#debugging): `debug_breakpoints`, `debug_state`, `debug_continue`
 - [Engine reference](#engine-reference): `docs_class`, `docs_search`
+- [Other tools](#other-tools): `meshlibrary_create`
 - [Prompts](#prompts)
 - [Resources](#resources)
 
@@ -1186,6 +1187,19 @@ No parameters.
 
 - `query` (required): string. Words to look for in class and member names and their summaries, such as "raycast", "tween" or "look at".
 - `max_results`: integer from 1 to 50, default `15`. The most results to list.
+
+## Other tools
+
+### `meshlibrary_create`
+
+**Make a MeshLibrary.** Build the MeshLibrary of a GridMap from a scene of blocks, as the editor's Scene → Export As → MeshLibrary does: each MeshInstance3D with a mesh becomes an item named after the node, with its mesh and materials, the collision shapes of its StaticBody3D children and the navigation mesh of a NavigationRegion3D child. update: true changes an existing library and keeps the ids of its items, which the cells of a GridMap store. Then set mesh_library of the GridMap to the file and paint it with gridmap_set_cells. Save the scene of the blocks first; needs the editor.
+
+*Makes changes*
+
+- `scene` (required): string. The saved scene of the blocks, such as "res://blocks/blocks.tscn": every MeshInstance3D in it with a mesh becomes a block named after the node, with the collision shapes of its StaticBody3D children and the navigation mesh of a NavigationRegion3D child.
+- `path` (required): string. The MeshLibrary file to write, such as "res://blocks/blocks.tres".
+- `update`: boolean, default `false`. Update the library at path: blocks keep their ids by name, new blocks get new ids, and blocks the scene no longer has stay. Needed when the file exists, since the cells of a GridMap store the ids.
+- `apply_transforms`: boolean, default `false`. Keep the transform that each block has in the scene, such as a rotation, in its item. Default: false, as the Import from Scene of the editor does, so blocks laid out side by side in the scene each sit in the middle of their cell.
 
 ## Prompts
 

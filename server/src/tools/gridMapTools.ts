@@ -129,3 +129,88 @@ export function createGridMapSetCellsTool(editor: EditorGateway): BridgeTool<typ
 function blockName(name: string, item: number): string {
   return name === '' ? `item ${String(item)}` : name;
 }
+
+const libraryItemSchema = z.object({ id: z.number(), name: z.string(), mesh: z.string(), shapes: z.number(), navigation: z.boolean(), added: z.boolean() });
+
+const meshLibrarySchema = z.object({
+  path: z.string(),
+  scene: z.string(),
+  created: z.boolean(),
+  items: z.array(libraryItemSchema),
+  left: z.array(z.object({ id: z.number(), name: z.string() })),
+  duplicates: z.array(z.string()),
+  previews: z.boolean(),
+});
+
+type MeshLibraryReport = z.infer<typeof meshLibrarySchema>;
+
+const meshLibraryCreateInput = z.object({
+  scene: z
+    .string()
+    .min(1)
+    .describe(
+      'The saved scene of the blocks, such as "res://blocks/blocks.tscn": every MeshInstance3D in it with a mesh becomes a block named after the node, with the collision shapes of its StaticBody3D children and the navigation mesh of a NavigationRegion3D child.',
+    ),
+  path: z.string().min(1).describe('The MeshLibrary file to write, such as "res://blocks/blocks.tres".'),
+  update: z
+    .boolean()
+    .default(false)
+    .describe(
+      'Update the library at path: blocks keep their ids by name, new blocks get new ids, and blocks the scene no longer has stay. Needed when the file exists, since the cells of a GridMap store the ids.',
+    ),
+  apply_transforms: z
+    .boolean()
+    .default(false)
+    .describe(
+      'Keep the transform that each block has in the scene, such as a rotation, in its item. Default: false, as the Import from Scene of the editor does, so blocks laid out side by side in the scene each sit in the middle of their cell.',
+    ),
+});
+
+export function createMeshLibraryCreateTool(editor: EditorGateway): BridgeTool<typeof meshLibraryCreateInput, MeshLibraryReport> {
+  return new BridgeTool(editor, {
+    name: 'meshlibrary_create',
+    definition: {
+      title: 'Make a MeshLibrary',
+      description:
+        "Build the MeshLibrary of a GridMap from a scene of blocks, as the editor's Scene → Export As → MeshLibrary does: each MeshInstance3D with a mesh becomes an item named after the node, with its mesh and materials, the collision shapes of its StaticBody3D children and the navigation mesh of a NavigationRegion3D child. update: true changes an existing library and keeps the ids of its items, which the cells of a GridMap store. Then set mesh_library of the GridMap to the file and paint it with gridmap_set_cells. Save the scene of the blocks first; needs the editor.",
+      inputSchema: meshLibraryCreateInput,
+      annotations: changingAnnotations({ destructive: false, idempotent: true }),
+      alwaysLoad: false,
+    },
+    method: 'meshlibrary.create',
+    responseSchema: meshLibrarySchema,
+    present: (library) => textResult(describeMeshLibrary(library)),
+  });
+}
+
+function describeMeshLibrary(library: MeshLibraryReport): string {
+  const added = library.items.filter((item) => item.added).length;
+  const kept = library.items.length - added;
+  const lines = [
+    library.created
+      ? `Created ${library.path} from ${library.scene} with ${countOf(library.items.length, 'block')}:`
+      : `Updated ${library.path} from ${library.scene}: ${String(added)} new ${added === 1 ? 'block' : 'blocks'}, ${String(kept)} kept ${kept === 1 ? 'its id' : 'their ids'}.`,
+    ...library.items.map((item) => `- ${describeLibraryItem(item, !library.created)}`),
+  ];
+  if (library.left.length > 0) {
+    lines.push(`Still in the library, though the scene has no block of that name: ${library.left.map((item) => `${item.name} (${String(item.id)})`).join(', ')}.`);
+  }
+  for (const name of library.duplicates) {
+    lines.push(`Several MeshInstance3D nodes are named ${name}; the last one became the block.`);
+  }
+  if (!library.previews) {
+    lines.push('No previews: the editor runs without a window, so the GridMap palette shows the names of the blocks.');
+  }
+  lines.push('Give it to a GridMap as its mesh_library and paint the blocks by name with gridmap_set_cells.');
+  return lines.join('\n');
+}
+
+function describeLibraryItem(item: z.infer<typeof libraryItemSchema>, marksNew: boolean): string {
+  const shapes = item.shapes === 0 ? 'no collision shape' : countOf(item.shapes, 'collision shape');
+  const navigation = item.navigation ? ', a navigation mesh' : '';
+  return `${item.name} (${String(item.id)}${marksNew && item.added ? ', new' : ''}): ${item.mesh}, ${shapes}${navigation}`;
+}
+
+function countOf(count: number, noun: string): string {
+  return `${String(count)} ${noun}${count === 1 ? '' : 's'}`;
+}

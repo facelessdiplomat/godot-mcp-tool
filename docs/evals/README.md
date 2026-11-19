@@ -430,3 +430,53 @@ scripts and names them. The run with an agent is still to come.
 Task T12 added `markers` to the views of `editor_screenshot` and `game_screenshot` and the scenario
 `the-crate-by-the-ramp`, which passes with its reference solution (8/8) and fails when nothing is done (Godot 4.8 at
 the pinned commit). Markers are a hypothesis: the run with an agent decides whether the option stays.
+
+### The scenarios of 0.3.0 with an agent, 2026-11-19
+
+Claude Opus 5.5 in Claude Code 2.1.318, the same Godot build, the server and addon of commit `c1889ab`, one run per
+scenario, three runs at a time; the three scenarios with a window ran one after another. The thirteen runs cost
+$5.46 together.
+
+| Scenario | Checks | Tool calls | Cost, $ | Time, s |
+|---|---|---|---|---|
+| only-the-player-opens-the-door | 4/4 | 24 | 0.67 | 53 |
+| sparks-on-impact | 7/7 | 17 | 0.30 | 45 |
+| skin-the-menu | 8/8 | 14 | 0.32 | 30 |
+| ride-the-rail | 6/6 | 19 | 0.41 | 57 |
+| swing-the-gate | 5/5 | 20 | 0.42 | 71 |
+| sword-in-hand | 4/4 | 12 | 0.53 | 30 |
+| blocks-from-a-scene | 6/6 | 33 | 0.62 | 83 |
+| reach-the-island | 3/3 | 21 | 0.34 | 43 |
+| silence-in-the-arena | 3/3 | 12 | 0.21 | 20 |
+| why-is-it-dark | 3/3 | 16 | 0.59 | 36 |
+| same-look-after-the-refactor | 3/3 | 21 | 0.57 | 56 |
+| one-more-argument | 6/7 | 21 | 0.32 | 41 |
+| the-crate-by-the-ramp | 8/8 | 5 | 0.16 | 19 |
+
+- The tools of phase 3 were used where they answer the question: `navigation_get_path` in `reach-the-island`, once to
+  find the gap and twice to check the fix; `audio_buses_get` with `in_game` in `silence-in-the-arena`; `compare_to`
+  in `same-look-after-the-refactor`; an `unshaded` view in `why-is-it-dark`.
+- `the-crate-by-the-ramp` used no markers: one `node_get_properties` with `paths` read the positions of the ramp and
+  the eight crates, and the agent painted `Crate5`. By the rule of T12 the option goes unless a scenario shows a
+  question that numbers cannot settle.
+- `one-more-argument` passed every check of the game, but the agent found the callers with one `Grep`, which also
+  finds the signal connection and the method track key of `arena.tscn` as text; it never called
+  `script_find_references`, so the check of the tool failed.
+- `blocks-from-a-scene`: `resource_create` set the names and meshes of the library items, but not `item/N/shapes`, a
+  list of a shape and a transform for each shape, which the codec does not decode; the engine kept an empty list. The
+  agent then built the library with a script of its own, run as a game scene. By the rule of T14, a tool
+  `meshlibrary_create` follows.
+- Twice, in `same-look-after-the-refactor` and `reach-the-island`, the agent first passed the operations of
+  `scene_batch_edit` as a JSON string instead of a list, and the call was refused.
+
+### A MeshLibrary from a scene, 2026-11-19
+
+Task T14 added `meshlibrary_create`, which builds the library of a `GridMap` from a scene of blocks as the editor's
+export does. The reference solution of `blocks-from-a-scene` now uses it, and writing the library as text stays as
+the other solution. One rerun with the same model and Claude Code:
+
+| Scenario | Checks | Tool calls | Cost, $ | Time, s |
+|---|---|---|---|---|
+| blocks-from-a-scene | 6/6 | 33 → 13 | 0.62 → 0.23 | 83 → 28 |
+
+The agent found the tool with its first `ToolSearch`, built the library in one call and needed no script of its own.

@@ -39,6 +39,7 @@ describe('createEditorTools', () => {
       'node_set_properties',
       'gridmap_get_cells',
       'gridmap_set_cells',
+      'meshlibrary_create',
       'tilemap_get_cells',
       'tilemap_set_cells',
       'signal_list',

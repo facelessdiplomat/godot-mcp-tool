@@ -1,6 +1,6 @@
 import type { CallToolResult } from '@modelcontextprotocol/server';
 import { describe, expect, it } from 'vitest';
-import { createGridMapGetCellsTool, createGridMapSetCellsTool } from '../../src/tools/gridMapTools.js';
+import { createGridMapGetCellsTool, createGridMapSetCellsTool, createMeshLibraryCreateTool } from '../../src/tools/gridMapTools.js';
 import { FakeEditorGateway } from '../support/FakeEditorGateway.js';
 
 function textOf(result: CallToolResult): string {
@@ -105,5 +105,56 @@ describe('GridMap tools', () => {
     expect(editor.requests[0]?.params).toEqual({ path: 'Courtyard', boxes, cells: [{ position: [9, 0, 9], item: null }] });
     expect(changed).toBe('Set 100 cells and erased 1 cell of Courtyard in res://courtyard.tscn as one Undo step; 2 cells already were so. It now has 99 cells. The scene has unsaved changes.');
     expect(same).toBe('The 1 cell given already was so in Courtyard in res://courtyard.tscn, so nothing changed. It has 99 cells.');
+  });
+
+  it('meshlibrary_create builds a library from a scene of blocks and lists the items with their ids', async () => {
+    const editor = new FakeEditorGateway().respondTo('meshlibrary.create', {
+      path: 'res://blocks/blocks.tres',
+      scene: 'res://blocks/blocks.tscn',
+      created: true,
+      items: [
+        { id: 0, name: 'Grass', mesh: 'BoxMesh', shapes: 1, navigation: false, added: true },
+        { id: 1, name: 'Stone', mesh: 'BoxMesh', shapes: 2, navigation: true, added: true },
+      ],
+      left: [],
+      duplicates: [],
+      previews: true,
+    });
+
+    const text = textOf(await createMeshLibraryCreateTool(editor).execute({ scene: 'res://blocks/blocks.tscn', path: 'res://blocks/blocks.tres' }));
+
+    expect(editor.requests[0]?.params).toEqual({ scene: 'res://blocks/blocks.tscn', path: 'res://blocks/blocks.tres', update: false, apply_transforms: false });
+    expect(text).toBe(
+      [
+        'Created res://blocks/blocks.tres from res://blocks/blocks.tscn with 2 blocks:',
+        '- Grass (0): BoxMesh, 1 collision shape',
+        '- Stone (1): BoxMesh, 2 collision shapes, a navigation mesh',
+        'Give it to a GridMap as its mesh_library and paint the blocks by name with gridmap_set_cells.',
+      ].join('\n'),
+    );
+  });
+
+  it('meshlibrary_create tells which blocks kept their ids on an update, and what it could not do', async () => {
+    const editor = new FakeEditorGateway().respondTo('meshlibrary.create', {
+      path: 'res://blocks/blocks.tres',
+      scene: 'res://blocks/blocks.tscn',
+      created: false,
+      items: [
+        { id: 2, name: 'Lava', mesh: 'ArrayMesh', shapes: 0, navigation: false, added: true },
+        { id: 1, name: 'Stone', mesh: 'BoxMesh', shapes: 1, navigation: false, added: false },
+      ],
+      left: [{ id: 0, name: 'Grass' }],
+      duplicates: ['Stone'],
+      previews: false,
+    });
+
+    const text = textOf(await createMeshLibraryCreateTool(editor).execute({ scene: 'res://blocks/blocks.tscn', path: 'res://blocks/blocks.tres', update: true }));
+
+    expect(text).toContain('Updated res://blocks/blocks.tres from res://blocks/blocks.tscn: 1 new block, 1 kept its id.');
+    expect(text).toContain('- Lava (2, new): ArrayMesh, no collision shape');
+    expect(text).toContain('- Stone (1): BoxMesh, 1 collision shape');
+    expect(text).toContain('Still in the library, though the scene has no block of that name: Grass (0).');
+    expect(text).toContain('Several MeshInstance3D nodes are named Stone; the last one became the block.');
+    expect(text).toContain('No previews: the editor runs without a window, so the GridMap palette shows the names of the blocks.');
   });
 });

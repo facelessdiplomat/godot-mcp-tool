@@ -17,6 +17,7 @@ const GodotMcpAutoloadRemoveCommand := preload("project/autoload_remove_command.
 const GodotMcpCommandRouter := preload("command_router.gd")
 const GodotMcpEditingContext := preload("../scene/editing_context.gd")
 const GodotMcpEditorFileSystemAccess := preload("../editor/editor_file_system_access.gd")
+const GodotMcpEditorMeshPreviewAccess := preload("../editor/editor_mesh_preview_access.gd")
 const GodotMcpEditorBreakpointsCommand := preload("editor/editor_breakpoints_command.gd")
 const GodotMcpEditorExtensionAccess := preload("../editor/editor_extension_access.gd")
 const GodotMcpEditorGetStateCommand := preload("editor/editor_get_state_command.gd")
@@ -41,6 +42,7 @@ const GodotMcpGameRunCommand := preload("game/game_run_command.gd")
 const GodotMcpGameStopCommand := preload("game/game_stop_command.gd")
 const GodotMcpGridMapGetCellsCommand := preload("grid/gridmap_get_cells_command.gd")
 const GodotMcpGridMapSetCellsCommand := preload("grid/gridmap_set_cells_command.gd")
+const GodotMcpMeshLibraryCreateCommand := preload("grid/meshlibrary_create_command.gd")
 const GodotMcpHeldCommand := preload("held_command.gd")
 const GodotMcpInputMapGetCommand := preload("input/input_map_get_command.gd")
 const GodotMcpInputMapSetCommand := preload("input/input_map_set_command.gd")
@@ -115,6 +117,7 @@ const METHODS_THAT_CHANGE := [
 	"game.set_properties",
 	"game.step",
 	"gridmap.set_cells",
+	"meshlibrary.create",
 	"input_map.set",
 	"navigation.bake",
 	"node.add",
@@ -211,6 +214,7 @@ static func build_router(context: GodotMcpEditingContext, runtime: GodotMcpRunti
 	router.register("node.set_groups", GodotMcpNodeSetGroupsCommand.new(context))
 	router.register("gridmap.get_cells", GodotMcpGridMapGetCellsCommand.new(context))
 	router.register("gridmap.set_cells", GodotMcpGridMapSetCellsCommand.new(context))
+	router.register("meshlibrary.create", GodotMcpMeshLibraryCreateCommand.new(GodotMcpEditorMeshPreviewAccess.new()))
 	router.register("tilemap.get_cells", GodotMcpTileMapGetCellsCommand.new(context))
 	router.register("tilemap.set_cells", GodotMcpTileMapSetCellsCommand.new(context))
 	router.register("signal.list", GodotMcpSignalListCommand.new(context))

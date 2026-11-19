@@ -19,7 +19,8 @@ the game runs.
 
 **Notes**
 
-- This is what the editor's Scene → Export As → MeshLibrary does. Without that step a run builds the library item by
-  item with `resource_create`, such as `"item/0/name"`, `"item/0/mesh"` and `"item/0/shapes"`, or writes it as a new
-  file; how agents do it decides whether a tool is needed (T14 of the plan for the next version).
+- This is what the editor's Scene → Export As → MeshLibrary does, and since 0.3.0 `meshlibrary_create`. The first
+  run with an agent, before that tool, set the names and meshes with `resource_create` but not `"item/0/shapes"`,
+  and built the library with a script of its own; that run decided T14 of the plan for the next version.
+- The reference solution uses `meshlibrary_create`; writing the library as a new text file is the other solution.
 - Evaluation run: `server/test/evals/scenarios/blocksFromAScene.ts`.
