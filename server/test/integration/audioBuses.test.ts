@@ -88,7 +88,7 @@ describe.skipIf(godotBinary === '')('the audio buses of a project', () => {
     if (editorProcess !== undefined) {
       await editorEnded(editorProcess);
     }
-    session = await McpSession.connect(project?.root ?? '', { GODOT_BIN: godotBinary });
+    session = await McpSession.connect(project?.root ?? '', { GODOT_BIN: godotBinary, GODOT_MCP_HEADLESS: '1' });
 
     const layout = await tools().call('audio_buses_get');
 
