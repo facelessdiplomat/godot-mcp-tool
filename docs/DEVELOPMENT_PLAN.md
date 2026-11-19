@@ -2326,10 +2326,12 @@ in the Claude Code CLI — `claude --debug=mcp` (the server's stderr ends up in 
 
 ## 16. Next steps
 
-1. The runs of T1, T4 and T17 and the release of 0.3.0 with its fourth full run (T25 in
-   [NEXT_VERSION_PLAN.md](NEXT_VERSION_PLAN.md)).
-2. After 0.3.0: the Asset Store (T21), full 2D (T22), several instances of the game (T23) and the comparison with
-   an existing server (T20).
+Version 0.3.0 is released (§12). What is left of its plan is in [NEXT_VERSION_PLAN.md](NEXT_VERSION_PLAN.md):
+
+1. The submission to the Godot Asset Store (T21), whose listing and archive are ready.
+2. The decision on full 2D (T22) and several instances of the game (T23) for the version after 0.3.0.
+3. The comparison with an existing server (T20), the screen recording for the READMEs (T19) and the first run of the
+   CI workflow of the skill on GitHub (T18), each when it is wanted.
 
 ---
 
