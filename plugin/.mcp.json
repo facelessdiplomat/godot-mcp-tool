@@ -2,7 +2,7 @@
   "mcpServers": {
     "godot": {
       "command": "npx",
-      "args": ["-y", "godot-mcp-tool@0.2.0"],
+      "args": ["-y", "godot-mcp-tool@0.3.0"],
       "env": {
         "GODOT_BIN": "${user_config.godot_path}"
       }

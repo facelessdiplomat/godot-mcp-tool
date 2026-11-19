@@ -2143,6 +2143,11 @@ and the evaluations. What each one found:
       pack:asset-store` are ready; the submission comes after 0.3.0.
 - T20, the comparison with an existing server, is not made in 0.3.0; the runner takes the server under test from
   `EVAL_SERVER` for a later one.
+- [x] T25, the release: the fourth full run passed all 51 scenarios with an agent, with 802 tool calls for $15.10
+      ([results](evals/README.md#fourth-full-run-2026-11-19)), and found that the codec missed the handles of the
+      first and the last point of a curve. The version is 0.3.0 in the package, the server, the addon and the
+      plugin, whose server and hooks now ask npm for `godot-mcp-tool@0.3.0`; the bridge protocol keeps its number,
+      since the handshake lists the new methods and a server and an addon of different versions say so.
 - T22, full 2D, and T23, several instances of the game, move to the version after 0.3.0 by the decision of
   2026-11-19.
 

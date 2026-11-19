@@ -6,7 +6,7 @@ reads its errors with stack traces, looks at it from several angles and stops it
 
 ![An arena with walls and a ramp from four angles, as Claude sees it through editor_screenshot](docs/media/arena-views.jpg)
 
-> Status: version 0.2.0, published on [npm](https://www.npmjs.com/package/godot-mcp-tool). See the
+> Status: version 0.3.0, published on [npm](https://www.npmjs.com/package/godot-mcp-tool). See the
 > [development plan](docs/DEVELOPMENT_PLAN.md).
 
 ## Quick start
