@@ -4,6 +4,8 @@ Godot MCP Tool lets Claude Code make Godot 4 games through the Godot editor. Cla
 open editor, where Ctrl+Z undoes its changes, writes GDScript and checks it, runs the game, plays input into it,
 reads its errors with stack traces, looks at it from several angles and stops it at breakpoints to find bugs.
 
+![An arena with walls and a ramp from four angles, as Claude sees it through editor_screenshot](docs/media/arena-views.jpg)
+
 > Status: version 0.2.0, published on [npm](https://www.npmjs.com/package/godot-mcp-tool). See the
 > [development plan](docs/DEVELOPMENT_PLAN.md).
 

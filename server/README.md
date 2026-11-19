@@ -4,6 +4,8 @@ The MCP server and command-line tool of [Godot MCP Tool](https://github.com/face
 it, Claude Code makes Godot 4 games through the Godot editor: it builds scenes that Ctrl+Z can undo, writes and checks
 GDScript, runs the game, plays input into it and reads its errors with stack traces.
 
+![An arena with walls and a ramp from four angles, as Claude sees it through editor_screenshot](https://raw.githubusercontent.com/facelessdiplomat/godot-mcp-tool/master/docs/media/arena-views.jpg)
+
 You need Godot 4.7 or newer, Node.js 22 or newer and Claude Code.
 
 ## Quick start

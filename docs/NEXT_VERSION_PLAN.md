@@ -33,7 +33,10 @@ runs without an agent passes on the pinned 4.8 build; what each task still needs
 | T16 | `game_record_input`; the integration test `gameInputRecording.test.ts` presses keys in the game as a person would, and the recorded steps, replayed with `fixed_fps`, bring the player to the same place | one check by hand: a walk and a jump played at the keyboard come back as steps that replay to the same place |
 | T17 | the subagent `plugin/agents/playtester.md` with a test of its tools, and the page `ui.md` of the skill; the plugin validates | the measurement with and without the subagent (two agent runs of `playtest-without-a-window`) |
 | T18 | the prompts `profile`, `add_tests` and `setup_ci`, and the page `ci.md` of the skill; the workflow parses, and its archive names, sums and template layout match the 4.7.2 release. A probe found that GUT exits with 0 when a test script does not load, so the workflow looks for that error | one run of the workflow on a scratch repository with a small game |
-| T19–T25 | not started | |
+| T19 | the still of four views of the arena from `editor_screenshot` in both READMEs (`docs/media/arena-views.jpg`, 134 KB), and the script of the recording in `docs/media/README.md` | the recording and the still of the panel (you), then both READMEs |
+| T20 | step 1: the runner takes the server under test from `EVAL_SERVER` and leaves the plugin out with `EVAL_PLUGIN=0`; `result.json` records both; `AgentInvocation.test.ts` covers them | your yes to installing `hi-godot/godot-ai`, then steps 2–4 and the runs (your yes) |
+| T21 | the rules of the store read; the listing in `docs/asset-store.md`; the addon folder holds `LICENSE` and `README.md`, which users keep; `npm run pack:asset-store` packs the committed addon of a commit with `addons/godot_mcp_tool/` at the root | the thumbnail from the recording (T19), the AI usage disclosure and the submission (you) |
+| T22–T25 | not started | |
 
 All checks above ran on the pinned `master` build only; CI runs them on 4.7.2 after the push. One window test fails
 on this machine at commit `d7f3ef3` as well, so before this work: the second test of `windowedRescan.test.ts`, whose
@@ -814,8 +817,9 @@ the check.
 7. **npm:** you publish from `server/`. The push follows only when `npm view godot-mcp-tool@0.3.0` answers, because
    the plugin of the marketplace asks npm for exactly that version.
 8. **After the push:** CI on the three systems; the published `gitHead` and checksum compared with the commit and a
-   local `npm pack`; the listing in the Asset Store (T21); a line for users: `claude plugin update
-   godot@godot-mcp-tool`, then `npx godot-mcp-tool update-addon` in each game.
+   local `npm pack`; a new version of the Asset Store listing, packed with `npm run pack:asset-store` at the release
+   commit as `docs/asset-store.md` says (T21); a line for users: `claude plugin update godot@godot-mcp-tool`, then
+   `npx godot-mcp-tool update-addon` in each game.
 
 ---
 

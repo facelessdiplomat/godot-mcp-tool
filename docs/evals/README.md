@@ -81,6 +81,10 @@ belong to `npm test` or the integration tests.
   the server of this checkout (`server/dist`, so build first), the plugin's hook and skill, `--restricted` and a
   budget (`EVAL_BUDGET_USD`, 5 by default), then runs the checks. `EVAL_SCENARIOS=a,b` picks scenarios and
   `EVAL_MODEL` the model. Every run is a real session on your account.
+- For a comparison, `EVAL_SERVER` names another server under test as a JSON list of its command and arguments, such
+  as `["uvx", "godot-ai==1.4.0"]`, and `EVAL_PLUGIN=0` leaves the plugin out, so the agent has the server alone. The
+  checks still run through the tools of this checkout, and `result.json` records the server and whether the plugin
+  was there.
 - `--restricted` keeps the file tools in the project folder, so the run adds the skill folder of the plugin with
   `--add-dir` for the pages that the skill links to.
 - The unsafe tools, such as `filesystem_delete`, make Claude Code ask the user, and only a person can answer:

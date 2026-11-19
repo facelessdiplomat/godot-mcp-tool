@@ -43,6 +43,7 @@
     "test:integration": "vitest run --config vitest.integration.config.ts",
     "docs:tools": "vitest run test/reference/toolReferenceFile.test.ts --update",
     "eval": "vitest run --config vitest.evals.config.ts",
+    "pack:asset-store": "node tools/pack-asset-store.js",
     "test:watch": "vitest"
   },
   "dependencies": {

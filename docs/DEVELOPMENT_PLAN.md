@@ -1308,6 +1308,8 @@ godot-mcp-tool/
 │   ├── protocol.md               bridge protocol (milestone 1)
 │   ├── tools.md                  tool reference, generated from the schemas by npm run docs:tools (milestone 5)
 │   ├── spikes.md                 spike results and the pinned engine commit (milestone 0)
+│   ├── asset-store.md            the listing of the addon in the Godot Asset Store and how to submit a version
+│   ├── media/                    the pictures of the READMEs and the script of the recording
 │   └── evals/                    evaluation scenarios, one per capability (from milestone 4)
 ├── server/                       MCP server (TypeScript)
 │   ├── src/
@@ -1329,9 +1331,11 @@ godot-mcp-tool/
 │   ├── addon/                    the addon copied in by the build and shipped in the npm package (not in Git)
 │   ├── README.md                 the page of the package on npm
 │   ├── LICENSE                   a copy of the repository's license for the package
+│   ├── tools/                    build helpers: the addon bundle, the GDScript comment check, the store archive
 │   └── test/
 ├── addon/
 │   └── addons/godot_mcp_tool/    copied (or symlinked) into the game project
+│       ├── README.md, LICENSE    for users, who keep this folder in their projects
 │       ├── plugin.cfg
 │       ├── plugin.gd             EditorPlugin: checks the Godot version, then starts editor/editor_services.gd
 │       ├── bridge/               TCP server, connections, JSON-RPC, discovery

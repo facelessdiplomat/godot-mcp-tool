@@ -1,6 +1,7 @@
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { godotBinary } from '../integration/harness.js';
+import { serverUnderTestFrom, withPluginFrom } from './AgentInvocation.js';
 import { runReferenceSolution, runScenario } from './runScenario.js';
 import type { Solution } from './Scenario.js';
 import { allScenarios } from './scenarios/allScenarios.js';
@@ -54,6 +55,8 @@ describe.skipIf(godotBinary === '' || claudeBinary === '' || referenceOnly || un
           claudeBinary,
           model: process.env['EVAL_MODEL'],
           budgetUsd: Number(process.env['EVAL_BUDGET_USD'] ?? '5'),
+          serverUnderTest: serverUnderTestFrom(process.env['EVAL_SERVER']),
+          withPlugin: withPluginFrom(process.env['EVAL_PLUGIN']),
           agentTimeoutMs,
           resultsDirectory: join(import.meta.dirname, 'results'),
         });

@@ -2,14 +2,13 @@ import { type ChildProcess, spawn } from 'node:child_process';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { findFreePort, godotBinary, McpSession, startHeadlessEditor, startWindowedEditor, TemporaryProject, waitFor } from '../integration/harness.js';
+import { type AgentOptions, agentArgumentsFor, mcpServerFor } from './AgentInvocation.js';
 import { type AgentRun, readAgentRun } from './AgentRun.js';
 import type { CheckResult, PrepareContext, Scenario, Solution } from './Scenario.js';
 import { stagePlugin } from './StagedPlugin.js';
 
-export interface EvalSettings {
+export interface EvalSettings extends AgentOptions {
   readonly claudeBinary: string;
-  readonly model: string | undefined;
-  readonly budgetUsd: number;
   readonly agentTimeoutMs: number;
   readonly resultsDirectory: string;
 }
@@ -20,6 +19,7 @@ export interface EvalResult {
   readonly passed: boolean;
   readonly checks: readonly CheckResult[];
   readonly toolCallCount: number;
+  readonly setup: { readonly server: string; readonly plugin: boolean };
   readonly agent: AgentRun;
 }
 
@@ -53,6 +53,7 @@ export async function runScenario(scenario: Scenario, settings: EvalSettings): P
       passed: checks.every((check) => check.passed),
       checks,
       toolCallCount: Object.values(agent.toolCalls).reduce((total, count) => total + count, 0),
+      setup: { server: settings.serverUnderTest?.join(' ') ?? 'this checkout', plugin: settings.withPlugin },
       agent,
     };
     writeFileSync(join(runDirectory, 'result.json'), `${JSON.stringify(result, null, 2)}\n`);
@@ -110,37 +111,13 @@ async function withTools<T>(project: TemporaryProject, variables: Readonly<Recor
 }
 
 function runAgent(scenario: Scenario, projectRoot: string, variables: Readonly<Record<string, string>>, runDirectory: string, settings: EvalSettings): Promise<string> {
-  const stagedPlugin = join(runDirectory, 'plugin');
-  stagePlugin(pluginDirectory, stagedPlugin, serverEntry);
-  const mcpConfig = join(runDirectory, 'mcp.json');
-  const serverArguments = scenario.unsafeTools === true ? [serverWithoutConfirmationsEntry, serverEntry] : [serverEntry];
-  const server = { command: process.execPath, args: serverArguments, env: { GODOT_PROJECT_PATH: projectRoot, ...variables } };
-  writeFileSync(mcpConfig, `${JSON.stringify({ mcpServers: { godot: server } }, null, 2)}\n`);
-  const agentArguments = [
-    '-p',
-    scenario.request,
-    '--output-format',
-    'stream-json',
-    '--verbose',
-    '--restricted',
-    '--strict-mcp-config',
-    '--mcp-config',
-    mcpConfig,
-    '--plugin-dir',
-    stagedPlugin,
-    '--add-dir',
-    join(stagedPlugin, 'skills'),
-    '--permission-mode',
-    'acceptEdits',
-    '--allowedTools',
-    'mcp__godot',
-    '--max-budget-usd',
-    String(settings.budgetUsd),
-    '--no-session-persistence',
-    '--debug-file',
-    join(runDirectory, 'claude-debug.log'),
-    ...(settings.model === undefined ? [] : ['--model', settings.model]),
-  ];
+  const files = { mcpConfig: join(runDirectory, 'mcp.json'), stagedPlugin: join(runDirectory, 'plugin'), debugLog: join(runDirectory, 'claude-debug.log') };
+  if (settings.withPlugin) {
+    stagePlugin(pluginDirectory, files.stagedPlugin, serverEntry);
+  }
+  const server = mcpServerFor(scenario, settings, { entry: serverEntry, withoutConfirmationsEntry: serverWithoutConfirmationsEntry }, { GODOT_PROJECT_PATH: projectRoot, ...variables });
+  writeFileSync(files.mcpConfig, `${JSON.stringify({ mcpServers: { godot: server } }, null, 2)}\n`);
+  const agentArguments = agentArgumentsFor(scenario, settings, files);
   return new Promise((resolve, reject) => {
     const agent = spawn(settings.claudeBinary, agentArguments, { cwd: projectRoot, env: { ...process.env, ...variables }, stdio: ['ignore', 'pipe', 'pipe'] });
     let stream = '';

@@ -13,6 +13,7 @@ const serverDirectory = join(import.meta.dirname, '..');
 const repositoryRoot = join(serverDirectory, '..');
 const repositoryUrl = 'https://github.com/facelessdiplomat/godot-mcp-tool';
 const repositoryFilePattern = new RegExp(`^${repositoryUrl}/blob/master/(?<path>[^#]+)`);
+const rawFilePattern = /^https:\/\/raw\.githubusercontent\.com\/facelessdiplomat\/godot-mcp-tool\/master\/(?<path>[^#?]+)$/;
 const manifest = JSON.parse(readFileSync(join(serverDirectory, 'package.json'), 'utf8')) as PackageManifest;
 
 describe('the npm package', () => {
@@ -25,6 +26,18 @@ describe('the npm package', () => {
 
   it('ships the license of the repository', () => {
     expect(readFileSync(join(serverDirectory, 'LICENSE'), 'utf8')).toBe(readFileSync(join(repositoryRoot, 'LICENSE'), 'utf8'));
+  });
+
+  it('shows the pictures of the repository on the npm page through links to their raw files', () => {
+    const readme = readFileSync(join(serverDirectory, 'README.md'), 'utf8');
+    const pictures = [...readme.matchAll(/!\[[^\]]*\]\((?<target>[^)\s]+)\)/g)].map((match) => match.groups?.['target'] ?? '');
+
+    expect(pictures.length).toBeGreaterThan(0);
+    for (const picture of pictures) {
+      const repositoryFile = rawFilePattern.exec(picture)?.groups?.['path'];
+      expect(repositoryFile, picture).toBeDefined();
+      expect(existsSync(join(repositoryRoot, repositoryFile ?? '')), picture).toBe(true);
+    }
   });
 
   it('has a README of its own whose links lead to existing pages of the repository from the npm page too', () => {

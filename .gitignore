@@ -3,6 +3,7 @@ node_modules/
 server/dist/
 server/addon/
 server/coverage/
+server/asset-store/
 server/test/evals/results/
 *.log
 .godot/
